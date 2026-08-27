@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"context"
+	"sort"
 	"strings"
 
 	identitymodel "github.com/domainry/domainry-identity-sdk/identity"
@@ -33,8 +34,11 @@ type Principal struct {
 	OrganizationScopes    OrganizationScopes `json:"organization_scopes"`
 	User                  User               `json:"user"`
 	Roles                 []Role             `json:"roles"`
-	Permissions           []string           `json:"permissions"`
-	MustChangePassword    bool               `json:"must_change_password"`
+	// Permissions is a presentation-only projection for clients. Runtime
+	// authorization is exclusively backed by AccessBundle and fails closed
+	// when the bundle is absent.
+	Permissions        []string `json:"permissions"`
+	MustChangePassword bool     `json:"must_change_password"`
 	// AccessBundle is resolved policy state for in-process authorization. It is
 	// never serialized into tokens, logs, or domain records.
 	AccessBundle *AccessBundle `json:"-"`
@@ -42,15 +46,69 @@ type Principal struct {
 
 func (p Principal) HasPermission(expected string) bool {
 	expected = strings.TrimSpace(expected)
-	if expected == "" {
+	if expected == "" || p.AccessBundle == nil {
 		return false
 	}
-	for _, permission := range p.Permissions {
-		if strings.EqualFold(strings.TrimSpace(permission), expected) {
-			return true
+	allowed := false
+	for _, grant := range p.AccessBundle.FunctionGrants {
+		permission := strings.TrimSpace(string(grant.Resource)) + "." + strings.TrimSpace(string(grant.Action))
+		matches := permission == expected || grant.Resource == "*" && grant.Action == "*"
+		if grant.Action == "*" {
+			matches = matches || strings.HasPrefix(expected, strings.TrimSpace(string(grant.Resource))+".")
+		}
+		if !matches {
+			continue
+		}
+		if grant.Effect == EffectDeny {
+			return false
+		}
+		allowed = allowed || grant.Effect == EffectAllow
+	}
+	return allowed
+}
+
+// HasAllPermissions requires every stable permission key and fails closed for
+// empty input or an unresolved AccessBundle.
+func (p Principal) HasAllPermissions(expected []string) bool {
+	if len(expected) == 0 {
+		return false
+	}
+	for _, permission := range expected {
+		if !p.HasPermission(permission) {
+			return false
 		}
 	}
-	return false
+	return true
+}
+
+// PermissionKeys projects effective allow grants for presentation and audit
+// boundaries. Authorization callers must continue to use HasPermission so a
+// matching deny always wins.
+func (p Principal) PermissionKeys() []string {
+	if p.AccessBundle == nil {
+		return nil
+	}
+	allowed, denied := map[string]bool{}, map[string]bool{}
+	for _, grant := range p.AccessBundle.FunctionGrants {
+		key := strings.TrimSpace(string(grant.Resource)) + "." + strings.TrimSpace(string(grant.Action))
+		if key == "." {
+			continue
+		}
+		if grant.Effect == EffectDeny {
+			denied[key] = true
+			delete(allowed, key)
+			continue
+		}
+		if grant.Effect == EffectAllow && !denied[key] {
+			allowed[key] = true
+		}
+	}
+	keys := make([]string, 0, len(allowed))
+	for key := range allowed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // RequestIdentity is the authenticated request subject. AccessToken is kept

@@ -13,14 +13,15 @@ type Factory struct{ config Config }
 
 func NewFactory(config Config) *Factory { return &Factory{config: config} }
 
-func (factory *Factory) Open(ctx context.Context, host identity.Host) (identity.Binding, error) {
+func (factory *Factory) Open(ctx context.Context, application identity.ApplicationRef) (identity.Binding, error) {
 	if ctx == nil {
 		return nil, &identity.Error{Code: "identity.context_required"}
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, &identity.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.context_unavailable", Cause: err}
 	}
-	config, application, err := remoteApplication(factory.config, host)
+	config := factory.config
+	config, application, err := remoteApplication(config, application)
 	if err != nil {
 		return nil, err
 	}
@@ -50,26 +51,26 @@ func (factory *Factory) Open(ctx context.Context, host identity.Host) (identity.
 		return nil, err
 	}
 	delegate := &binding{client: client, tokens: verifier, descriptor: identity.Descriptor{
-		ProtocolVersion: identity.CurrentProtocolVersion, BundleVersion: identity.PolicyBundleVersionV1,
+		ProtocolVersion: identity.CurrentProtocolVersion, BundleVersion: identity.CurrentPolicyBundleVersion,
 		CatalogVersion: identity.CatalogVersionV1, Mode: identity.DeploymentModeSaaS, Issuer: issuer, Audience: audience,
 		Capabilities: []string{"authentication", "token_verification", "authorization", "principal_resolution", "directory_projection", "catalog", "credentials", "oidc", "saml"},
 	}}
 	return identityapplication.Bind(delegate, application)
 }
 
-func remoteApplication(config Config, host identity.Host) (Config, identity.ApplicationRef, error) {
-	application := identity.ApplicationRef{
+func remoteApplication(config Config, application identity.ApplicationRef) (Config, identity.ApplicationRef, error) {
+	configured := identity.ApplicationRef{
 		WorkspaceID: identity.WorkspaceID(strings.TrimSpace(config.WorkspaceID)), ApplicationKey: identity.ApplicationKey(strings.TrimSpace(config.Audience)),
 	}
-	if host != nil {
-		hostApplication := host.Application()
-		if !hostApplication.WorkspaceID.Valid() || !hostApplication.ApplicationKey.Valid() {
+	if application.WorkspaceID.Valid() || application.ApplicationKey.Valid() {
+		if !application.WorkspaceID.Valid() || !application.ApplicationKey.Valid() {
 			return Config{}, identity.ApplicationRef{}, &identity.Error{Code: "identity.application_scope_invalid"}
 		}
-		if application.WorkspaceID != "" && application.WorkspaceID != hostApplication.WorkspaceID || application.ApplicationKey != "" && application.ApplicationKey != hostApplication.ApplicationKey {
+		if configured.WorkspaceID != "" && configured.WorkspaceID != application.WorkspaceID || configured.ApplicationKey != "" && configured.ApplicationKey != application.ApplicationKey {
 			return Config{}, identity.ApplicationRef{}, &identity.Error{Code: "identity.application_scope_mismatch"}
 		}
-		application = hostApplication
+	} else {
+		application = configured
 	}
 	if !application.WorkspaceID.Valid() || !application.ApplicationKey.Valid() {
 		return Config{}, identity.ApplicationRef{}, &identity.Error{Code: "identity.application_scope_invalid"}
@@ -79,7 +80,7 @@ func remoteApplication(config Config, host identity.Host) (Config, identity.Appl
 }
 
 func validateDiscovery(descriptor identity.Descriptor, expectedIssuer string) error {
-	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.PolicyBundleVersionV1 || descriptor.CatalogVersion != identity.CatalogVersionV1 || descriptor.Mode != identity.DeploymentModeSaaS {
+	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.CurrentPolicyBundleVersion || descriptor.CatalogVersion != identity.CatalogVersionV1 || descriptor.Mode != identity.DeploymentModeSaaS {
 		return &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.protocol_incompatible"}
 	}
 	if strings.TrimSpace(descriptor.Issuer) != strings.TrimSpace(expectedIssuer) {

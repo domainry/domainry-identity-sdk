@@ -1,14 +1,14 @@
 # Domainry Identity SDK
 
 `domainry-identity-sdk` is the stable integration boundary between Domainry
-Runtime applications and Identity. It contains no Identity persistence,
+applications and Identity. It contains no Identity persistence,
 management CRUD, Plane types, or service-side domain implementation.
 
 ## Packages
 
 - root package `identity`: the small deployment-neutral `Binding`, `Factory`,
-  and host-capability facade.
-- `application`: binds a `Binding` to one Runtime workspace/application and
+  and application-scope contract.
+- `application`: binds a `Binding` to one workspace/application and
   rejects cross-workspace or cross-audience reuse in both deployment modes.
 - `identity`: shared identity identifiers, users, roles, and SDK errors.
 - `authentication`: login, SSO, OTP, session, token, and credential contracts.
@@ -17,10 +17,8 @@ management CRUD, Plane types, or service-side domain implementation.
   cache policy.
 - `authorization/evaluator`: local function, record, field, reference, and
   export evaluation.
-- `management`: optional exact HTTP administration Surface for embedded
-  modules; it is intentionally not part of the Runtime CRUD contract.
-- `modulehost`: optional SQL pool and migration capabilities used only by an
-  embedded module; Remote/SaaS code never imports it.
+- `httpapi`: optional exact HTTP administration Surface for embedded modules;
+  it is intentionally not part of the consuming application's CRUD contract.
 - `httpmiddleware`: fail-closed `net/http` authentication and high-risk gates.
 - `browsergateway`: same-origin HttpOnly refresh-cookie HTTP adapter.
 - `remote`: SaaS `Factory`, HTTP transport and JWKS token verifier.
@@ -36,7 +34,9 @@ factory := remote.NewFactory(remote.Config{
 	Issuer:      "https://identity.example.com",
 	Audience:    "runtime-app",
 })
-binding, err := factory.Open(ctx, host)
+binding, err := factory.Open(ctx, identitysdk.ApplicationRef{
+	WorkspaceID: "workspace-a", ApplicationKey: "runtime-app",
+})
 if err != nil {
     panic(err)
 }
@@ -53,7 +53,9 @@ if err != nil {
 }
 
 handler := security.Authenticate(
-    security.RequirePermission("order.read", orderHandler),
+    security.RequirePasswordChanged(
+        security.RequirePermission("order.read", orderHandler),
+    ),
 )
 ```
 
@@ -76,10 +78,10 @@ decision, err := binding.Authorization().Reauthorize(ctx, identitysdk.DecisionRe
 })
 ```
 
-Identity never queries the Runtime's business database. The Runtime projects
-the bounded facts declared by its published authorization catalog, and the
-same evaluator applies those facts in Module and SaaS mode. Missing facts fail
-closed.
+Identity never queries the consuming application's business database. The
+application projects the bounded facts declared by its published authorization
+catalog, and the same evaluator applies those facts in Module and SaaS mode.
+Missing facts fail closed.
 
 The remote adapter applies a total request deadline, bounded payload sizes,
 safe retries, and a circuit breaker. Authentication and session mutations are
@@ -90,22 +92,24 @@ trace headers, but cannot override authorization, cookies, or workspace scope.
 incompatible protocol, policy bundle, Catalog version, issuer, deployment mode,
 or required capability before it exposes a Binding.
 
-`Host.Application()` is authoritative in both topologies. A conflicting
-`remote.Config.WorkspaceID` or `Audience` fails startup, while a matching scope
-is enforced by the `application` wrapper on login, refresh, token verification,
-authorization, credentials, and Catalog operations.
+The explicit `ApplicationRef` is authoritative in both topologies. A
+conflicting `remote.Config.WorkspaceID` or `Audience` fails startup, while a
+matching scope is enforced by the `application` wrapper on login, refresh,
+token verification, authorization, credentials, and Catalog operations.
 
 ## Module mode
 
 The Identity repository implements this SDK directly. Module mode is composed
-with its Factory and never creates loopback HTTP traffic. The host must
-implement `modulehost.Host`: it lends Identity a host-owned SQL pool and
-registers Identity migrations in the host lifecycle. Identity does not open or
-close that pool. The root `identity.Host` remains deployment-neutral.
+with its Factory and never creates loopback HTTP traffic. The module owns its
+database pool, schema migration, Identity application graph, and shutdown
+lifecycle. The host supplies only its application scope; Identity never
+borrows host persistence.
 
 ```go
-factory := identitymodule.NewFactory(identitymodule.Options{})
-binding, err := factory.Open(ctx, host)
+factory := identitymodule.NewFactory(identitymodule.OptionsFromEnvironment())
+binding, err := factory.Open(ctx, identitysdk.ApplicationRef{
+	WorkspaceID: "workspace-a", ApplicationKey: "runtime-app",
+})
 if err != nil {
     panic(err)
 }
@@ -113,7 +117,7 @@ defer binding.Close(shutdownContext)
 ```
 
 Both `identitymodule.Factory` and `remote.Factory` return the same
-`identity.Binding`; Runtime request code never branches on deployment mode.
+`identity.Binding`; consuming request code never branches on deployment mode.
 
 ## Development
 

@@ -11,11 +11,19 @@ import (
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
-type remoteTestHost struct{ application identity.ApplicationRef }
-
-func (host remoteTestHost) Application() identity.ApplicationRef { return host.application }
-func (remoteTestHost) Clock() identity.Clock                     { return nil }
-func (remoteTestHost) Audit() identity.AuditAppender             { return nil }
+func TestRemoteFactoryConfigurationComesFromCompositionEnvironment(t *testing.T) {
+	t.Setenv("IDENTITY_ENDPOINT", " https://identity.example.test ")
+	t.Setenv("IDENTITY_WORKSPACE_ID", " workspace-a ")
+	t.Setenv("IDENTITY_ISSUER", " https://issuer.example.test ")
+	t.Setenv("IDENTITY_AUDIENCE", " runtime-app ")
+	t.Setenv("IDENTITY_SERVICE_ACCESS_TOKEN", " service-token ")
+	t.Setenv("IDENTITY_USER_AGENT", " domainry-runtime/test ")
+	config := ConfigFromEnvironment()
+	if config.Endpoint != "https://identity.example.test" || config.WorkspaceID != "workspace-a" || config.Issuer != "https://issuer.example.test" ||
+		config.Audience != "runtime-app" || config.ServiceAccessToken != "service-token" || config.UserAgent != "domainry-runtime/test" {
+		t.Fatalf("environment configuration = %#v", config)
+	}
+}
 
 func newTestClient(t *testing.T, handler http.Handler) *client {
 	t.Helper()
@@ -209,7 +217,7 @@ func TestConfigurationAndRemoteErrors(t *testing.T) {
 func TestDiscoveryRequiresCompatibleSaaSIssuerAndCapabilities(t *testing.T) {
 	valid := identity.Descriptor{
 		ProtocolVersion: identity.CurrentProtocolVersion,
-		BundleVersion:   identity.PolicyBundleVersionV1,
+		BundleVersion:   identity.CurrentPolicyBundleVersion,
 		CatalogVersion:  identity.CatalogVersionV1,
 		Mode:            identity.DeploymentModeSaaS,
 		Issuer:          "https://identity.example.com",
@@ -238,10 +246,10 @@ func TestDiscoveryRequiresCompatibleSaaSIssuerAndCapabilities(t *testing.T) {
 	}
 }
 
-func TestRemoteApplicationUsesHostScopeAndRejectsSplitConfiguration(t *testing.T) {
-	host := remoteTestHost{application: identity.ApplicationRef{WorkspaceID: "workspace-a", ApplicationKey: "orders-runtime"}}
-	resolved, application, err := remoteApplication(Config{}, host)
-	if err != nil || resolved.WorkspaceID != "workspace-a" || resolved.Audience != "orders-runtime" || application.WorkspaceID != host.application.WorkspaceID || application.ApplicationKey != host.application.ApplicationKey {
+func TestRemoteApplicationUsesExplicitScopeAndRejectsSplitConfiguration(t *testing.T) {
+	scope := identity.ApplicationRef{WorkspaceID: "workspace-a", ApplicationKey: "orders-runtime"}
+	resolved, application, err := remoteApplication(Config{}, scope)
+	if err != nil || resolved.WorkspaceID != "workspace-a" || resolved.Audience != "orders-runtime" || application.WorkspaceID != scope.WorkspaceID || application.ApplicationKey != scope.ApplicationKey {
 		t.Fatalf("resolved=%+v application=%+v err=%v", resolved, application, err)
 	}
 	for name, config := range map[string]Config{
@@ -249,13 +257,13 @@ func TestRemoteApplicationUsesHostScopeAndRejectsSplitConfiguration(t *testing.T
 		"application": {WorkspaceID: "workspace-a", Audience: "billing-runtime"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, _, err := remoteApplication(config, host); err == nil {
+			if _, _, err := remoteApplication(config, scope); err == nil {
 				t.Fatalf("split Identity configuration accepted: %+v", config)
 			}
 		})
 	}
-	if _, _, err := remoteApplication(Config{}, remoteTestHost{}); err == nil {
-		t.Fatal("invalid host application scope accepted")
+	if _, _, err := remoteApplication(Config{}, identity.ApplicationRef{}); err == nil {
+		t.Fatal("invalid application scope accepted")
 	}
 }
 

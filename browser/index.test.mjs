@@ -30,6 +30,25 @@ test('keeps access credentials in memory and sends cookie-bound requests', async
   assert.equal(new Headers(requests[1][1].headers).get('X-Workspace-ID'), 'workspace-a')
 })
 
+test('targets Identity management endpoints through the configured Identity base URL', async () => {
+	const requests = []
+	const client = new IdentityClient({
+		endpoint: 'https://identity.example.test/api/browser',
+		managementEndpoint: 'https://identity.example.test/api',
+		workspaceId: 'workspace-a', applicationKey: 'runtime-app',
+		fetch: async (url, init) => {
+			requests.push([String(url), init])
+			return new Response(JSON.stringify({ items: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+		},
+	})
+
+	const response = await client.authorizedRequest('/identity/users')
+
+	assert.equal(response.status, 200)
+	assert.equal(requests[0][0], 'https://identity.example.test/api/identity/users')
+	assert.equal(new Headers(requests[0][1].headers).get('X-Workspace-ID'), 'workspace-a')
+})
+
 test('clears the in-memory access token even when remote logout fails', async () => {
   let calls = 0
   const client = new IdentityClient({

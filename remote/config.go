@@ -8,7 +8,7 @@ import (
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
-type ContextHeaderProvider func(context.Context) http.Header
+type ContextHeaderProvider = func(context.Context) http.Header
 
 type RetryPolicy struct {
 	MaxAttempts    int

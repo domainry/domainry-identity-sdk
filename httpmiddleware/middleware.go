@@ -112,6 +112,62 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
+// RequireAuthenticated protects a route after Authenticate has populated the
+// SDK RequestIdentity. It intentionally checks the SDK context rather than a
+// host-owned principal projection so every embedding Runtime shares the same
+// authentication semantics.
+func (m *Middleware) RequireAuthenticated(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		identity, ok := identitysdk.RequestIdentityFromContext(r.Context())
+		if !ok || !identity.Principal.Known {
+			m.writeError(w, r, http.StatusUnauthorized, "auth.token_required")
+			return
+		}
+		if next == nil {
+			m.writeError(w, r, http.StatusInternalServerError, "identity.middleware_handler_required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RequirePasswordChanged denies business access for sessions created with a
+// temporary password. Identity credential endpoints can omit this guard so
+// the user can complete the required password handoff; embedding Runtimes
+// should place it immediately after Authenticate.
+func (m *Middleware) RequirePasswordChanged(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		identity, ok := identitysdk.RequestIdentityFromContext(r.Context())
+		if !ok || !identity.Principal.Known {
+			m.writeError(w, r, http.StatusUnauthorized, "auth.token_required")
+			return
+		}
+		if identity.Principal.MustChangePassword {
+			m.writeError(w, r, http.StatusForbidden, "auth.password_change_required")
+			return
+		}
+		if next == nil {
+			m.writeError(w, r, http.StatusInternalServerError, "identity.middleware_handler_required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// AuthenticatedFunc adapts RequireAuthenticated to the standard route-guard
+// shape used by net/http HandlerFunc-based routers.
+func (m *Middleware) AuthenticatedFunc(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(m.RequireAuthenticated(next).ServeHTTP)
+}
+
+// PermissionFunc returns a HandlerFunc route guard backed exclusively by the
+// SDK AccessBundle attached to RequestIdentity.
+func (m *Middleware) PermissionFunc(permission string) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return http.HandlerFunc(m.RequirePermission(permission, next).ServeHTTP)
+	}
+}
+
 func (m *Middleware) RequirePermission(permission string, next http.Handler) http.Handler {
 	return m.RequireAllPermissions([]string{permission}, next)
 }

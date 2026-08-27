@@ -25,7 +25,7 @@ func CompileRecordFilter(bundle identity.AccessBundle, resource identity.Resourc
 	}
 	functionAllowed := false
 	for _, grant := range bundle.FunctionGrants {
-		if grant.Resource != resource || grant.Action != action {
+		if !resourceMatches(grant.Resource, resource) || !actionMatches(grant.Action, action) {
 			continue
 		}
 		if grant.Effect == identity.EffectDeny {
@@ -37,7 +37,7 @@ func CompileRecordFilter(bundle identity.AccessBundle, resource identity.Resourc
 		return filter, nil
 	}
 	for _, guardrail := range bundle.Guardrails {
-		if guardrail.Resource != "" && guardrail.Resource != resource || guardrail.Action != "" && guardrail.Action != action {
+		if guardrail.Resource != "" && !resourceMatches(guardrail.Resource, resource) || guardrail.Action != "" && !actionMatches(guardrail.Action, action) {
 			continue
 		}
 		if guardrail.Predicate == nil {
@@ -46,7 +46,7 @@ func CompileRecordFilter(bundle identity.AccessBundle, resource identity.Resourc
 		filter.Deny = append(filter.Deny, *guardrail.Predicate)
 	}
 	for _, policy := range bundle.DataPolicies {
-		if policy.Resource != resource || policy.Action != action {
+		if !resourceMatches(policy.Resource, resource) || !actionMatches(policy.Action, action) {
 			continue
 		}
 		if err := policy.Predicate.Validate(); err != nil {
@@ -71,14 +71,18 @@ type SQLFilter struct {
 type ColumnResolver func(string) (string, bool)
 
 func CompileSQL(filter RecordFilter, subject identity.Subject, resolve ColumnResolver) (SQLFilter, error) {
+	return CompileSQLWithContext(filter, EvaluationContext{Subject: subject}, resolve)
+}
+
+func CompileSQLWithContext(filter RecordFilter, evaluation EvaluationContext, resolve ColumnResolver) (SQLFilter, error) {
 	if resolve == nil {
 		return SQLFilter{}, &identity.Error{Code: "identity.policy_column_resolver_required"}
 	}
-	allow, allowArgs, err := compileGroup(filter.Allow, subject, resolve, " OR ")
+	allow, allowArgs, err := compileGroup(filter.Allow, evaluation, resolve, " OR ")
 	if err != nil {
 		return SQLFilter{}, err
 	}
-	deny, denyArgs, err := compileGroup(filter.Deny, subject, resolve, " OR ")
+	deny, denyArgs, err := compileGroup(filter.Deny, evaluation, resolve, " OR ")
 	if err != nil {
 		return SQLFilter{}, err
 	}
@@ -100,11 +104,11 @@ func CompileSQL(filter RecordFilter, subject identity.Subject, resolve ColumnRes
 	return SQLFilter{Clause: clause, Args: args}, nil
 }
 
-func compileGroup(values []identity.Predicate, subject identity.Subject, resolve ColumnResolver, separator string) (string, []any, error) {
+func compileGroup(values []identity.Predicate, evaluation EvaluationContext, resolve ColumnResolver, separator string) (string, []any, error) {
 	clauses := make([]string, 0, len(values))
 	args := []any{}
 	for _, predicate := range values {
-		clause, values, err := compilePredicate(predicate, subject, resolve)
+		clause, values, err := compilePredicate(predicate, evaluation, resolve)
 		if err != nil {
 			return "", nil, err
 		}
@@ -114,27 +118,36 @@ func compileGroup(values []identity.Predicate, subject identity.Subject, resolve
 	return strings.Join(clauses, separator), args, nil
 }
 
-func compilePredicate(predicate identity.Predicate, subject identity.Subject, resolve ColumnResolver) (string, []any, error) {
+func compilePredicate(predicate identity.Predicate, evaluation EvaluationContext, resolve ColumnResolver) (string, []any, error) {
 	if err := predicate.Validate(); err != nil {
 		return "", nil, err
 	}
+	if len(predicate.Path) > 0 {
+		return "", nil, &identity.Error{Code: "identity.policy_relation_resolver_required"}
+	}
 	if len(predicate.All) > 0 {
-		clause, args, err := compileGroup(predicate.All, subject, resolve, " AND ")
+		clause, args, err := compileGroup(predicate.All, evaluation, resolve, " AND ")
 		return "(" + clause + ")", args, err
 	}
 	if len(predicate.Any) > 0 {
-		clause, args, err := compileGroup(predicate.Any, subject, resolve, " OR ")
+		clause, args, err := compileGroup(predicate.Any, evaluation, resolve, " OR ")
 		return "(" + clause + ")", args, err
 	}
 	if predicate.Not != nil {
-		clause, args, err := compilePredicate(*predicate.Not, subject, resolve)
+		clause, args, err := compilePredicate(*predicate.Not, evaluation, resolve)
 		return "NOT (" + clause + ")", args, err
 	}
 	column, ok := resolve(predicate.Fact)
 	if !ok || strings.TrimSpace(column) == "" {
 		return "", nil, &identity.Error{Code: "identity.policy_fact_untranslatable", Message: predicate.Fact}
 	}
-	expected := resolveSubjectValue(predicate.Value, subject)
+	expected, err := ResolveValue(predicate.Value, evaluation)
+	if err != nil {
+		return "", nil, err
+	}
+	if IsMissingValue(expected) {
+		return "0 = 1", nil, nil
+	}
 	switch predicate.Operator {
 	case identity.OperatorEqual:
 		return column + " = ?", []any{expected}, nil

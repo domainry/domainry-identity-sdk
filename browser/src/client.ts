@@ -13,8 +13,9 @@ import type {
  */
 export class IdentityClient {
   #accessToken = ''
-  #fetch: typeof globalThis.fetch
-  #endpoint: string
+	#fetch: typeof globalThis.fetch
+	#endpoint: string
+	#managementEndpoint: string
   #listeners = new Set<(session: IdentitySession | null) => void>()
   #refreshInFlight: Promise<IdentitySession> | null = null
 
@@ -22,7 +23,8 @@ export class IdentityClient {
     if (!configuration.workspaceId.trim() || !configuration.applicationKey.trim()) {
       throw new Error('workspaceId and applicationKey are required')
     }
-    this.#endpoint = (configuration.endpoint || '').replace(/\/$/, '')
+		this.#endpoint = (configuration.endpoint || '').replace(/\/$/, '')
+		this.#managementEndpoint = (configuration.managementEndpoint || configuration.endpoint || '').replace(/\/$/, '')
     this.#fetch = configuration.fetch || ((input, init) => globalThis.fetch(input, init))
   }
 
@@ -31,11 +33,11 @@ export class IdentityClient {
   }
 
   /**
-   * Sends a Runtime request with the current in-memory access token. A 401 is
+	 * Sends a downstream request with the current in-memory access token. A 401 is
    * retried once only for read operations or mutations carrying an
    * Idempotency-Key; concurrent callers share the same refresh rotation.
    */
-  async authorizedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+	async authorizedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
     const replaySafe = this.#isReplaySafe(input, init)
     // A Request body is a one-shot stream. Clone it before the first dispatch so
     // an explicitly idempotent mutation can be retried after token refresh.
@@ -46,8 +48,18 @@ export class IdentityClient {
     await response.body?.cancel().catch(() => undefined)
     await this.refresh()
     response = await this.#fetch(retryInput, this.#authorizedInit(init))
-    return response
-  }
+		return response
+	}
+
+	/**
+	 * Sends an authenticated request to an Identity-owned endpoint. Consumers
+	 * use this for management APIs without duplicating token refresh/replay
+	 * behavior or reaching into the configured Identity base URL.
+	 */
+	async authorizedRequest(path: string, init: RequestInit = {}): Promise<Response> {
+		if (!path.startsWith('/')) throw new Error('Identity request path must start with /')
+		return this.authorizedFetch(this.#managementEndpoint + path, init)
+	}
 
   subscribe(listener: (session: IdentitySession | null) => void): () => void {
     this.#listeners.add(listener)

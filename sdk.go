@@ -44,38 +44,19 @@ type Binding interface {
 }
 
 type Factory interface {
-	Open(context.Context, Host) (Binding, error)
-}
-
-// Host exposes only deployment-neutral capabilities. In-process factories
-// discover database and migration capabilities through the modulehost package;
-// a SaaS adapter never sees Runtime persistence types.
-type Host interface {
-	Clock() Clock
-	Audit() AuditAppender
-	Application() ApplicationRef
+	Open(context.Context, ApplicationRef) (Binding, error)
 }
 
 type Clock interface {
 	Now() time.Time
 }
 
-type AuditEvent struct {
-	Type        string            `json:"type"`
-	TenantID    TenantID          `json:"tenant_id,omitempty"`
-	WorkspaceID WorkspaceID       `json:"workspace_id,omitempty"`
-	SubjectID   SubjectID         `json:"subject_id,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
-}
-
-type AuditAppender interface {
-	AppendIdentityAudit(context.Context, AuditEvent) error
-}
-
 const (
 	ProtocolVersionV1               = "domainry-identity-protocol-v1"
 	CurrentProtocolVersion          = ProtocolVersionV1
 	PolicyBundleVersionV1           = authorization.PolicyBundleVersionV1
+	PolicyBundleVersionV2           = authorization.PolicyBundleVersionV2
+	CurrentPolicyBundleVersion      = authorization.CurrentPolicyBundleVersion
 	CatalogVersionV1                = authorization.CatalogVersionV1
 	PrincipalContextContractVersion = authorization.PrincipalContextContractVersion
 	EffectAllow                     = authorization.EffectAllow
@@ -89,6 +70,17 @@ const (
 	OperatorExists                  = authorization.OperatorExists
 	OperatorPrefix                  = authorization.OperatorPrefix
 	OperatorContains                = authorization.OperatorContains
+	FieldEffectAllow                = authorization.FieldEffectAllow
+	FieldEffectDeny                 = authorization.FieldEffectDeny
+	FieldEffectHide                 = authorization.FieldEffectHide
+	FieldEffectMask                 = authorization.FieldEffectMask
+	MaskTypePhone                   = authorization.MaskTypePhone
+	MaskTypeIDNumber                = authorization.MaskTypeIDNumber
+	MaskTypeEmail                   = authorization.MaskTypeEmail
+	MaskTypeYearOnly                = authorization.MaskTypeYearOnly
+	MaskTypeLastN                   = authorization.MaskTypeLastN
+	RelationForward                 = authorization.RelationForward
+	RelationReverse                 = authorization.RelationReverse
 )
 
 type Error = identitymodel.Error
@@ -149,17 +141,25 @@ type FunctionGrant = authorization.FunctionGrant
 type Effect = authorization.Effect
 type DataPolicy = authorization.DataPolicy
 type FieldPolicy = authorization.FieldPolicy
+type FieldRule = authorization.FieldRule
+type FieldEffect = authorization.FieldEffect
+type MaskStrategy = authorization.MaskStrategy
+type MaskType = authorization.MaskType
 type ReferencePolicy = authorization.ReferencePolicy
 type ExportMode = authorization.ExportMode
 type ExportPolicy = authorization.ExportPolicy
 type Guardrail = authorization.Guardrail
+type ExecutionGrant = authorization.ExecutionGrant
 type Predicate = authorization.Predicate
+type RelationSegment = authorization.RelationSegment
+type RelationDirection = authorization.RelationDirection
 type Operator = authorization.Operator
 type ResourceFacts = authorization.ResourceFacts
 type ApplicationRef = authorization.ApplicationRef
 type AuthorizationCatalog = authorization.AuthorizationCatalog
 type ResourceDefinition = authorization.ResourceDefinition
 type ReferenceDefinition = authorization.ReferenceDefinition
+type ReferenceTargetAuthority = authorization.ReferenceTargetAuthority
 type ActionDefinition = authorization.ActionDefinition
 type CatalogReceipt = authorization.CatalogReceipt
 type CatalogClient = authorization.CatalogClient
@@ -175,3 +175,13 @@ var ValidateIdentifier = identitymodel.ValidateIdentifier
 var WithRequestIdentity = authorization.WithRequestIdentity
 var RequestIdentityFromContext = authorization.RequestIdentityFromContext
 var PrincipalFromContext = authorization.PrincipalFromContext
+var DeriveExecutionAccess = authorization.DeriveExecutionAccess
+var RestrictAccess = authorization.RestrictAccess
+
+const (
+	ReferenceTargetApplication = authorization.ReferenceTargetApplication
+	ReferenceTargetIdentity    = authorization.ReferenceTargetIdentity
+	IdentityUserResource       = authorization.IdentityUserResource
+	IdentityDepartmentResource = authorization.IdentityDepartmentResource
+	UserStatusActive           = identitymodel.UserStatusActive
+)

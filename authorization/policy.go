@@ -11,7 +11,7 @@ import (
 )
 
 func (bundle AccessBundle) Validate(now time.Time) error {
-	if bundle.ContractVersion != PolicyBundleVersionV1 {
+	if bundle.ContractVersion != CurrentPolicyBundleVersion {
 		return &Error{Code: "identity.access_bundle_version_unsupported"}
 	}
 	if !bundle.CatalogRevision.Valid() || !bundle.AuthorizationRevision.Valid() || !bundle.Subject.WorkspaceID.Valid() || !bundle.Subject.SubjectID.Valid() {
@@ -62,6 +62,29 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 			return &Error{Code: "identity.field_policy_duplicate"}
 		}
 		fieldKeys[key] = struct{}{}
+		ruleKeys := map[string]struct{}{}
+		priorities := map[int]struct{}{}
+		for _, rule := range policy.Rules {
+			if strings.TrimSpace(rule.Key) == "" || !rule.Effect.Valid() || !uniqueActions(rule.Actions) {
+				return &Error{Code: "identity.field_rule_invalid"}
+			}
+			if _, duplicate := ruleKeys[rule.Key]; duplicate {
+				return &Error{Code: "identity.field_rule_duplicate"}
+			}
+			if _, duplicate := priorities[rule.Priority]; duplicate {
+				return &Error{Code: "identity.field_rule_priority_duplicate"}
+			}
+			ruleKeys[rule.Key] = struct{}{}
+			priorities[rule.Priority] = struct{}{}
+			if rule.Predicate != nil {
+				if err := rule.Predicate.Validate(); err != nil {
+					return err
+				}
+			}
+			if err := rule.validateMaskStrategy(); err != nil {
+				return err
+			}
+		}
 	}
 	referenceKeys := map[string]struct{}{}
 	for _, policy := range bundle.ReferencePolicies {
@@ -92,10 +115,13 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 		if strings.TrimSpace(guardrail.Key) == "" || !guardrail.Effect.Valid() || guardrail.Effect != EffectDeny {
 			return &Error{Code: "identity.guardrail_invalid"}
 		}
-		if guardrail.Resource == "" && (guardrail.Action != "" || guardrail.Predicate != nil) {
+		if guardrail.Resource == "" && (guardrail.Action != "" || strings.TrimSpace(guardrail.Field) != "" || guardrail.Predicate != nil) {
 			// An action or record predicate has no unambiguous meaning without a
 			// resource type. Reject it instead of letting a catalog adapter drop a
 			// deny rule while constraining the bundle.
+			return &Error{Code: "identity.guardrail_invalid"}
+		}
+		if strings.TrimSpace(guardrail.Field) != "" && guardrail.Action == "" {
 			return &Error{Code: "identity.guardrail_invalid"}
 		}
 		if _, duplicate := guardrailKeys[guardrail.Key]; duplicate {
@@ -112,6 +138,57 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 }
 
 func (effect Effect) Valid() bool { return effect == EffectAllow || effect == EffectDeny }
+
+func (effect FieldEffect) Valid() bool {
+	switch effect {
+	case FieldEffectAllow, FieldEffectDeny, FieldEffectHide, FieldEffectMask:
+		return true
+	default:
+		return false
+	}
+}
+
+func (rule FieldRule) validateMaskStrategy() error {
+	if rule.Effect != FieldEffectMask {
+		if rule.MaskStrategy != nil {
+			return &Error{Code: "identity.field_rule_mask_invalid"}
+		}
+		return nil
+	}
+	if rule.MaskStrategy == nil {
+		return &Error{Code: "identity.field_rule_mask_required"}
+	}
+	switch rule.MaskStrategy.Type {
+	case MaskTypePhone, MaskTypeIDNumber, MaskTypeEmail, MaskTypeYearOnly:
+		if rule.MaskStrategy.LastN != 0 {
+			return &Error{Code: "identity.field_rule_mask_invalid"}
+		}
+	case MaskTypeLastN:
+		if rule.MaskStrategy.LastN < 1 || rule.MaskStrategy.LastN > 32 {
+			return &Error{Code: "identity.field_rule_mask_invalid"}
+		}
+	default:
+		return &Error{Code: "identity.field_rule_mask_invalid"}
+	}
+	return nil
+}
+
+func uniqueActions(values []Action) bool {
+	if len(values) == 0 {
+		return false
+	}
+	seen := make(map[Action]struct{}, len(values))
+	for _, value := range values {
+		if !value.Valid() {
+			return false
+		}
+		if _, duplicate := seen[value]; duplicate {
+			return false
+		}
+		seen[value] = struct{}{}
+	}
+	return true
+}
 
 func (predicate Predicate) Validate() error {
 	branches := 0
@@ -132,6 +209,16 @@ func (predicate Predicate) Validate() error {
 	}
 	if branches != 1 {
 		return &Error{Code: "identity.policy_predicate_invalid"}
+	}
+	if len(predicate.Path) > 0 {
+		if len(predicate.Path) > 3 || len(predicate.All) > 0 || len(predicate.Any) > 0 || predicate.Not != nil {
+			return &Error{Code: "identity.policy_relation_path_invalid"}
+		}
+		for _, segment := range predicate.Path {
+			if segment.Direction != RelationForward && segment.Direction != RelationReverse || strings.TrimSpace(segment.Reference) == "" || !segment.TargetResource.Valid() {
+				return &Error{Code: "identity.policy_relation_path_invalid"}
+			}
+		}
 	}
 	for _, child := range append(append([]Predicate(nil), predicate.All...), predicate.Any...) {
 		if err := child.Validate(); err != nil {
@@ -175,6 +262,9 @@ func (bundle AccessBundle) CanonicalJSON(now time.Time) ([]byte, error) {
 		clone.DataPolicies[index].Predicate = canonicalPredicate(clone.DataPolicies[index].Predicate)
 	}
 	clone.FieldPolicies = append([]FieldPolicy(nil), bundle.FieldPolicies...)
+	for index := range clone.FieldPolicies {
+		clone.FieldPolicies[index] = canonicalFieldPolicy(clone.FieldPolicies[index])
+	}
 	clone.ReferencePolicies = append([]ReferencePolicy(nil), bundle.ReferencePolicies...)
 	for index := range clone.ReferencePolicies {
 		clone.ReferencePolicies[index].DisplayFields = append([]string(nil), clone.ReferencePolicies[index].DisplayFields...)
@@ -209,6 +299,7 @@ func (bundle AccessBundle) CanonicalJSON(now time.Time) ([]byte, error) {
 }
 
 func canonicalPredicate(predicate Predicate) Predicate {
+	predicate.Path = append([]RelationSegment(nil), predicate.Path...)
 	predicate.All = canonicalPredicateList(predicate.All)
 	predicate.Any = canonicalPredicateList(predicate.Any)
 	if predicate.Not != nil {
@@ -232,6 +323,31 @@ func canonicalPredicate(predicate Predicate) Predicate {
 		}
 	}
 	return predicate
+}
+
+func canonicalFieldPolicy(policy FieldPolicy) FieldPolicy {
+	policy.Rules = append([]FieldRule(nil), policy.Rules...)
+	for index := range policy.Rules {
+		policy.Rules[index].Actions = append([]Action(nil), policy.Rules[index].Actions...)
+		sort.Slice(policy.Rules[index].Actions, func(left, right int) bool {
+			return policy.Rules[index].Actions[left] < policy.Rules[index].Actions[right]
+		})
+		if policy.Rules[index].Predicate != nil {
+			predicate := canonicalPredicate(*policy.Rules[index].Predicate)
+			policy.Rules[index].Predicate = &predicate
+		}
+		if policy.Rules[index].MaskStrategy != nil {
+			strategy := *policy.Rules[index].MaskStrategy
+			policy.Rules[index].MaskStrategy = &strategy
+		}
+	}
+	sort.Slice(policy.Rules, func(left, right int) bool {
+		if policy.Rules[left].Priority != policy.Rules[right].Priority {
+			return policy.Rules[left].Priority > policy.Rules[right].Priority
+		}
+		return policy.Rules[left].Key < policy.Rules[right].Key
+	})
+	return policy
 }
 
 func canonicalPredicateList(values []Predicate) []Predicate {

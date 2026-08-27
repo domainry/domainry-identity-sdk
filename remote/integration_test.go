@@ -27,7 +27,7 @@ func TestIdentityIntegrationPasswordSession(t *testing.T) {
 	if audience == "" {
 		audience = "domainry-runtime"
 	}
-	binding, err := NewFactory(Config{Endpoint: baseURL, WorkspaceID: workspaceID, Issuer: issuer, Audience: audience}).Open(t.Context(), nil)
+	binding, err := NewFactory(Config{Endpoint: baseURL, WorkspaceID: workspaceID, Issuer: issuer, Audience: audience}).Open(t.Context(), identitysdk.ApplicationRef{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,11 +17,40 @@ import (
 )
 
 type Decision struct {
-	Allowed bool
-	Code    string
+	Allowed     bool
+	Code        string
+	PolicyKey   string
+	Reason      string
+	AuditDenial bool
+}
+
+// AuditDenialRequired reports whether a denial for the requested resource and
+// action is configured as auditable. It is intentionally independent of
+// record facts so callers can decide after a not-found projection without
+// reconstructing Identity policy semantics.
+func AuditDenialRequired(bundle identity.AccessBundle, resource identity.ResourceType, action identity.Action, now time.Time) (bool, error) {
+	if err := bundle.Validate(now); err != nil {
+		return false, err
+	}
+	if !resource.Valid() || !action.Valid() {
+		return false, &identity.Error{Code: "identity.access_request_invalid"}
+	}
+	for _, policy := range bundle.DataPolicies {
+		if resourceMatches(policy.Resource, resource) && actionMatches(policy.Action, action) && policy.AuditDenial {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func Evaluate(bundle identity.AccessBundle, request identity.AccessRequest, facts identity.ResourceFacts, now time.Time) (Decision, error) {
+	return EvaluateWithContext(bundle, request, facts, EvaluationContext{Subject: bundle.Subject}, now)
+}
+
+// EvaluateWithContext evaluates one complete function/data/field request. The
+// caller may add business claims (for example an active business
+// profile) without mutating the Identity-issued AccessBundle.
+func EvaluateWithContext(bundle identity.AccessBundle, request identity.AccessRequest, facts identity.ResourceFacts, evaluation EvaluationContext, now time.Time) (Decision, error) {
 	if err := bundle.Validate(now); err != nil {
 		return Decision{Code: "access_bundle_invalid"}, err
 	}
@@ -31,7 +60,7 @@ func Evaluate(bundle identity.AccessBundle, request identity.AccessRequest, fact
 	}
 	functionAllowed := false
 	for _, grant := range bundle.FunctionGrants {
-		if grant.Resource != resource || grant.Action != action {
+		if !resourceMatches(grant.Resource, resource) || !actionMatches(grant.Action, action) {
 			continue
 		}
 		if grant.Effect == identity.EffectDeny {
@@ -43,33 +72,39 @@ func Evaluate(bundle identity.AccessBundle, request identity.AccessRequest, fact
 		return Decision{Code: "function_not_granted"}, nil
 	}
 	for _, guardrail := range bundle.Guardrails {
-		if guardrail.Resource != "" && guardrail.Resource != resource || guardrail.Action != "" && guardrail.Action != action {
+		if guardrail.Resource != "" && !resourceMatches(guardrail.Resource, resource) || guardrail.Action != "" && !actionMatches(guardrail.Action, action) {
+			continue
+		}
+		if strings.TrimSpace(guardrail.Field) != "" {
+			// A field restriction must not deny the containing record. It is
+			// evaluated by EvaluateField below when a field was requested.
 			continue
 		}
 		matches := true
 		var err error
 		if guardrail.Predicate != nil {
-			matches, err = EvaluatePredicate(*guardrail.Predicate, facts, bundle.Subject)
+			matches, err = EvaluatePredicateWithContext(*guardrail.Predicate, facts, evaluation)
 		}
 		if err != nil {
 			return Decision{Code: "guardrail_invalid"}, err
 		}
 		if matches {
-			return Decision{Code: "guardrail_denied"}, nil
+			return Decision{Code: "guardrail_denied", PolicyKey: guardrail.Key, Reason: guardrail.Reason}, nil
 		}
 	}
-	matchedAllow, hasPolicies := false, false
+	matchedAllow, hasPolicies, auditDenial := false, false, false
 	for _, policy := range bundle.DataPolicies {
-		if policy.Resource != resource || policy.Action != action {
+		if !resourceMatches(policy.Resource, resource) || !actionMatches(policy.Action, action) {
 			continue
 		}
 		hasPolicies = true
-		matches, err := EvaluatePredicate(policy.Predicate, facts, bundle.Subject)
+		auditDenial = auditDenial || policy.AuditDenial
+		matches, err := EvaluatePredicateWithContext(policy.Predicate, facts, evaluation)
 		if err != nil {
 			return Decision{Code: "data_policy_invalid"}, err
 		}
 		if matches && policy.Effect == identity.EffectDeny {
-			return Decision{Code: "data_policy_denied"}, nil
+			return Decision{Code: "data_policy_denied", PolicyKey: policy.Key, AuditDenial: policy.AuditDenial}, nil
 		}
 		matchedAllow = matchedAllow || matches && policy.Effect == identity.EffectAllow
 	}
@@ -77,37 +112,36 @@ func Evaluate(bundle identity.AccessBundle, request identity.AccessRequest, fact
 	// scope is represented by an explicit allow predicate (for example, id
 	// exists), so an absent data policy fails closed.
 	if !hasPolicies || !matchedAllow {
-		return Decision{Code: "data_policy_not_granted"}, nil
+		return Decision{Code: "data_policy_not_granted", AuditDenial: auditDenial}, nil
 	}
 	if field := strings.TrimSpace(request.FieldKey); field != "" {
-		fieldAllowed := false
-		for _, policy := range bundle.FieldPolicies {
-			if policy.Resource != resource || policy.Field != field {
-				continue
-			}
-			switch strings.ToLower(strings.TrimSpace(request.Action)) {
-			case "read", "list", "view", "search":
-				fieldAllowed = policy.Read
-			case "export":
-				fieldAllowed = policy.Export
-			default:
-				fieldAllowed = policy.Write
-			}
+		fieldDecision, err := EvaluateField(bundle, FieldRequest{Resource: resource, Field: field, Action: identity.Action(request.Action)}, func(predicate identity.Predicate) (bool, error) {
+			return EvaluatePredicateWithContext(predicate, facts, evaluation)
+		})
+		if err != nil {
+			return Decision{Code: "field_policy_invalid"}, err
 		}
-		if !fieldAllowed {
-			return Decision{Code: "field_not_granted"}, nil
+		if fieldDecision.Effect != identity.FieldEffectAllow && fieldDecision.Effect != identity.FieldEffectMask {
+			return Decision{Code: "field_not_granted", PolicyKey: fieldDecision.RuleKey, Reason: fieldDecision.Reason, AuditDenial: fieldDecision.AuditDenial}, nil
 		}
 	}
 	return Decision{Allowed: true, Code: "allowed"}, nil
 }
 
 func EvaluatePredicate(predicate identity.Predicate, facts identity.ResourceFacts, subject identity.Subject) (bool, error) {
+	return EvaluatePredicateWithContext(predicate, facts, EvaluationContext{Subject: subject})
+}
+
+func EvaluatePredicateWithContext(predicate identity.Predicate, facts identity.ResourceFacts, evaluation EvaluationContext) (bool, error) {
 	if err := predicate.Validate(); err != nil {
 		return false, err
 	}
+	if len(predicate.Path) > 0 {
+		return false, &identity.Error{Code: "identity.policy_relation_resolver_required"}
+	}
 	if len(predicate.All) > 0 {
 		for _, child := range predicate.All {
-			match, err := EvaluatePredicate(child, facts, subject)
+			match, err := EvaluatePredicateWithContext(child, facts, evaluation)
 			if err != nil || !match {
 				return false, err
 			}
@@ -116,7 +150,7 @@ func EvaluatePredicate(predicate identity.Predicate, facts identity.ResourceFact
 	}
 	if len(predicate.Any) > 0 {
 		for _, child := range predicate.Any {
-			match, err := EvaluatePredicate(child, facts, subject)
+			match, err := EvaluatePredicateWithContext(child, facts, evaluation)
 			if err != nil {
 				return false, err
 			}
@@ -127,11 +161,17 @@ func EvaluatePredicate(predicate identity.Predicate, facts identity.ResourceFact
 		return false, nil
 	}
 	if predicate.Not != nil {
-		match, err := EvaluatePredicate(*predicate.Not, facts, subject)
+		match, err := EvaluatePredicateWithContext(*predicate.Not, facts, evaluation)
 		return !match, err
 	}
 	actual, exists := facts[predicate.Fact]
-	expected := resolveSubjectValue(predicate.Value, subject)
+	expected, err := ResolveValue(predicate.Value, evaluation)
+	if err != nil {
+		return false, err
+	}
+	if IsMissingValue(expected) {
+		return false, nil
+	}
 	switch predicate.Operator {
 	case identity.OperatorExists:
 		want, ok := expected.(bool)
@@ -180,7 +220,7 @@ func ExportableFields(bundle identity.AccessBundle, resource identity.ResourceTy
 	hasAllowList := false
 	allowList := map[string]bool{}
 	for _, policy := range bundle.ExportPolicies {
-		if policy.Resource != resource {
+		if !resourceMatches(policy.Resource, resource) {
 			continue
 		}
 		switch policy.Mode {
@@ -206,7 +246,7 @@ func ExportableFields(bundle identity.AccessBundle, resource identity.ResourceTy
 func fields(bundle identity.AccessBundle, resource identity.ResourceType, allowed func(identity.FieldPolicy) bool) []string {
 	set := map[string]bool{}
 	for _, policy := range bundle.FieldPolicies {
-		if policy.Resource == resource && strings.TrimSpace(policy.Field) != "" && allowed(policy) {
+		if resourceMatches(policy.Resource, resource) && strings.TrimSpace(policy.Field) != "" && allowed(policy) {
 			set[policy.Field] = true
 		}
 	}
@@ -222,27 +262,91 @@ func AllowedReferences(bundle identity.AccessBundle, resource identity.ResourceT
 	allowed := map[string]identity.ReferencePolicy{}
 	denied := map[string]bool{}
 	for _, policy := range bundle.ReferencePolicies {
-		if policy.SourceResource != resource {
+		if !resourceMatches(policy.SourceResource, resource) {
 			continue
 		}
-		if !policy.Allowed {
+		if !policy.Allowed || referenceGuardrailDenied(bundle, resource, policy.Reference) {
 			denied[policy.Reference] = true
-			delete(allowed, policy.Reference)
+			for key, existing := range allowed {
+				if existing.Reference == policy.Reference {
+					delete(allowed, key)
+				}
+			}
 			continue
 		}
 		if !denied[policy.Reference] {
-			allowed[policy.Reference] = policy
+			key := strings.TrimSpace(policy.Reference) + "\x00" + strings.TrimSpace(string(policy.TargetResource))
+			if existing, found := allowed[key]; found {
+				existing.DisplayFields = appendUniqueStrings(existing.DisplayFields, policy.DisplayFields...)
+				if existing.Reason == "" {
+					existing.Reason = policy.Reason
+				}
+				allowed[key] = existing
+			} else {
+				policy.DisplayFields = appendUniqueStrings(nil, policy.DisplayFields...)
+				allowed[key] = policy
+			}
 		}
 	}
 	result := make([]identity.ReferencePolicy, 0, len(allowed))
 	for _, policy := range allowed {
 		result = append(result, policy)
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].Reference < result[j].Reference })
+	sort.Slice(result, func(i, j int) bool {
+		left := result[i].Reference + "\x00" + string(result[i].TargetResource)
+		right := result[j].Reference + "\x00" + string(result[j].TargetResource)
+		return left < right
+	})
 	return result
 }
 
+func resourceMatches(configured, requested identity.ResourceType) bool {
+	return configured == requested || configured == "*"
+}
+
+func actionMatches(configured, requested identity.Action) bool {
+	return configured == requested || configured == "*"
+}
+
+func referenceGuardrailDenied(bundle identity.AccessBundle, resource identity.ResourceType, reference string) bool {
+	for _, guardrail := range bundle.Guardrails {
+		if guardrail.Effect != identity.EffectDeny || !resourceMatches(guardrail.Resource, resource) ||
+			strings.TrimSpace(guardrail.Field) != strings.TrimSpace(reference) ||
+			!actionMatches(guardrail.Action, "read") || guardrail.Predicate != nil {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func appendUniqueStrings(existing []string, values ...string) []string {
+	seen := make(map[string]bool, len(existing)+len(values))
+	for _, value := range existing {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			seen[value] = true
+		}
+	}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" && !seen[value] {
+			existing = append(existing, value)
+			seen[value] = true
+		}
+	}
+	return existing
+}
+
 func resolveSubjectValue(value any, subject identity.Subject) any {
+	resolved, err := ResolveValue(value, EvaluationContext{Subject: subject})
+	if err != nil {
+		return value
+	}
+	return resolved
+}
+
+func resolveIdentitySubjectValue(value any, subject identity.Subject) any {
 	text, ok := value.(string)
 	if !ok || !strings.HasPrefix(text, "$subject.") {
 		return value

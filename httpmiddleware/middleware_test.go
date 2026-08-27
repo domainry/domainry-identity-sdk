@@ -41,8 +41,22 @@ func (stub *authenticatorStub) Authenticate(_ context.Context, token string) (id
 	return stub.principal, stub.err
 }
 
+func permissionBundle(permissions ...string) *identitysdk.AccessBundle {
+	bundle := &identitysdk.AccessBundle{}
+	for _, permission := range permissions {
+		resource, action, ok := strings.Cut(permission, ".")
+		if !ok {
+			continue
+		}
+		bundle.FunctionGrants = append(bundle.FunctionGrants, identitysdk.FunctionGrant{
+			Resource: identitysdk.ResourceType(resource), Action: identitysdk.Action(action), Effect: identitysdk.EffectAllow,
+		})
+	}
+	return bundle
+}
+
 func TestAuthenticatePublishesIdentityAndRejectsCredentials(t *testing.T) {
-	stub := &authenticatorStub{principal: identitysdk.Principal{Known: true, UserID: "user-1", Permissions: []string{"order.read"}}}
+	stub := &authenticatorStub{principal: identitysdk.Principal{Known: true, UserID: "user-1", AccessBundle: permissionBundle("order.read")}}
 	middleware, err := New(stub)
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +116,7 @@ func TestPermissionGatesRequireAuthenticatedContext(t *testing.T) {
 	middleware, _ := New(&authenticatorStub{})
 	nextCalls := 0
 	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { nextCalls++ })
-	identity := identitysdk.RequestIdentity{Principal: identitysdk.Principal{Known: true, UserID: "user", Permissions: []string{"order.read", "order.export"}}}
+	identity := identitysdk.RequestIdentity{Principal: identitysdk.Principal{Known: true, UserID: "user", AccessBundle: permissionBundle("order.read", "order.export")}}
 	request := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(identitysdk.WithRequestIdentity(context.Background(), identity))
 
 	for _, handler := range []http.Handler{
@@ -127,6 +141,66 @@ func TestPermissionGatesRequireAuthenticatedContext(t *testing.T) {
 	middleware.RequirePermission("order.read", next).ServeHTTP(unauthenticated, httptest.NewRequest(http.MethodGet, "/", nil))
 	if unauthenticated.Code != http.StatusUnauthorized {
 		t.Fatalf("unauthenticated status=%d", unauthenticated.Code)
+	}
+}
+
+func TestRequirePasswordChangedOwnsTemporaryPasswordBusinessGate(t *testing.T) {
+	middleware, _ := New(&authenticatorStub{})
+	nextCalls := 0
+	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { nextCalls++ })
+
+	for _, fixture := range []struct {
+		name      string
+		principal *identitysdk.Principal
+		status    int
+	}{
+		{name: "missing identity", status: http.StatusUnauthorized},
+		{name: "temporary password", principal: &identitysdk.Principal{Known: true, UserID: "user", MustChangePassword: true}, status: http.StatusForbidden},
+		{name: "password changed", principal: &identitysdk.Principal{Known: true, UserID: "user"}, status: http.StatusOK},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, "/business", nil)
+			if fixture.principal != nil {
+				request = request.WithContext(identitysdk.WithRequestIdentity(request.Context(), identitysdk.RequestIdentity{Principal: *fixture.principal}))
+			}
+			response := httptest.NewRecorder()
+			middleware.RequirePasswordChanged(next).ServeHTTP(response, request)
+			if response.Code != fixture.status {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+		})
+	}
+	if nextCalls != 1 {
+		t.Fatalf("next calls=%d", nextCalls)
+	}
+}
+
+func TestRouteGuardHelpersUseOnlySDKRequestIdentity(t *testing.T) {
+	middleware, err := New(&authenticatorStub{principal: identitysdk.Principal{
+		Known: true, UserID: "user-a", WorkspaceID: "workspace-a", AccessBundle: permissionBundle("workspace.admin"),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	protected := middleware.AuthenticatedFunc(middleware.PermissionFunc("workspace.admin")(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	request := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	response := httptest.NewRecorder()
+	protected(response, request)
+	if response.Code != http.StatusUnauthorized || called {
+		t.Fatalf("route guard accepted a host-only request: status=%d called=%t", response.Code, called)
+	}
+
+	request = httptest.NewRequest(http.MethodGet, "/admin", nil)
+	request.Header.Set("Authorization", "Bearer token")
+	response = httptest.NewRecorder()
+	middleware.Authenticate(http.HandlerFunc(protected)).ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent || !called {
+		t.Fatalf("route guard rejected SDK identity: status=%d called=%t body=%s", response.Code, called, response.Body.String())
 	}
 }
 

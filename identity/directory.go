@@ -1,10 +1,12 @@
 // Package identity owns the stable, non-secret identity vocabulary shared by
-// authentication, authorization, and Runtime directory projections.
+// authentication, authorization, and application directory projections.
 package identity
 
 import "context"
 
-// ApplicationScope identifies the Runtime application allowed to consume an
+const UserStatusActive = "active"
+
+// ApplicationScope identifies the application allowed to consume an
 // Identity projection. It deliberately excludes redirect and catalog data.
 type ApplicationScope struct {
 	TenantID       TenantID       `json:"tenant_id,omitempty"`
@@ -12,7 +14,7 @@ type ApplicationScope struct {
 	ApplicationKey ApplicationKey `json:"application_key"`
 }
 
-// Directory is a read-only Runtime projection. Identity management commands
+// Directory is a read-only application projection. Identity management commands
 // and CRUD models do not belong to this contract.
 type Directory interface {
 	FindUser(context.Context, UserLookup) (User, bool, error)
@@ -42,7 +44,7 @@ type UserRoleAssignmentQuery struct {
 	UserID      SubjectID        `json:"user_id,omitempty"`
 }
 
-// User contains only directory attributes safe for Runtime projections. It
+// User contains only directory attributes safe for application projections. It
 // never carries credentials, external-provider tokens, MFA, or session data.
 type User struct {
 	ID          string `json:"id"`

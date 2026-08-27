@@ -1,6 +1,7 @@
 export interface IdentityClientConfiguration {
-  endpoint?: string
-  tenantId?: string
+	endpoint?: string
+	managementEndpoint?: string
+	tenantId?: string
   workspaceId: string
   applicationKey: string
   fetch?: typeof globalThis.fetch

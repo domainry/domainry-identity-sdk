@@ -61,3 +61,21 @@ func TestAuthorizationCatalogRejectsInvalidReferenceAndScope(t *testing.T) {
 		t.Fatal("catalog reference to an undeclared target accepted")
 	}
 }
+
+func TestAuthorizationCatalogAcceptsIdentityOwnedDirectoryReference(t *testing.T) {
+	catalog := AuthorizationCatalog{
+		ContractVersion: CatalogVersionV1,
+		Application:     ApplicationRef{WorkspaceID: "workspace", ApplicationKey: "runtime"},
+		Resources: []ResourceDefinition{{
+			Key: "employee_profile", Fields: []string{"identity_user"},
+			References: []ReferenceDefinition{{Key: "identity_user", TargetResource: IdentityUserResource, TargetAuthority: ReferenceTargetIdentity}},
+		}},
+	}
+	if err := catalog.ValidateContract(); err != nil {
+		t.Fatalf("identity directory reference was rejected: %v", err)
+	}
+	catalog.Resources[0].References[0].TargetResource = "external_customer"
+	if err := catalog.ValidateContract(); err == nil || err.(*Error).Code != "identity.catalog_reference_target_invalid" {
+		t.Fatalf("unknown identity-owned reference target error=%v", err)
+	}
+}

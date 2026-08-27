@@ -75,9 +75,9 @@ func (gateway *Gateway) RegisterRoutes(mux *http.ServeMux, prefix string) error 
 	if gateway == nil || mux == nil {
 		return errors.New("Identity browser gateway and ServeMux are required")
 	}
-	prefix = strings.TrimSuffix(strings.TrimSpace(prefix), "/")
-	if prefix != "" && (!strings.HasPrefix(prefix, "/") || strings.ContainsAny(prefix, "?# \t\r\n")) {
-		return fmt.Errorf("invalid Identity browser route prefix %q", prefix)
+	prefix, err := normalizeRoutePrefix(prefix)
+	if err != nil {
+		return err
 	}
 	path := func(suffix string) string { return prefix + suffix }
 
@@ -96,4 +96,39 @@ func (gateway *Gateway) RegisterRoutes(mux *http.ServeMux, prefix string) error 
 	mux.HandleFunc("POST "+path("/auth/providers/{provider}/callback"), gateway.ProviderCallback)
 	mux.HandleFunc("POST "+path("/auth/providers/{provider}/verify"), gateway.VerifyProvider)
 	return nil
+}
+
+// RoutePatterns returns the exact browser-session route contract owned by the
+// SDK. Hosts can use it for listener inventories and OpenAPI/surface checks
+// without duplicating authentication routes.
+func RoutePatterns(prefix string) ([]string, error) {
+	prefix, err := normalizeRoutePrefix(prefix)
+	if err != nil {
+		return nil, err
+	}
+	path := func(suffix string) string { return prefix + suffix }
+	return []string{
+		"GET " + path("/auth/session"),
+		"POST " + path("/auth/code/exchange"),
+		"POST " + path("/auth/login"),
+		"POST " + path("/auth/refresh"),
+		"POST " + path("/auth/logout"),
+		"POST " + path("/auth/change-password"),
+		"POST " + path("/auth/reset-password"),
+		"POST " + path("/auth/sessions/revoke-others"),
+		"GET " + path("/auth/providers"),
+		"GET " + path("/auth/providers/{provider}/start"),
+		"POST " + path("/auth/providers/{provider}/start"),
+		"GET " + path("/auth/providers/{provider}/callback"),
+		"POST " + path("/auth/providers/{provider}/callback"),
+		"POST " + path("/auth/providers/{provider}/verify"),
+	}, nil
+}
+
+func normalizeRoutePrefix(prefix string) (string, error) {
+	prefix = strings.TrimSuffix(strings.TrimSpace(prefix), "/")
+	if prefix != "" && (!strings.HasPrefix(prefix, "/") || strings.ContainsAny(prefix, "?# \t\r\n")) {
+		return "", fmt.Errorf("invalid Identity browser route prefix %q", prefix)
+	}
+	return prefix, nil
 }

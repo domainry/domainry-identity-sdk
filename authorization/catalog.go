@@ -30,9 +30,19 @@ type ResourceDefinition struct {
 }
 
 type ReferenceDefinition struct {
-	Key            string       `json:"key"`
-	TargetResource ResourceType `json:"target_resource"`
+	Key             string                   `json:"key"`
+	TargetResource  ResourceType             `json:"target_resource"`
+	TargetAuthority ReferenceTargetAuthority `json:"target_authority,omitempty"`
 }
+
+type ReferenceTargetAuthority string
+
+const (
+	ReferenceTargetApplication ReferenceTargetAuthority = "application"
+	ReferenceTargetIdentity    ReferenceTargetAuthority = "identity"
+	IdentityUserResource       ResourceType             = "identity_user"
+	IdentityDepartmentResource ResourceType             = "identity_department"
+)
 
 type ActionDefinition struct {
 	Resource ResourceType `json:"resource"`
@@ -91,6 +101,19 @@ func (catalog AuthorizationCatalog) ValidateContract() error {
 	}
 	for _, resource := range catalog.Resources {
 		for _, reference := range resource.References {
+			authority := reference.TargetAuthority
+			if authority == "" {
+				authority = ReferenceTargetApplication
+			}
+			if authority == ReferenceTargetIdentity {
+				if reference.TargetResource != IdentityUserResource && reference.TargetResource != IdentityDepartmentResource {
+					return &Error{Code: "identity.catalog_reference_target_invalid"}
+				}
+				continue
+			}
+			if authority != ReferenceTargetApplication {
+				return &Error{Code: "identity.catalog_reference_target_invalid"}
+			}
 			if _, exists := resources[reference.TargetResource]; !exists {
 				return &Error{Code: "identity.catalog_reference_target_unknown"}
 			}

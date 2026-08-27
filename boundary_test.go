@@ -45,9 +45,8 @@ func TestBusinessContractsDoNotDependOnOuterAdapters(t *testing.T) {
 		"github.com/domainry/domainry-identity-sdk/application",
 		"github.com/domainry/domainry-identity-sdk/browsergateway",
 		"github.com/domainry/domainry-identity-sdk/contracttest",
+		"github.com/domainry/domainry-identity-sdk/httpapi",
 		"github.com/domainry/domainry-identity-sdk/httpmiddleware",
-		"github.com/domainry/domainry-identity-sdk/management",
-		"github.com/domainry/domainry-identity-sdk/modulehost",
 		"github.com/domainry/domainry-identity-sdk/remote",
 	}
 	for _, directory := range coreDirectories {
@@ -113,18 +112,14 @@ func TestBusinessImplementationsDoNotDependBackOnRootFacade(t *testing.T) {
 	}
 }
 
-func TestModuleHostCapabilitiesStayOutOfDeploymentNeutralPackages(t *testing.T) {
+func TestSDKContainsNoPersistenceContracts(t *testing.T) {
 	repositoryRoot := sdkRepositoryRoot(t)
-	moduleHostImport := "github.com/domainry/domainry-identity-sdk/modulehost"
 	err := filepath.WalkDir(repositoryRoot, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		if entry.IsDir() {
 			if entry.Name() == ".git" || entry.Name() == "node_modules" || entry.Name() == "dist" {
-				return filepath.SkipDir
-			}
-			if path == filepath.Join(repositoryRoot, "modulehost") {
 				return filepath.SkipDir
 			}
 			return nil
@@ -141,8 +136,8 @@ func TestModuleHostCapabilitiesStayOutOfDeploymentNeutralPackages(t *testing.T) 
 			if unquoteErr != nil {
 				return unquoteErr
 			}
-			if importPath == "database/sql" || importPath == moduleHostImport || strings.HasPrefix(importPath, moduleHostImport+"/") {
-				t.Errorf("deployment-neutral SDK file %s imports module-only capability %s", path, importPath)
+			if importPath == "database/sql" {
+				t.Errorf("SDK file %s imports persistence capability %s", path, importPath)
 			}
 		}
 		return nil

@@ -29,11 +29,10 @@ import (
 	"github.com/domainry/domainry-identity-sdk/authorization/evaluator"
 	"github.com/domainry/domainry-identity-sdk/authorization/principal"
 	"github.com/domainry/domainry-identity-sdk/browsergateway"
-	_ "github.com/domainry/domainry-identity-sdk/contracttest"
-	"github.com/domainry/domainry-identity-sdk/httpmiddleware"
-	identitymodel "github.com/domainry/domainry-identity-sdk/identity"
-	"github.com/domainry/domainry-identity-sdk/management"
-	"github.com/domainry/domainry-identity-sdk/modulehost"
+		_ "github.com/domainry/domainry-identity-sdk/contracttest"
+		"github.com/domainry/domainry-identity-sdk/httpapi"
+		"github.com/domainry/domainry-identity-sdk/httpmiddleware"
+		identitymodel "github.com/domainry/domainry-identity-sdk/identity"
 	"github.com/domainry/domainry-identity-sdk/remote"
 )
 
@@ -42,8 +41,7 @@ var (
 	_ authentication.Authentication
 	_ authorization.Authorization
 	_ identitymodel.Directory
-	_ management.Surface
-	_ modulehost.Host
+		_ httpapi.Surface
 	_ = application.Bind
 	_ = evaluator.Evaluate
 	_ = principal.NewResolver

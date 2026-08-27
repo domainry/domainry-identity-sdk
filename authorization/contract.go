@@ -106,11 +106,12 @@ const (
 )
 
 type DataPolicy struct {
-	Key       string       `json:"key"`
-	Resource  ResourceType `json:"resource"`
-	Action    Action       `json:"action"`
-	Effect    Effect       `json:"effect"`
-	Predicate Predicate    `json:"predicate"`
+	Key         string       `json:"key"`
+	Resource    ResourceType `json:"resource"`
+	Action      Action       `json:"action"`
+	Effect      Effect       `json:"effect"`
+	Predicate   Predicate    `json:"predicate"`
+	AuditDenial bool         `json:"audit_denial,omitempty"`
 }
 
 type FieldPolicy struct {
@@ -120,7 +121,45 @@ type FieldPolicy struct {
 	Write    bool         `json:"write"`
 	Export   bool         `json:"export"`
 	Masked   bool         `json:"masked"`
+	Reason   string       `json:"reason,omitempty"`
+	Rules    []FieldRule  `json:"rules,omitempty"`
 }
+
+// FieldRule refines a field's static access envelope for a matching record.
+// Rules are evaluated by descending priority and the first match is decisive.
+type FieldRule struct {
+	Key          string        `json:"key"`
+	Priority     int           `json:"priority"`
+	Actions      []Action      `json:"actions"`
+	Effect       FieldEffect   `json:"effect"`
+	Predicate    *Predicate    `json:"predicate,omitempty"`
+	MaskStrategy *MaskStrategy `json:"mask_strategy,omitempty"`
+	AuditDenial  bool          `json:"audit_denial,omitempty"`
+}
+
+type FieldEffect string
+
+const (
+	FieldEffectAllow FieldEffect = "allow"
+	FieldEffectDeny  FieldEffect = "deny"
+	FieldEffectHide  FieldEffect = "hide"
+	FieldEffectMask  FieldEffect = "mask"
+)
+
+type MaskStrategy struct {
+	Type  MaskType `json:"type"`
+	LastN int      `json:"last_n,omitempty"`
+}
+
+type MaskType string
+
+const (
+	MaskTypePhone    MaskType = "phone"
+	MaskTypeIDNumber MaskType = "id_number"
+	MaskTypeEmail    MaskType = "email"
+	MaskTypeYearOnly MaskType = "year_only"
+	MaskTypeLastN    MaskType = "last_n"
+)
 
 type ReferencePolicy struct {
 	SourceResource ResourceType `json:"source_resource"`
@@ -128,6 +167,7 @@ type ReferencePolicy struct {
 	TargetResource ResourceType `json:"target_resource"`
 	DisplayFields  []string     `json:"display_fields,omitempty"`
 	Allowed        bool         `json:"allowed"`
+	Reason         string       `json:"reason,omitempty"`
 }
 
 type ExportMode string
@@ -147,18 +187,34 @@ type Guardrail struct {
 	Key       string       `json:"key"`
 	Resource  ResourceType `json:"resource,omitempty"`
 	Action    Action       `json:"action,omitempty"`
+	Field     string       `json:"field,omitempty"`
 	Effect    Effect       `json:"effect"`
 	Predicate *Predicate   `json:"predicate,omitempty"`
+	Reason    string       `json:"reason,omitempty"`
 }
 
 type Predicate struct {
-	Fact     string      `json:"fact,omitempty"`
-	Operator Operator    `json:"operator,omitempty"`
-	Value    any         `json:"value,omitempty"`
-	All      []Predicate `json:"all,omitempty"`
-	Any      []Predicate `json:"any,omitempty"`
-	Not      *Predicate  `json:"not,omitempty"`
+	Fact     string            `json:"fact,omitempty"`
+	Path     []RelationSegment `json:"path,omitempty"`
+	Operator Operator          `json:"operator,omitempty"`
+	Value    any               `json:"value,omitempty"`
+	All      []Predicate       `json:"all,omitempty"`
+	Any      []Predicate       `json:"any,omitempty"`
+	Not      *Predicate        `json:"not,omitempty"`
 }
+
+type RelationSegment struct {
+	Direction      RelationDirection `json:"direction"`
+	Reference      string            `json:"reference"`
+	TargetResource ResourceType      `json:"target_resource"`
+}
+
+type RelationDirection string
+
+const (
+	RelationForward RelationDirection = "forward"
+	RelationReverse RelationDirection = "reverse"
+)
 
 type Operator string
 

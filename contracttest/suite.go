@@ -34,7 +34,7 @@ func Run(t *testing.T, fixture Fixture) {
 		t.Fatal("Identity application key is required")
 	}
 	descriptor := fixture.Binding.Descriptor()
-	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.PolicyBundleVersionV1 || descriptor.CatalogVersion != identity.CatalogVersionV1 {
+	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.CurrentPolicyBundleVersion || descriptor.CatalogVersion != identity.CatalogVersionV1 {
 		t.Fatalf("unsupported descriptor: %+v", descriptor)
 	}
 	if identity.ApplicationKey(descriptor.Audience) != fixture.ApplicationKey || descriptor.Issuer == "" {

@@ -9,7 +9,7 @@ import (
 func TestAccessBundleCanonicalJSONIsOrderIndependent(t *testing.T) {
 	now := time.Date(2026, 8, 27, 1, 0, 0, 0, time.UTC)
 	first := AccessBundle{
-		ContractVersion: PolicyBundleVersionV1, CatalogRevision: "catalog-1", AuthorizationRevision: "authz-1", ExpiresAt: now.Add(time.Hour),
+		ContractVersion: CurrentPolicyBundleVersion, CatalogRevision: "catalog-1", AuthorizationRevision: "authz-1", ExpiresAt: now.Add(time.Hour),
 		Subject:        Subject{WorkspaceID: "workspace-1", SubjectID: "user-1", ReportingSubjectIDs: []SubjectID{"user-3", "user-2"}, OrganizationScopes: map[string][]string{"team_ids": {"team-b", "team-a"}}},
 		FunctionGrants: []FunctionGrant{{Resource: "order", Action: "update", Effect: EffectDeny}, {Resource: "order", Action: "read", Effect: EffectAllow}},
 		DataPolicies: []DataPolicy{
@@ -52,7 +52,7 @@ func TestAccessBundleCanonicalJSONIsOrderIndependent(t *testing.T) {
 
 func TestAccessBundleRejectsAmbiguousEffectivePolicies(t *testing.T) {
 	now := time.Now().UTC()
-	base := AccessBundle{ContractVersion: PolicyBundleVersionV1, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute), Subject: Subject{WorkspaceID: "workspace", SubjectID: "user"}}
+	base := AccessBundle{ContractVersion: CurrentPolicyBundleVersion, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute), Subject: Subject{WorkspaceID: "workspace", SubjectID: "user"}}
 	duplicateFunction := base
 	duplicateFunction.FunctionGrants = []FunctionGrant{{Resource: "order", Action: "read", Effect: EffectAllow}, {Resource: "order", Action: "read", Effect: EffectAllow}}
 	if err := duplicateFunction.Validate(now); err == nil {
@@ -74,5 +74,41 @@ func TestAccessBundleRejectsAmbiguousEffectivePolicies(t *testing.T) {
 	ambiguousGuardrail.Guardrails = []Guardrail{{Key: "ambiguous", Effect: EffectDeny, Predicate: &Predicate{Fact: "status", Operator: OperatorEqual, Value: "blocked"}}}
 	if err := ambiguousGuardrail.Validate(now); err == nil {
 		t.Fatal("resource-free predicate guardrail accepted")
+	}
+}
+
+func TestAccessBundleV2PreservesContextualAndRelationshipPolicy(t *testing.T) {
+	now := time.Now().UTC()
+	predicate := Predicate{
+		Fact: "owner_id", Operator: OperatorEqual, Value: "$context.business_profile_id",
+		Path: []RelationSegment{{Direction: RelationForward, Reference: "account_id", TargetResource: "account"}},
+	}
+	bundle := AccessBundle{
+		ContractVersion: CurrentPolicyBundleVersion, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
+		Subject:      Subject{WorkspaceID: "workspace", SubjectID: "user"},
+		DataPolicies: []DataPolicy{{Key: "owned-account", Resource: "invoice", Action: "read", Effect: EffectAllow, Predicate: predicate, AuditDenial: true}},
+		FieldPolicies: []FieldPolicy{{
+			Resource: "invoice", Field: "phone", Read: true, Masked: true, Reason: "personal data",
+			Rules: []FieldRule{{Key: "owner-clear", Priority: 100, Actions: []Action{"export", "read"}, Effect: FieldEffectAllow, Predicate: &predicate}},
+		}},
+		ReferencePolicies: []ReferencePolicy{{SourceResource: "invoice", Reference: "account_id", TargetResource: "account", Allowed: false, Reason: "restricted account"}},
+		Guardrails:        []Guardrail{{Key: "deny-phone-export", Resource: "invoice", Action: "export", Field: "phone", Effect: EffectDeny, Reason: "export restricted"}},
+	}
+	first, err := bundle.CanonicalJSON(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle.FieldPolicies[0].Rules[0].Actions = []Action{"read", "export"}
+	second, err := bundle.CanonicalJSON(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(first, second) {
+		t.Fatalf("canonical V2 policies differ:\n%s\n%s", first, second)
+	}
+	legacy := bundle
+	legacy.ContractVersion = PolicyBundleVersionV1
+	if err := legacy.Validate(now); err == nil {
+		t.Fatal("V1 bundle was accepted by the V2 evaluator")
 	}
 }

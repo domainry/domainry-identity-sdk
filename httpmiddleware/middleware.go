@@ -21,12 +21,53 @@ func WithErrorWriter(writer ErrorWriter) Option {
 	}
 }
 
+// WithAuthorization enables online, fail-closed reauthorization for
+// high-risk operations. Ordinary requests should use cached AccessBundles.
+func WithAuthorization(authorization identitysdk.Authorization) Option {
+	return func(middleware *Middleware) {
+		middleware.authorization = authorization
+	}
+}
+
 type Middleware struct {
-	authenticator identitysdk.Authenticator
+	authenticator identitysdk.PrincipalAuthenticator
+	authorization identitysdk.Authorization
 	writeError    ErrorWriter
 }
 
-func New(authenticator identitysdk.Authenticator, options ...Option) (*Middleware, error) {
+func (m *Middleware) RequireReauthorization(access identitysdk.AccessRequest, facts func(*http.Request) identitysdk.ResourceFacts, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		identity, ok := identitysdk.RequestIdentityFromContext(r.Context())
+		if !ok {
+			m.writeError(w, r, http.StatusUnauthorized, "auth.token_required")
+			return
+		}
+		if m.authorization == nil {
+			m.writeError(w, r, http.StatusServiceUnavailable, "identity.reauthorization_unavailable")
+			return
+		}
+		if next == nil {
+			m.writeError(w, r, http.StatusInternalServerError, "identity.middleware_handler_required")
+			return
+		}
+		resourceFacts := identitysdk.ResourceFacts{}
+		if facts != nil {
+			resourceFacts = facts(r)
+		}
+		decision, err := m.authorization.Reauthorize(r.Context(), identitysdk.DecisionRequest{Identity: identity, Access: access, Facts: resourceFacts})
+		if err != nil {
+			m.writeError(w, r, http.StatusServiceUnavailable, "identity.reauthorization_failed")
+			return
+		}
+		if !decision.Allowed {
+			m.writeError(w, r, http.StatusForbidden, "auth.permission_denied")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func New(authenticator identitysdk.PrincipalAuthenticator, options ...Option) (*Middleware, error) {
 	if authenticator == nil {
 		return nil, errors.New("identity authenticator is required")
 	}

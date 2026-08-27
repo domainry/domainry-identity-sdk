@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	identitysdk "github.com/domainry/domainry-identity-sdk"
+	identityprincipal "github.com/domainry/domainry-identity-sdk/authorization/principal"
 	"github.com/domainry/domainry-identity-sdk/httpmiddleware"
 )
 
@@ -18,25 +19,38 @@ func TestIdentityIntegrationPasswordSession(t *testing.T) {
 	if baseURL == "" || login == "" || password == "" || workspaceID == "" {
 		t.Skip("Identity SDK integration environment is not configured")
 	}
-	client, err := New(Config{BaseURL: baseURL, WorkspaceID: workspaceID})
+	issuer := os.Getenv("IDENTITY_SDK_INTEGRATION_ISSUER")
+	if issuer == "" {
+		issuer = baseURL
+	}
+	audience := os.Getenv("IDENTITY_SDK_INTEGRATION_AUDIENCE")
+	if audience == "" {
+		audience = "domainry-runtime"
+	}
+	binding, err := NewFactory(Config{Endpoint: baseURL, WorkspaceID: workspaceID, Issuer: issuer, Audience: audience}).Open(t.Context(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	session, err := client.Login(t.Context(), identitysdk.LoginRequest{Login: login, Password: password})
+	t.Cleanup(func() { _ = binding.Close(t.Context()) })
+	session, err := binding.Authentication().LoginWithPassword(t.Context(), identitysdk.PasswordLoginRequest{WorkspaceID: identitysdk.WorkspaceID(workspaceID), Login: login, Password: password})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if session.AccessToken == "" || session.RefreshToken == "" {
 		t.Fatal("Identity login returned incomplete credentials")
 	}
-	principal, err := client.Authenticate(t.Context(), session.AccessToken)
+	resolver, err := identityprincipal.NewResolver(binding, identityprincipal.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	principal, err := resolver.Authenticate(t.Context(), session.AccessToken)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !principal.Known || principal.UserID == "" || principal.WorkspaceID != workspaceID {
 		t.Fatalf("principal identity mismatch: known=%v user=%q workspace=%q", principal.Known, principal.UserID, principal.WorkspaceID)
 	}
-	security, err := httpmiddleware.New(client)
+	security, err := httpmiddleware.New(resolver)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +68,7 @@ func TestIdentityIntegrationPasswordSession(t *testing.T) {
 	if response.Code != http.StatusNoContent {
 		t.Fatalf("protected middleware status=%d body=%s", response.Code, response.Body.String())
 	}
-	if err := client.Logout(t.Context(), session.RefreshToken); err != nil {
+	if err := binding.Authentication().LogoutSession(t.Context(), identitysdk.LogoutRequest{WorkspaceID: identitysdk.WorkspaceID(workspaceID), RefreshToken: session.RefreshToken}); err != nil {
 		t.Fatal(err)
 	}
 }

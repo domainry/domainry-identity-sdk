@@ -18,6 +18,23 @@ type authenticatorStub struct {
 	calls     int
 }
 
+type authorizationStub struct {
+	decision identitysdk.AccessDecision
+	err      error
+	request  identitysdk.DecisionRequest
+	calls    int
+}
+
+func (stub *authorizationStub) ResolveAccess(context.Context, identitysdk.AccessBundleRequest) (identitysdk.AccessBundle, error) {
+	return identitysdk.AccessBundle{}, errors.New("not used")
+}
+
+func (stub *authorizationStub) Reauthorize(_ context.Context, request identitysdk.DecisionRequest) (identitysdk.AccessDecision, error) {
+	stub.calls++
+	stub.request = request
+	return stub.decision, stub.err
+}
+
 func (stub *authenticatorStub) Authenticate(_ context.Context, token string) (identitysdk.Principal, error) {
 	stub.calls++
 	stub.token = token
@@ -126,5 +143,46 @@ func TestNewAndCustomErrorWriter(t *testing.T) {
 	middleware.Authenticate(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
 	if response.Code != http.StatusUnauthorized || writtenCode != "auth.token_required" {
 		t.Fatalf("status=%d code=%q", response.Code, writtenCode)
+	}
+}
+
+func TestRequireReauthorizationUsesOnlineDecisionAndFacts(t *testing.T) {
+	authorization := &authorizationStub{decision: identitysdk.AccessDecision{Allowed: true}}
+	middleware, err := New(&authenticatorStub{}, WithAuthorization(authorization))
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextCalls := 0
+	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { nextCalls++ })
+	identity := identitysdk.RequestIdentity{Principal: identitysdk.Principal{Known: true, UserID: "user"}, AccessToken: "access-token"}
+	request := httptest.NewRequest(http.MethodDelete, "/orders/1", nil).WithContext(identitysdk.WithRequestIdentity(context.Background(), identity))
+	handler := middleware.RequireReauthorization(identitysdk.AccessRequest{ObjectKey: "order", Action: "delete", RecordID: "1"}, func(*http.Request) identitysdk.ResourceFacts {
+		return identitysdk.ResourceFacts{"owner_id": "user"}
+	}, next)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if nextCalls != 1 || authorization.calls != 1 || authorization.request.Identity.AccessToken != "access-token" || authorization.request.Facts["owner_id"] != "user" {
+		t.Fatalf("next=%d calls=%d request=%#v", nextCalls, authorization.calls, authorization.request)
+	}
+
+	authorization.decision.Allowed = false
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden || nextCalls != 1 {
+		t.Fatalf("denied status=%d next=%d", response.Code, nextCalls)
+	}
+
+	authorization.err = errors.New("offline")
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable || nextCalls != 1 {
+		t.Fatalf("failed status=%d next=%d", response.Code, nextCalls)
+	}
+
+	withoutAuthorization, _ := New(&authenticatorStub{})
+	response = httptest.NewRecorder()
+	withoutAuthorization.RequireReauthorization(identitysdk.AccessRequest{}, nil, next).ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("missing authorization status=%d", response.Code)
 	}
 }

@@ -6,25 +6,29 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"strings"
 	"testing"
 
-	identitysdk "github.com/domainry/domainry-identity-sdk"
+	identity "github.com/domainry/domainry-identity-sdk"
 )
 
-func newTestClient(t *testing.T, handler http.Handler) *Client {
+type remoteTestHost struct{ application identity.ApplicationRef }
+
+func (host remoteTestHost) Application() identity.ApplicationRef { return host.application }
+func (remoteTestHost) Clock() identity.Clock                     { return nil }
+func (remoteTestHost) Audit() identity.AuditAppender             { return nil }
+
+func newTestClient(t *testing.T, handler http.Handler) *client {
 	t.Helper()
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
-	client, err := New(Config{BaseURL: server.URL, WorkspaceID: "workspace-a", HTTPClient: server.Client()})
+	client, err := newClient(Config{Endpoint: server.URL, WorkspaceID: "workspace-a", Audience: "runtime-app", HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return client
 }
 
-func TestAuthenticateAndAuthorize(t *testing.T) {
+func TestAuthenticationAndOnlineAuthorization(t *testing.T) {
 	calls := []string{}
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls = append(calls, r.URL.Path)
@@ -33,16 +37,17 @@ func TestAuthenticateAndAuthorize(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/auth/me":
-			_, _ = w.Write([]byte(`{"user":{"id":"user-1","name":"Ada","status":"active"},"roles":[{"id":"role-1","key":"admin","label":"Admin"}],"default_role":"admin","permissions":["order.write","order.read","order.read"],"must_change_password":false}`))
-		case "/identity/principal-context":
-			_, _ = w.Write([]byte(`{"contract_version":"domainry-principal-context-v1","known":true,"workspace_id":"workspace-a","user_id":"user-1","role_key":"admin","reporting_user_ids":[],"organization_scopes":{"team_ids":[],"store_ids":[],"territory_ids":[],"warehouse_ids":[]},"business_profiles":[],"request_contexts":[]}`))
-		case "/identity/access/explain":
-			var request map[string]string
+		case "/auth/session":
+			_, _ = w.Write([]byte(`{"session_id":"session-1","tenant_id":"tenant-a","workspace_id":"workspace-a","subject_id":"user-1","authorization_revision":"revision-1","user":{"id":"user-1","name":"Ada","status":"active"},"roles":[{"id":"role-1","key":"admin","label":"Admin"}],"default_role":"admin","permissions":["order.write","order.read"],"must_change_password":false}`))
+		case "/identity/reauthorize":
+			var request struct {
+				Access identity.AccessRequest `json:"access"`
+				Facts  identity.ResourceFacts `json:"facts"`
+			}
 			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 				t.Fatal(err)
 			}
-			if request["user_id"] != "user-1" || request["object_key"] != "order" || request["action"] != "read" || request["record_id"] != "order-1" {
+			if request.Access.ObjectKey != "order" || request.Access.Action != "read" || request.Access.RecordID != "order-1" || request.Facts["owner_id"] != "user-1" {
 				t.Fatalf("access request = %#v", request)
 			}
 			_, _ = w.Write([]byte(`{"user_id":"user-1","object_key":"order","action":"read","record_id":"order-1","allowed":true,"authorization_revision":"revision-1","reason":{"code":"effective_access_allowed","effect":"allow","layer":"effective"}}`))
@@ -51,24 +56,26 @@ func TestAuthenticateAndAuthorize(t *testing.T) {
 		}
 	}))
 
-	principal, err := client.Authenticate(t.Context(), " access-token ")
-	if err != nil {
-		t.Fatal(err)
+	authentication := authentication{client: client}
+	session, err := authentication.CurrentSession(t.Context(), identity.CurrentSessionRequest{AccessToken: "access-token"})
+	if err != nil || session.SubjectID != "user-1" || session.WorkspaceID != "workspace-a" || session.DefaultRole != "admin" {
+		t.Fatalf("session=%#v err=%v", session, err)
 	}
-	if !principal.Known || principal.UserID != "user-1" || principal.User.Name != "Ada" || principal.RoleKey != "admin" || len(principal.Permissions) != 2 || principal.Permissions[0] != "order.read" {
-		t.Fatalf("principal = %#v", principal)
+	// Reauthorization authenticates the bearer token on the Identity server;
+	// the remote transport must not trust or require a caller-supplied user ID.
+	principal := identity.Principal{Known: true, WorkspaceID: "workspace-a"}
+	decision, err := (authorization{client: client}).Reauthorize(t.Context(), identity.DecisionRequest{
+		Identity: identity.RequestIdentity{Principal: principal, AccessToken: "access-token"},
+		Access:   identity.AccessRequest{ObjectKey: " order ", Action: " read ", RecordID: " order-1 "},
+		Facts:    identity.ResourceFacts{"owner_id": "user-1"},
+	})
+	if err != nil || !decision.Allowed || len(calls) != 2 {
+		t.Fatalf("decision=%#v calls=%v err=%v", decision, calls, err)
 	}
-	decision, err := client.Authorize(t.Context(), identitysdk.RequestIdentity{Principal: principal, AccessToken: "access-token"}, identitysdk.AccessRequest{ObjectKey: " order ", Action: " read ", RecordID: " order-1 "})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !decision.Allowed || decision.AuthorizationRevision != "revision-1" || len(calls) != 3 {
-		t.Fatalf("decision=%#v calls=%v", decision, calls)
-	}
-	if _, err := client.Authenticate(t.Context(), " "); err == nil {
+	if _, err := authentication.CurrentSession(t.Context(), identity.CurrentSessionRequest{}); err == nil {
 		t.Fatal("empty access token accepted")
 	}
-	if _, err := client.Authorize(t.Context(), identitysdk.RequestIdentity{}, identitysdk.AccessRequest{}); err == nil {
+	if _, err := (authorization{client: client}).Reauthorize(t.Context(), identity.DecisionRequest{}); err == nil {
 		t.Fatal("unknown identity accepted")
 	}
 }
@@ -78,9 +85,9 @@ func TestPasswordAndProviderFlows(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/auth/login":
-			var request identitysdk.LoginRequest
+			var request identity.PasswordLoginRequest
 			_ = json.NewDecoder(r.Body).Decode(&request)
-			if request.WorkspaceID != "workspace-a" || request.Login != "admin@example.com" || request.Password != "password" {
+			if request.WorkspaceID != "workspace-a" || request.ApplicationKey != "runtime-app" || request.Login != "admin@example.com" || request.Password != "password" {
 				t.Fatalf("login request = %#v", request)
 			}
 			_, _ = w.Write([]byte(`{"workspace_id":"workspace-a","access_token":"access-1","refresh_token":"refresh-1","token_type":"Bearer","user":{"id":"user-1"}}`))
@@ -91,6 +98,11 @@ func TestPasswordAndProviderFlows(t *testing.T) {
 		case "/auth/providers":
 			_, _ = w.Write([]byte(`[{"key":"oidc","label":"Company SSO","type":"oidc","enabled":true}]`))
 		case "/auth/providers/oidc/start":
+			var request identity.BeginFederatedLoginRequest
+			_ = json.NewDecoder(r.Body).Decode(&request)
+			if request.ApplicationKey != "runtime-app" {
+				t.Fatalf("provider application key=%q", request.ApplicationKey)
+			}
 			_, _ = w.Write([]byte(`{"provider":"oidc","state":"state-1","nonce":"nonce-1","auth_url":"https://login.example/authorize","expires_at":"2026-01-01T00:00:00Z"}`))
 		case "/auth/providers/otp/verify":
 			_, _ = w.Write([]byte(`{"workspace_id":"workspace-a","access_token":"otp-access","refresh_token":"otp-refresh","token_type":"Bearer","user":{"id":"user-1"}}`))
@@ -98,75 +110,152 @@ func TestPasswordAndProviderFlows(t *testing.T) {
 			if err := r.ParseForm(); err != nil || r.Form.Get("state") != "state-1" || r.Form.Get("code") != "code-1" {
 				t.Fatalf("callback form=%v err=%v", r.Form, err)
 			}
-			_, _ = w.Write([]byte(`{"workspace_id":"workspace-a","access_token":"sso-access","refresh_token":"sso-refresh","token_type":"Bearer","user":{"id":"user-1"}}`))
+			http.Redirect(w, r, "http://localhost:3100/auth/callback?code=domainry-code&state=state-1", http.StatusSeeOther)
 		default:
 			http.NotFound(w, r)
 		}
 	}))
+	authentication := authentication{client: client}
 
-	session, err := client.Login(t.Context(), identitysdk.LoginRequest{Login: " admin@example.com ", Password: "password"})
+	session, err := authentication.LoginWithPassword(t.Context(), identity.PasswordLoginRequest{Login: " admin@example.com ", Password: "password", WorkspaceID: "workspace-a"})
 	if err != nil || session.AccessToken != "access-1" || session.RefreshToken != "refresh-1" {
 		t.Fatalf("login session=%#v err=%v", session, err)
 	}
-	refreshed, err := client.Refresh(t.Context(), "refresh-1")
+	refreshed, err := authentication.RefreshSession(t.Context(), identity.RefreshRequest{WorkspaceID: "workspace-a", RefreshToken: "refresh-1"})
 	if err != nil || refreshed.AccessToken != "access-2" {
 		t.Fatalf("refresh session=%#v err=%v", refreshed, err)
 	}
-	if err := client.Logout(t.Context(), "refresh-2"); err != nil {
+	if err := authentication.LogoutSession(t.Context(), identity.LogoutRequest{WorkspaceID: "workspace-a", RefreshToken: "refresh-2"}); err != nil {
 		t.Fatal(err)
 	}
-	providers, err := client.Providers(t.Context())
+	providers, err := authentication.Providers(t.Context(), identity.ProviderQuery{WorkspaceID: "workspace-a"})
 	if err != nil || len(providers) != 1 || providers[0].Key != "oidc" {
 		t.Fatalf("providers=%#v err=%v", providers, err)
 	}
-	challenge, err := client.StartProvider(t.Context(), "oidc", identitysdk.ProviderStartRequest{})
+	challenge, err := authentication.BeginFederatedLogin(t.Context(), identity.BeginFederatedLoginRequest{WorkspaceID: "workspace-a", Provider: "oidc"})
 	if err != nil || challenge.State != "state-1" || challenge.AuthURL == "" {
 		t.Fatalf("challenge=%#v err=%v", challenge, err)
 	}
-	otp, err := client.VerifyProvider(t.Context(), "otp", identitysdk.ProviderVerifyRequest{State: "state", Code: "123456"})
+	otp, err := authentication.VerifyOTP(t.Context(), identity.VerifyOTPRequest{WorkspaceID: "workspace-a", Provider: "otp", State: "state", Code: "123456"})
 	if err != nil || otp.AccessToken != "otp-access" {
 		t.Fatalf("otp=%#v err=%v", otp, err)
 	}
-	sso, err := client.CompleteProviderCallback(t.Context(), "oidc", identitysdk.ProviderCallback{Values: map[string]string{"state": "state-1", "code": "code-1"}})
-	if err != nil || sso.AccessToken != "sso-access" {
-		t.Fatalf("sso=%#v err=%v", sso, err)
+	completion, err := authentication.CompleteFederatedLogin(t.Context(), identity.CompleteFederatedLoginRequest{Provider: "oidc", Values: map[string]string{"state": "state-1", "code": "code-1"}})
+	if err != nil || completion.AuthorizationCode != "domainry-code" || completion.ReturnURL != "http://localhost:3100/auth/callback" {
+		t.Fatalf("completion=%#v err=%v", completion, err)
+	}
+}
+
+func TestCredentialMutationsPropagateIdempotencyKeys(t *testing.T) {
+	wantKeys := map[string]string{
+		"/auth/change-password":        "change-1",
+		"/auth/reset-password":         "reset-1",
+		"/auth/sessions/revoke-others": "revoke-1",
+	}
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got, want := r.Header.Get("Idempotency-Key"), wantKeys[r.URL.Path]; got != want {
+			t.Fatalf("%s idempotency key=%q want=%q", r.URL.Path, got, want)
+		}
+		if r.Header.Get("Authorization") != "Bearer access-token" {
+			t.Fatalf("%s authorization=%q", r.URL.Path, r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/auth/change-password" {
+			_, _ = w.Write([]byte(`{"workspace_id":"workspace-a","access_token":"rotated","refresh_token":"refresh","token_type":"Bearer","user":{"id":"user-1"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	credentials := credentialClient{client: client}
+	if session, err := credentials.ChangePassword(t.Context(), identity.ChangePasswordRequest{AccessToken: "access-token", CurrentPassword: "old", NewPassword: "new", IdempotencyKey: "change-1"}); err != nil || session.AccessToken != "rotated" {
+		t.Fatalf("change session=%#v err=%v", session, err)
+	}
+	if err := credentials.ResetPassword(t.Context(), identity.ResetPasswordRequest{AccessToken: "access-token", SubjectID: "user-2", NewPassword: "temporary", IdempotencyKey: "reset-1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := credentials.RevokeSessions(t.Context(), identity.RevokeSessionsRequest{AccessToken: "access-token", SubjectID: "user-1", IdempotencyKey: "revoke-1"}); err != nil {
+		t.Fatal(err)
 	}
 }
 
 func TestConfigurationAndRemoteErrors(t *testing.T) {
 	for _, rawURL := range []string{"", "identity.example.com", "ftp://identity.example.com", "https://identity.example.com?bad=1"} {
-		if _, err := New(Config{BaseURL: rawURL}); err == nil {
+		if _, err := newClient(Config{Endpoint: rawURL}); err == nil {
 			t.Fatalf("invalid URL accepted: %q", rawURL)
 		}
 	}
 
-	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Request-ID", "request-1")
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = w.Write([]byte(`{"error":{"code":"auth.token_invalid","params":{"kind":"expired"}}}`))
 	}))
-	_, err := client.Authenticate(t.Context(), "expired-token")
-	var identityError *identitysdk.Error
+	_, err := (authentication{client: client}).CurrentSession(t.Context(), identity.CurrentSessionRequest{AccessToken: "expired-token"})
+	var identityError *identity.Error
 	if !errors.As(err, &identityError) || identityError.StatusCode != http.StatusForbidden || identityError.Code != "auth.token_invalid" || identityError.RequestID != "request-1" || identityError.Params["kind"] != "expired" {
 		t.Fatalf("error = %#v", err)
 	}
 
-	brokenClient := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`not-json`))
-	}))
-	_, err = brokenClient.Authenticate(t.Context(), "token")
-	if !errors.As(err, &identityError) || identityError.Code != "identity.response_invalid" {
-		t.Fatalf("invalid response error = %#v", err)
-	}
-
-	unreachable, _ := New(Config{BaseURL: "http://127.0.0.1:1", HTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+	unreachable, _ := newClient(Config{Endpoint: "http://127.0.0.1:1", HTTPClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return nil, context.DeadlineExceeded
 	})}})
-	_, err = unreachable.Authenticate(t.Context(), "token")
+	_, err = (authentication{client: unreachable}).CurrentSession(t.Context(), identity.CurrentSessionRequest{AccessToken: "token"})
 	if !errors.As(err, &identityError) || identityError.Code != "identity.remote_unavailable" {
 		t.Fatalf("unavailable error = %#v", err)
+	}
+}
+
+func TestDiscoveryRequiresCompatibleSaaSIssuerAndCapabilities(t *testing.T) {
+	valid := identity.Descriptor{
+		ProtocolVersion: identity.CurrentProtocolVersion,
+		BundleVersion:   identity.PolicyBundleVersionV1,
+		CatalogVersion:  identity.CatalogVersionV1,
+		Mode:            identity.DeploymentModeSaaS,
+		Issuer:          "https://identity.example.com",
+		Capabilities:    []string{"authentication", "token_verification", "authorization", "principal_resolution", "directory_projection", "catalog"},
+	}
+	if err := validateDiscovery(valid, valid.Issuer); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := map[string]identity.Descriptor{
+		"protocol": func() identity.Descriptor { value := valid; value.ProtocolVersion = "future"; return value }(),
+		"mode":     func() identity.Descriptor { value := valid; value.Mode = identity.DeploymentModeModule; return value }(),
+		"issuer":   func() identity.Descriptor { value := valid; value.Issuer = "https://other.example.com"; return value }(),
+		"capabilities": func() identity.Descriptor {
+			value := valid
+			value.Capabilities = []string{"authentication"}
+			return value
+		}(),
+	}
+	for name, descriptor := range tests {
+		t.Run(name, func(t *testing.T) {
+			if err := validateDiscovery(descriptor, valid.Issuer); err == nil {
+				t.Fatalf("invalid discovery accepted: %+v", descriptor)
+			}
+		})
+	}
+}
+
+func TestRemoteApplicationUsesHostScopeAndRejectsSplitConfiguration(t *testing.T) {
+	host := remoteTestHost{application: identity.ApplicationRef{WorkspaceID: "workspace-a", ApplicationKey: "orders-runtime"}}
+	resolved, application, err := remoteApplication(Config{}, host)
+	if err != nil || resolved.WorkspaceID != "workspace-a" || resolved.Audience != "orders-runtime" || application.WorkspaceID != host.application.WorkspaceID || application.ApplicationKey != host.application.ApplicationKey {
+		t.Fatalf("resolved=%+v application=%+v err=%v", resolved, application, err)
+	}
+	for name, config := range map[string]Config{
+		"workspace":   {WorkspaceID: "workspace-b", Audience: "orders-runtime"},
+		"application": {WorkspaceID: "workspace-a", Audience: "billing-runtime"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, _, err := remoteApplication(config, host); err == nil {
+				t.Fatalf("split Identity configuration accepted: %+v", config)
+			}
+		})
+	}
+	if _, _, err := remoteApplication(Config{}, remoteTestHost{}); err == nil {
+		t.Fatal("invalid host application scope accepted")
 	}
 }
 
@@ -174,11 +263,4 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (function roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
 	return function(request)
-}
-
-func TestCallbackUsesFormEncoding(t *testing.T) {
-	values := url.Values{"RelayState": {"state"}, "SAMLResponse": {"assertion"}}
-	if encoded := values.Encode(); !strings.Contains(encoded, "SAMLResponse=assertion") {
-		t.Fatalf("encoded callback = %q", encoded)
-	}
 }

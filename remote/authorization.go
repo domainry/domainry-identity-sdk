@@ -5,33 +5,44 @@ import (
 	"net/http"
 	"strings"
 
-	identitysdk "github.com/domainry/domainry-identity-sdk"
+	identity "github.com/domainry/domainry-identity-sdk"
 )
 
-func (c *Client) Authorize(ctx context.Context, identity identitysdk.RequestIdentity, request identitysdk.AccessRequest) (identitysdk.AccessDecision, error) {
-	if !identity.Principal.Known || strings.TrimSpace(identity.Principal.UserID) == "" || strings.TrimSpace(identity.AccessToken) == "" {
-		return identitysdk.AccessDecision{}, &identitysdk.Error{StatusCode: http.StatusUnauthorized, Code: "auth.token_required"}
+type authorization struct{ client *client }
+
+func (adapter authorization) ResolveAccess(ctx context.Context, request identity.AccessBundleRequest) (identity.AccessBundle, error) {
+	if !request.Identity.Principal.Known || strings.TrimSpace(request.Identity.AccessToken) == "" {
+		return identity.AccessBundle{}, &identity.Error{StatusCode: http.StatusUnauthorized, Code: "auth.token_required"}
 	}
-	request.ObjectKey = strings.TrimSpace(request.ObjectKey)
-	request.Action = strings.TrimSpace(request.Action)
-	request.FieldKey = strings.TrimSpace(request.FieldKey)
-	request.RecordID = strings.TrimSpace(request.RecordID)
-	if request.ObjectKey == "" || request.Action == "" {
-		return identitysdk.AccessDecision{}, &identitysdk.Error{StatusCode: http.StatusBadRequest, Code: "identity.access_request_invalid"}
+	payload := map[string]string{"resource_type": string(request.ResourceType), "action": string(request.Action)}
+	var bundle identity.AccessBundle
+	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/access-bundle", request.Identity.AccessToken, payload, &bundle); err != nil {
+		return identity.AccessBundle{}, err
+	}
+	if err := bundle.Validate(adapter.client.now()); err != nil {
+		return identity.AccessBundle{}, err
+	}
+	return bundle, nil
+}
+
+func (adapter authorization) Reauthorize(ctx context.Context, request identity.DecisionRequest) (identity.AccessDecision, error) {
+	if !request.Identity.Principal.Known || strings.TrimSpace(request.Identity.AccessToken) == "" {
+		return identity.AccessDecision{}, &identity.Error{StatusCode: http.StatusUnauthorized, Code: "auth.token_required"}
+	}
+	request.Access.ObjectKey = strings.TrimSpace(request.Access.ObjectKey)
+	request.Access.Action = strings.TrimSpace(request.Access.Action)
+	request.Access.FieldKey = strings.TrimSpace(request.Access.FieldKey)
+	request.Access.RecordID = strings.TrimSpace(request.Access.RecordID)
+	if request.Access.ObjectKey == "" || request.Access.Action == "" {
+		return identity.AccessDecision{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.access_request_invalid"}
 	}
 	payload := struct {
-		UserID    string `json:"user_id"`
-		ObjectKey string `json:"object_key"`
-		Action    string `json:"action"`
-		FieldKey  string `json:"field_key,omitempty"`
-		RecordID  string `json:"record_id,omitempty"`
-	}{
-		UserID: identity.Principal.UserID, ObjectKey: request.ObjectKey, Action: request.Action,
-		FieldKey: request.FieldKey, RecordID: request.RecordID,
-	}
-	var decision identitysdk.AccessDecision
-	if err := c.doJSON(ctx, http.MethodPost, "/identity/access/explain", identity.AccessToken, payload, &decision); err != nil {
-		return identitysdk.AccessDecision{}, err
+		Access identity.AccessRequest `json:"access"`
+		Facts  identity.ResourceFacts `json:"facts,omitempty"`
+	}{Access: request.Access, Facts: request.Facts}
+	var decision identity.AccessDecision
+	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/reauthorize", request.Identity.AccessToken, payload, &decision); err != nil {
+		return identity.AccessDecision{}, err
 	}
 	return decision, nil
 }

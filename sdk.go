@@ -56,12 +56,26 @@ type DatabaseHandle struct {
 	Schema                    string
 	FilePath                  string
 	OrganizationScopeResolver OrganizationScopeResolver
+	BusinessProfileResolver   BusinessProfileResolver
 }
 
 // OrganizationScopeResolver projects application-owned organization facts for
 // Identity principals. The embedding application supplies the implementation;
 // Identity never reads application business tables directly.
 type OrganizationScopeResolver func(context.Context, string, []string) (OrganizationScopes, error)
+
+// BusinessProfileBinding is an application-owned active profile fact. Identity
+// uses it only to reconcile published system-managed business roles; it never
+// reads application business tables directly.
+type BusinessProfileBinding struct {
+	BindingKey string `json:"binding_key"`
+	ProfileID  string `json:"profile_id"`
+}
+
+// BusinessProfileResolver projects active application profiles for one
+// Identity user. The embedding Runtime remains authoritative for profile
+// status, cardinality, and the identity relation.
+type BusinessProfileResolver func(context.Context, string, string) ([]BusinessProfileBinding, error)
 
 // DatabaseFactory is implemented by in-process factories that can join the
 // embedding Runtime's project database pool. Remote factories intentionally

@@ -46,7 +46,7 @@ func CompileRecordFilter(bundle identity.AccessBundle, resource identity.Resourc
 		filter.Deny = append(filter.Deny, *guardrail.Predicate)
 	}
 	for _, policy := range bundle.DataPolicies {
-		if !resourceMatches(policy.Resource, resource) || !actionMatches(policy.Action, action) {
+		if !resourceMatches(policy.Resource, resource) || !dataActionMatches(policy.Action, action) {
 			continue
 		}
 		if err := policy.Predicate.Validate(); err != nil {

@@ -36,7 +36,7 @@ func AuditDenialRequired(bundle identity.AccessBundle, resource identity.Resourc
 		return false, &identity.Error{Code: "identity.access_request_invalid"}
 	}
 	for _, policy := range bundle.DataPolicies {
-		if resourceMatches(policy.Resource, resource) && actionMatches(policy.Action, action) && policy.AuditDenial {
+		if resourceMatches(policy.Resource, resource) && dataActionMatches(policy.Action, action) && policy.AuditDenial {
 			return true, nil
 		}
 	}
@@ -94,7 +94,7 @@ func EvaluateWithContext(bundle identity.AccessBundle, request identity.AccessRe
 	}
 	matchedAllow, hasPolicies, auditDenial := false, false, false
 	for _, policy := range bundle.DataPolicies {
-		if !resourceMatches(policy.Resource, resource) || !actionMatches(policy.Action, action) {
+		if !resourceMatches(policy.Resource, resource) || !dataActionMatches(policy.Action, action) {
 			continue
 		}
 		hasPolicies = true
@@ -306,6 +306,26 @@ func resourceMatches(configured, requested identity.ResourceType) bool {
 
 func actionMatches(configured, requested identity.Action) bool {
 	return configured == requested || configured == "*"
+}
+
+// dataActionMatches bridges the deliberately coarse role data contract
+// (read/write) with exact Runtime operations. Function grants and guardrails
+// remain exact: this widening applies only after an exact functional grant has
+// already authorized the requested operation.
+func dataActionMatches(configured, requested identity.Action) bool {
+	if actionMatches(configured, requested) {
+		return true
+	}
+	configuredValue := strings.ToLower(strings.TrimSpace(string(configured)))
+	requestedValue := strings.ToLower(strings.TrimSpace(string(requested)))
+	switch configuredValue {
+	case "read":
+		return requestedValue == "export"
+	case "write":
+		return requestedValue != "" && requestedValue != "read" && requestedValue != "export"
+	default:
+		return false
+	}
 }
 
 func referenceGuardrailDenied(bundle identity.AccessBundle, resource identity.ResourceType, reference string) bool {

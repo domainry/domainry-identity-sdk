@@ -187,6 +187,69 @@ func TestRecordFilterRequiresCurrentFunctionGrantAndAppliesGuardrails(t *testing
 	}
 }
 
+func TestWriteDataPolicyAuthorizesExactMutationOperationsOnlyAfterFunctionGrant(t *testing.T) {
+	now := time.Now().UTC()
+	bundle := identity.AccessBundle{
+		ContractVersion: identity.CurrentPolicyBundleVersion, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
+		Subject: identity.Subject{WorkspaceID: "workspace", SubjectID: "wechat-user"},
+		FunctionGrants: []identity.FunctionGrant{
+			{Resource: "course_favorite", Action: "create", Effect: identity.EffectAllow},
+			{Resource: "member", Action: "self_enroll", Effect: identity.EffectAllow},
+		},
+		DataPolicies: []identity.DataPolicy{
+			{Key: "favorite-owner", Resource: "course_favorite", Action: "write", Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "identity_user_id", Operator: identity.OperatorEqual, Value: "$subject.id"}},
+			{Key: "member-owner", Resource: "member", Action: "write", Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "identity_user_id", Operator: identity.OperatorEqual, Value: "$subject.id"}},
+		},
+	}
+
+	for _, request := range []identity.AccessRequest{
+		{ObjectKey: "course_favorite", Action: "create"},
+		{ObjectKey: "member", Action: "self_enroll"},
+	} {
+		decision, err := Evaluate(bundle, request, identity.ResourceFacts{"identity_user_id": "wechat-user"}, now)
+		if err != nil || !decision.Allowed {
+			t.Fatalf("request=%+v decision=%+v err=%v", request, decision, err)
+		}
+		filter, err := CompileRecordFilter(bundle, identity.ResourceType(request.ObjectKey), identity.Action(request.Action), now)
+		if err != nil || len(filter.Allow) != 1 {
+			t.Fatalf("request=%+v filter=%+v err=%v", request, filter, err)
+		}
+	}
+
+	withoutExactFunction := bundle
+	withoutExactFunction.FunctionGrants = []identity.FunctionGrant{{Resource: "course_favorite", Action: "read", Effect: identity.EffectAllow}}
+	decision, err := Evaluate(withoutExactFunction, identity.AccessRequest{ObjectKey: "course_favorite", Action: "create"}, identity.ResourceFacts{"identity_user_id": "wechat-user"}, now)
+	if err != nil || decision.Allowed || decision.Code != "function_not_granted" {
+		t.Fatalf("write data policy widened function authority: decision=%+v err=%v", decision, err)
+	}
+
+	readRequest := bundle
+	readRequest.FunctionGrants = []identity.FunctionGrant{{Resource: "course_favorite", Action: "read", Effect: identity.EffectAllow}}
+	decision, err = Evaluate(readRequest, identity.AccessRequest{ObjectKey: "course_favorite", Action: "read"}, identity.ResourceFacts{"identity_user_id": "wechat-user"}, now)
+	if err != nil || decision.Allowed || decision.Code != "data_policy_not_granted" {
+		t.Fatalf("write data policy authorized read: decision=%+v err=%v", decision, err)
+	}
+}
+
+func TestWriteDataPolicyCarriesAuditDenialAcrossMutationActions(t *testing.T) {
+	now := time.Now().UTC()
+	bundle := identity.AccessBundle{
+		ContractVersion: identity.CurrentPolicyBundleVersion, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
+		Subject:      identity.Subject{WorkspaceID: "workspace", SubjectID: "subject"},
+		DataPolicies: []identity.DataPolicy{{Key: "owned", Resource: "favorite", Action: "write", Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "owner_id", Operator: identity.OperatorEqual, Value: "$subject.id"}, AuditDenial: true}},
+	}
+	for _, action := range []identity.Action{"create", "update", "delete", "self_enroll"} {
+		required, err := AuditDenialRequired(bundle, "favorite", action, now)
+		if err != nil || !required {
+			t.Fatalf("action=%s required=%v err=%v", action, required, err)
+		}
+	}
+	required, err := AuditDenialRequired(bundle, "favorite", "read", now)
+	if err != nil || required {
+		t.Fatalf("write audit policy leaked to read: required=%v err=%v", required, err)
+	}
+}
+
 func TestSQLPrefixEscapesWildcardInput(t *testing.T) {
 	filter := RecordFilter{Allow: []identity.Predicate{{Fact: "path", Operator: identity.OperatorPrefix, Value: `sales%_\`}}}
 	compiled, err := CompileSQL(filter, identity.Subject{}, func(string) (string, bool) { return `"path"`, true })

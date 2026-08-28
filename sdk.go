@@ -51,11 +51,17 @@ type Factory interface {
 // Identity module. The provider retains lifecycle ownership; consumers must
 // never close DB.
 type DatabaseHandle struct {
-	Pool     any
-	Driver   string
-	Schema   string
-	FilePath string
+	Pool                      any
+	Driver                    string
+	Schema                    string
+	FilePath                  string
+	OrganizationScopeResolver OrganizationScopeResolver
 }
+
+// OrganizationScopeResolver projects application-owned organization facts for
+// Identity principals. The embedding application supplies the implementation;
+// Identity never reads application business tables directly.
+type OrganizationScopeResolver func(context.Context, string, []string) (OrganizationScopes, error)
 
 // DatabaseFactory is implemented by in-process factories that can join the
 // embedding Runtime's project database pool. Remote factories intentionally

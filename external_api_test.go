@@ -22,6 +22,7 @@ func TestExternalConsumerCompilesEveryPublicGoPackage(t *testing.T) {
 	source := `package consumer
 
 import (
+	"context"
 	identity "github.com/domainry/domainry-identity-sdk"
 	"github.com/domainry/domainry-identity-sdk/application"
 	"github.com/domainry/domainry-identity-sdk/authentication"
@@ -38,6 +39,8 @@ import (
 
 var (
 	_ identity.Factory
+	_ identity.OrganizationScopeResolver = func(context.Context, string, []string) (identity.OrganizationScopes, error) { return identity.OrganizationScopes{}, nil }
+	_ = identity.DatabaseHandle{OrganizationScopeResolver: identity.OrganizationScopeResolver(nil)}
 	_ authentication.Authentication
 	_ authorization.Authorization
 	_ identitymodel.Directory

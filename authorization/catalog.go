@@ -45,9 +45,10 @@ const (
 )
 
 type ActionDefinition struct {
-	Resource ResourceType `json:"resource"`
-	Action   Action       `json:"action"`
-	Risk     string       `json:"risk,omitempty"`
+	Resource        ResourceType `json:"resource"`
+	Action          Action       `json:"action"`
+	Risk            string       `json:"risk,omitempty"`
+	ServiceCallable bool         `json:"service_callable,omitempty"`
 }
 
 type CatalogReceipt struct {

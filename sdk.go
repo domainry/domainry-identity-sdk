@@ -161,6 +161,16 @@ type ChangePasswordRequest = authentication.ChangePasswordRequest
 type ResetPasswordRequest = authentication.ResetPasswordRequest
 type RevokeSessionsRequest = authentication.RevokeSessionsRequest
 type CredentialManager = authentication.CredentialManager
+type ApplicationServiceGrant = authentication.ApplicationServiceGrant
+type ExchangeApplicationServiceTokenRequest = authentication.ExchangeApplicationServiceTokenRequest
+type ApplicationServiceToken = authentication.ApplicationServiceToken
+type VerifyApplicationServiceTokenRequest = authentication.VerifyApplicationServiceTokenRequest
+type ApplicationServicePrincipal = authentication.ApplicationServicePrincipal
+type ApplicationServiceAuthentication = authentication.ApplicationServiceAuthentication
+
+type ApplicationServiceBinding interface {
+	ApplicationServices() ApplicationServiceAuthentication
+}
 type VerifyTokenRequest = authentication.VerifyTokenRequest
 type VerifiedToken = authentication.VerifiedToken
 type TokenVerifier = authentication.TokenVerifier

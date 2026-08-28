@@ -46,6 +46,9 @@ func (value *binding) Catalog() identity.CatalogClient        { return catalog{b
 func (value *binding) Credentials() identity.CredentialManager {
 	return credentials{binding: value}
 }
+func (value *binding) ApplicationServices() identity.ApplicationServiceAuthentication {
+	return applicationServices{binding: value}
+}
 func (value *binding) Close(ctx context.Context) error { return value.delegate.Close(ctx) }
 
 func (value *binding) workspace(input identity.WorkspaceID) (identity.WorkspaceID, error) {
@@ -113,3 +116,4 @@ func scopeError(status int, code string) error {
 }
 
 var _ identity.Binding = (*binding)(nil)
+var _ identity.ApplicationServiceBinding = (*binding)(nil)

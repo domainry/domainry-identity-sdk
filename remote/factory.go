@@ -122,7 +122,11 @@ func (value *binding) Catalog() identity.CatalogClient { return catalogClient{cl
 func (value *binding) Credentials() identity.CredentialManager {
 	return credentialClient{client: value.client}
 }
+func (value *binding) ApplicationServices() identity.ApplicationServiceAuthentication {
+	return applicationServices{client: value.client}
+}
 func (value *binding) Close(context.Context) error { return nil }
 
 var _ identity.Factory = (*Factory)(nil)
 var _ identity.Binding = (*binding)(nil)
+var _ identity.ApplicationServiceBinding = (*binding)(nil)

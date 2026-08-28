@@ -13,13 +13,14 @@ import (
 
 func TestRemoteFactoryConfigurationComesFromCompositionEnvironment(t *testing.T) {
 	t.Setenv("IDENTITY_ENDPOINT", " https://identity.example.test ")
+	t.Setenv("IDENTITY_TENANT_ID", " tenant-a ")
 	t.Setenv("IDENTITY_WORKSPACE_ID", " workspace-a ")
 	t.Setenv("IDENTITY_ISSUER", " https://issuer.example.test ")
 	t.Setenv("IDENTITY_AUDIENCE", " runtime-app ")
 	t.Setenv("IDENTITY_SERVICE_ACCESS_TOKEN", " service-token ")
 	t.Setenv("IDENTITY_USER_AGENT", " domainry-runtime/test ")
 	config := ConfigFromEnvironment()
-	if config.Endpoint != "https://identity.example.test" || config.WorkspaceID != "workspace-a" || config.Issuer != "https://issuer.example.test" ||
+	if config.Endpoint != "https://identity.example.test" || config.TenantID != "tenant-a" || config.WorkspaceID != "workspace-a" || config.Issuer != "https://issuer.example.test" ||
 		config.Audience != "runtime-app" || config.ServiceAccessToken != "service-token" || config.UserAgent != "domainry-runtime/test" {
 		t.Fatalf("environment configuration = %#v", config)
 	}

@@ -11,6 +11,7 @@ import (
 func ConfigFromEnvironment() Config {
 	return Config{
 		Endpoint:           strings.TrimSpace(os.Getenv("IDENTITY_ENDPOINT")),
+		TenantID:           strings.TrimSpace(os.Getenv("IDENTITY_TENANT_ID")),
 		WorkspaceID:        strings.TrimSpace(os.Getenv("IDENTITY_WORKSPACE_ID")),
 		Issuer:             strings.TrimSpace(os.Getenv("IDENTITY_ISSUER")),
 		Audience:           strings.TrimSpace(os.Getenv("IDENTITY_AUDIENCE")),

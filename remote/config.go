@@ -23,6 +23,7 @@ type CircuitBreakerPolicy struct {
 
 type Config struct {
 	Endpoint           string
+	TenantID           string
 	WorkspaceID        string
 	Issuer             string
 	Audience           string

@@ -30,6 +30,9 @@ func TestApplicationServicesExchangeAndVerifyKeepStaticCredentialAtIdentity(t *t
 			if request.Header.Get("Authorization") != "Bearer static-credential" {
 				t.Fatalf("verify authorization=%q", request.Header.Get("Authorization"))
 			}
+			if request.Header.Get("X-Domainry-Tenant-ID") != "tenant-a" || request.Header.Get("X-Domainry-Workspace-ID") != "workspace-a" {
+				t.Fatalf("verify scope headers=%v", request.Header)
+			}
 			var input identity.VerifyApplicationServiceTokenRequest
 			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
 				t.Fatal(err)
@@ -43,7 +46,7 @@ func TestApplicationServicesExchangeAndVerifyKeepStaticCredentialAtIdentity(t *t
 		}
 	}))
 	t.Cleanup(server.Close)
-	client, err := newClient(Config{Endpoint: server.URL, WorkspaceID: "workspace-a", Audience: "orders-runtime", ServiceAccessToken: "static-credential", HTTPClient: server.Client()})
+	client, err := newClient(Config{Endpoint: server.URL, TenantID: "tenant-a", WorkspaceID: "workspace-a", Audience: "orders-runtime", ServiceAccessToken: "static-credential", HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatal(err)
 	}

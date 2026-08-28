@@ -60,7 +60,7 @@ func (factory *Factory) Open(ctx context.Context, application identity.Applicati
 
 func remoteApplication(config Config, application identity.ApplicationRef) (Config, identity.ApplicationRef, error) {
 	configured := identity.ApplicationRef{
-		WorkspaceID: identity.WorkspaceID(strings.TrimSpace(config.WorkspaceID)), ApplicationKey: identity.ApplicationKey(strings.TrimSpace(config.Audience)),
+		TenantID: identity.TenantID(strings.TrimSpace(config.TenantID)), WorkspaceID: identity.WorkspaceID(strings.TrimSpace(config.WorkspaceID)), ApplicationKey: identity.ApplicationKey(strings.TrimSpace(config.Audience)),
 	}
 	if application.WorkspaceID.Valid() || application.ApplicationKey.Valid() {
 		if !application.WorkspaceID.Valid() || !application.ApplicationKey.Valid() {
@@ -75,7 +75,10 @@ func remoteApplication(config Config, application identity.ApplicationRef) (Conf
 	if !application.WorkspaceID.Valid() || !application.ApplicationKey.Valid() {
 		return Config{}, identity.ApplicationRef{}, &identity.Error{Code: "identity.application_scope_invalid"}
 	}
-	config.WorkspaceID, config.Audience = string(application.WorkspaceID), string(application.ApplicationKey)
+	if application.TenantID == "" {
+		application.TenantID = identity.TenantID(application.WorkspaceID)
+	}
+	config.TenantID, config.WorkspaceID, config.Audience = string(application.TenantID), string(application.WorkspaceID), string(application.ApplicationKey)
 	return config, application, nil
 }
 

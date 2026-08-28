@@ -31,7 +31,10 @@ func (adapter applicationServices) Verify(ctx context.Context, request identity.
 		return identity.ApplicationServicePrincipal{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.application_service_verify_invalid"}
 	}
 	var principal identity.ApplicationServicePrincipal
-	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/application-service/verify", adapter.client.serviceAccessToken, request, &principal); err != nil {
+	headers := http.Header{}
+	headers.Set("X-Domainry-Tenant-ID", adapter.client.tenantID)
+	headers.Set("X-Domainry-Workspace-ID", adapter.client.workspaceID)
+	if err := adapter.client.doJSONWithHeaders(ctx, http.MethodPost, "/identity/application-service/verify", adapter.client.serviceAccessToken, request, &principal, headers); err != nil {
 		return identity.ApplicationServicePrincipal{}, err
 	}
 	return principal, nil

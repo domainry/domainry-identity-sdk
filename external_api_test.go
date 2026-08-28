@@ -39,6 +39,7 @@ import (
 
 var (
 	_ identity.Factory
+	_ identity.ProjectRoleCatalogPublisher
 	_ identity.OrganizationScopeResolver = func(context.Context, string, []string) (identity.OrganizationScopes, error) { return identity.OrganizationScopes{}, nil }
 	_ = identity.DatabaseHandle{OrganizationScopeResolver: identity.OrganizationScopeResolver(nil)}
 	_ authentication.Authentication

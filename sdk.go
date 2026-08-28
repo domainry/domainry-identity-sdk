@@ -47,6 +47,23 @@ type Factory interface {
 	Open(context.Context, ApplicationRef) (Binding, error)
 }
 
+// DatabaseHandle is a project-owned database pool borrowed by an in-process
+// Identity module. The provider retains lifecycle ownership; consumers must
+// never close DB.
+type DatabaseHandle struct {
+	Pool     any
+	Driver   string
+	Schema   string
+	FilePath string
+}
+
+// DatabaseFactory is implemented by in-process factories that can join the
+// embedding Runtime's project database pool. Remote factories intentionally
+// implement only Factory.
+type DatabaseFactory interface {
+	OpenWithDatabase(context.Context, ApplicationRef, DatabaseHandle) (Binding, error)
+}
+
 type Clock interface {
 	Now() time.Time
 }

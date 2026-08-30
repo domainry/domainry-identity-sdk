@@ -57,6 +57,14 @@ type DatabaseHandle struct {
 	FilePath                  string
 	OrganizationScopeResolver OrganizationScopeResolver
 	BusinessProfileResolver   BusinessProfileResolver
+	Migrations                EmbeddedMigrationRegistrar
+}
+
+// EmbeddedMigrationRegistrar lets an in-process Identity module execute its
+// source-owned schema assembly under the embedding host's migration lock and
+// sole _schema_migrations ledger.
+type EmbeddedMigrationRegistrar interface {
+	ApplyOwnedMigration(context.Context, string, uint, string, string, func(context.Context) error) error
 }
 
 // OrganizationScopeResolver projects application-owned organization facts for

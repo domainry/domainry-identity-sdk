@@ -25,6 +25,8 @@ management CRUD, Plane types, or service-side domain implementation.
 - `contracttest`: one parity suite used by Module and SaaS implementations.
 - `browser`: the separately versioned `@domainry/identity-client` package.
 
+The SDK intentionally has no public `persistence` package. Identity owns its database and exposes business capabilities such as Authentication, Authorization, and Directory instead of storage contracts. `modulehost` is limited to embedded composition and host-coordinated provisioning capabilities.
+
 ## HTTP middleware
 
 ```go

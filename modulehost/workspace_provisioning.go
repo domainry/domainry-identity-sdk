@@ -32,6 +32,10 @@ type WorkspaceIdentityProvisionRequest struct {
 	WorkspaceID  string `json:"workspace_id"`
 	AdminLoginID string `json:"admin_login_id"`
 	AdminName    string `json:"admin_name"`
+	// InitialPassword is accepted only across the in-process bootstrap
+	// boundary. It is deliberately excluded from serialized contracts so a
+	// remote or public workspace-provisioning request cannot select a password.
+	InitialPassword string `json:"-"`
 }
 
 type WorkspaceIdentityProvisionResult struct {

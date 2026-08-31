@@ -4,7 +4,7 @@ import test from 'node:test'
 import { IdentityClient, IdentityClientError } from './dist/index.js'
 
 const session = {
-  session_id: 'session-1', tenant_id: '', workspace_id: 'default', access_token: 'access-1',
+  session_id: 'session-1', tenant_id: '', workspace_id: 'workspace-primary', access_token: 'access-1',
   token_type: 'Bearer', expires_at: '2026-08-27T00:00:00Z',
   user: { id: 'user-1', name: 'User', email: 'user@example.test', version: 1, status: 'active' },
   roles: [], default_role: '', permissions: [], must_change_password: false,
@@ -52,7 +52,7 @@ test('targets Identity management endpoints through the configured Identity base
 test('clears the in-memory access token even when remote logout fails', async () => {
   let calls = 0
   const client = new IdentityClient({
-    endpoint: 'https://runtime.example.test', workspaceId: 'default', applicationKey: 'runtime-app',
+    endpoint: 'https://runtime.example.test', workspaceId: 'workspace-primary', applicationKey: 'runtime-app',
     fetch: async () => {
       calls++
       if (calls === 1) return new Response(JSON.stringify(session), { status: 200, headers: { 'content-type': 'application/json' } })
@@ -67,7 +67,7 @@ test('clears the in-memory access token even when remote logout fails', async ()
 test('uses the same provider contract for OTP without exposing refresh credentials', async () => {
   const requests = []
   const client = new IdentityClient({
-    endpoint: 'https://runtime.example.test', workspaceId: 'default', applicationKey: 'runtime-app',
+    endpoint: 'https://runtime.example.test', workspaceId: 'workspace-primary', applicationKey: 'runtime-app',
     fetch: async (url, init) => {
       requests.push([url, init])
       const body = url.endsWith('/start')
@@ -90,7 +90,7 @@ test('coalesces concurrent refreshes into one rotating-cookie request', async ()
   let releaseRefresh
   const refreshReleased = new Promise((resolve) => { releaseRefresh = resolve })
   const client = new IdentityClient({
-    endpoint: 'https://runtime.example.test', workspaceId: 'default', applicationKey: 'runtime-app',
+    endpoint: 'https://runtime.example.test', workspaceId: 'workspace-primary', applicationKey: 'runtime-app',
     fetch: async (url) => {
       assert.match(url, /\/auth\/refresh$/)
       refreshCalls++
@@ -113,7 +113,7 @@ test('coalesces concurrent refreshes into one rotating-cookie request', async ()
 test('releases the single-flight refresh after failure', async () => {
   let refreshCalls = 0
   const client = new IdentityClient({
-    endpoint: 'https://runtime.example.test', workspaceId: 'default', applicationKey: 'runtime-app',
+    endpoint: 'https://runtime.example.test', workspaceId: 'workspace-primary', applicationKey: 'runtime-app',
     fetch: async () => {
       refreshCalls++
       if (refreshCalls === 1) {
@@ -136,7 +136,7 @@ test('clears a stale in-memory credential when refresh is rejected', async () =>
   let calls = 0
   let cleared = false
   const client = new IdentityClient({
-    endpoint: 'https://runtime.example.test', workspaceId: 'default', applicationKey: 'runtime-app',
+    endpoint: 'https://runtime.example.test', workspaceId: 'workspace-primary', applicationKey: 'runtime-app',
     fetch: async () => {
       calls++
       if (calls === 1) return new Response(JSON.stringify(session), { status: 200, headers: { 'content-type': 'application/json' } })
@@ -173,7 +173,7 @@ test('reauthorizes concurrent safe Runtime requests with one refresh', async () 
   let runtimeCalls = 0
   let refreshed = false
   const client = new IdentityClient({
-    endpoint: 'https://runtime.example.test', workspaceId: 'default', applicationKey: 'runtime-app',
+    endpoint: 'https://runtime.example.test', workspaceId: 'workspace-primary', applicationKey: 'runtime-app',
     fetch: async (url, init) => {
       if (String(url).endsWith('/auth/refresh')) {
         refreshCalls++
@@ -184,7 +184,7 @@ test('reauthorizes concurrent safe Runtime requests with one refresh', async () 
       runtimeCalls++
       const headers = new Headers(init?.headers)
       const authorization = headers.get('Authorization')
-      assert.equal(headers.get('X-Workspace-ID'), 'default')
+      assert.equal(headers.get('X-Workspace-ID'), 'workspace-primary')
       if (!refreshed) return new Response(JSON.stringify({ code: 'auth.token_expired' }), { status: 401 })
       assert.equal(authorization, 'Bearer access-1')
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
@@ -203,7 +203,7 @@ test('reauthorizes concurrent safe Runtime requests with one refresh', async () 
 test('does not replay an unsafe mutation without an idempotency key', async () => {
   let calls = 0
   const client = new IdentityClient({
-    endpoint: 'https://runtime.example.test', workspaceId: 'default', applicationKey: 'runtime-app',
+    endpoint: 'https://runtime.example.test', workspaceId: 'workspace-primary', applicationKey: 'runtime-app',
     fetch: async () => {
       calls++
       return new Response(JSON.stringify({ code: 'auth.token_expired' }), { status: 401 })
@@ -223,7 +223,7 @@ test('derives replay safety from Request method and preserves idempotent body', 
   let refreshCalls = 0
   const bodies = []
   const client = new IdentityClient({
-    endpoint: 'https://runtime.example.test', workspaceId: 'default', applicationKey: 'runtime-app',
+    endpoint: 'https://runtime.example.test', workspaceId: 'workspace-primary', applicationKey: 'runtime-app',
     fetch: async (input) => {
       if (String(input) === 'https://runtime.example.test/auth/refresh') {
         refreshCalls++
@@ -251,7 +251,7 @@ test('derives replay safety from Request method and preserves idempotent body', 
 test('does not treat a non-idempotent Request mutation as a GET', async () => {
   let calls = 0
   const client = new IdentityClient({
-    endpoint: 'https://runtime.example.test', workspaceId: 'default', applicationKey: 'runtime-app',
+    endpoint: 'https://runtime.example.test', workspaceId: 'workspace-primary', applicationKey: 'runtime-app',
     fetch: async () => {
       calls++
       return new Response(JSON.stringify({ code: 'auth.token_expired' }), { status: 401 })

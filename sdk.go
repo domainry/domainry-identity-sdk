@@ -93,6 +93,21 @@ type DatabaseFactory interface {
 	OpenWithDatabase(context.Context, ApplicationRef, DatabaseHandle) (Binding, error)
 }
 
+// BootstrapBinding is the deliberately narrow in-process surface available
+// before the first tenant exists. It can participate in the host-owned atomic
+// tenant transaction, but exposes no authentication or business APIs.
+type BootstrapBinding interface {
+	modulehost.WorkspaceProvisioner
+	Close(context.Context) error
+}
+
+// BootstrapDatabaseFactory is implemented only by an embedded Identity
+// module. A host uses it to create the first tenant in its project database,
+// then closes it and reopens the ordinary workspace-bound Binding.
+type BootstrapDatabaseFactory interface {
+	OpenBootstrapWithDatabase(context.Context, ApplicationKey, DatabaseHandle) (BootstrapBinding, error)
+}
+
 type Clock interface {
 	Now() time.Time
 }

@@ -68,7 +68,7 @@ func (authentication *testAuthentication) LogoutSession(context.Context, identit
 	return authentication.logoutError
 }
 func (*testAuthentication) CurrentSession(context.Context, identity.CurrentSessionRequest) (identity.SessionView, error) {
-	return identity.SessionView{WorkspaceID: "default", SubjectID: "user-1"}, nil
+	return identity.SessionView{WorkspaceID: "workspace-primary", SubjectID: "user-1"}, nil
 }
 
 type testCredentials struct{}
@@ -84,14 +84,15 @@ func (testCredentials) RevokeSessions(context.Context, identity.RevokeSessionsRe
 }
 
 func browserSession(refreshToken string) identity.AuthSession {
-	return identity.AuthSession{WorkspaceID: "default", AccessToken: "access", RefreshToken: refreshToken, TokenType: "Bearer"}
+	return identity.AuthSession{WorkspaceID: "workspace-primary", AccessToken: "access", RefreshToken: refreshToken, TokenType: "Bearer"}
 }
 
 func newTestGateway(t *testing.T, authentication *testAuthentication) *http.ServeMux {
 	t.Helper()
 	gateway, err := New(testBinding{auth: authentication}, Config{
 		ApplicationKey: "identity-admin", AllowedReturnURLs: []string{"http://localhost:3100/auth/callback"},
-		Cookie: CookieConfig{Path: "/browser/auth", MaxAge: time.Hour},
+		DefaultWorkspaceID: "workspace-primary",
+		Cookie:             CookieConfig{Path: "/browser/auth", MaxAge: time.Hour},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -103,12 +104,20 @@ func newTestGateway(t *testing.T, authentication *testAuthentication) *http.Serv
 	return mux
 }
 
+func TestGatewayRequiresAnInitializedWorkspace(t *testing.T) {
+	for _, workspaceID := range []identity.WorkspaceID{"", "default"} {
+		if _, err := New(testBinding{auth: &testAuthentication{}}, Config{ApplicationKey: "identity-admin", DefaultWorkspaceID: workspaceID}); err == nil {
+			t.Fatalf("workspace %q was accepted", workspaceID)
+		}
+	}
+}
+
 func TestGatewayKeepsRefreshCredentialInHTTPOnlyCookie(t *testing.T) {
 	authentication := &testAuthentication{}
 	mux := newTestGateway(t, authentication)
 	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/browser/auth/login", strings.NewReader(`{"workspace_id":"default","login":"admin","password":"secret"}`))
-	request.Header.Set("X-Workspace-ID", "default")
+	request := httptest.NewRequest(http.MethodPost, "/browser/auth/login", strings.NewReader(`{"workspace_id":"workspace-primary","login":"admin","password":"secret"}`))
+	request.Header.Set("X-Workspace-ID", "workspace-primary")
 	mux.ServeHTTP(response, request)
 
 	if response.Code != http.StatusOK || strings.Contains(response.Body.String(), "login-refresh") {
@@ -124,17 +133,17 @@ func TestGatewayKeepsRefreshCredentialInHTTPOnlyCookie(t *testing.T) {
 		}
 		t.Fatalf("cookies=%#v", cookies)
 	}
-	if authentication.loginRequest.ApplicationKey != "identity-admin" || authentication.loginRequest.WorkspaceID != "default" {
+	if authentication.loginRequest.ApplicationKey != "identity-admin" || authentication.loginRequest.WorkspaceID != "workspace-primary" {
 		t.Fatalf("login request=%#v", authentication.loginRequest)
 	}
 }
 
 func TestGatewayRejectsSessionWithoutRotatingRefreshCredential(t *testing.T) {
 	authentication := &testAuthentication{loginSession: identity.AuthSession{
-		WorkspaceID: "default", AccessToken: "new-access", TokenType: "Bearer",
+		WorkspaceID: "workspace-primary", AccessToken: "new-access", TokenType: "Bearer",
 	}}
 	mux := newTestGateway(t, authentication)
-	request := httptest.NewRequest(http.MethodPost, "/browser/auth/login", strings.NewReader(`{"workspace_id":"default","login":"admin","password":"secret"}`))
+	request := httptest.NewRequest(http.MethodPost, "/browser/auth/login", strings.NewReader(`{"workspace_id":"workspace-primary","login":"admin","password":"secret"}`))
 	request.AddCookie(&http.Cookie{Name: DefaultRefreshCookieName, Value: "stale-refresh"})
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, request)

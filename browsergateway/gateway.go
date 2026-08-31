@@ -45,11 +45,8 @@ func New(binding identity.Binding, config Config) (*Gateway, error) {
 	if !config.ApplicationKey.Valid() {
 		return nil, errors.New("Identity browser application key is required")
 	}
-	if config.DefaultWorkspaceID == "" {
-		config.DefaultWorkspaceID = "default"
-	}
 	if !config.DefaultWorkspaceID.Valid() {
-		return nil, errors.New("Identity browser default workspace is invalid")
+		return nil, errors.New("Identity browser initialized workspace is required")
 	}
 	if strings.TrimSpace(config.Cookie.Name) == "" {
 		config.Cookie.Name = DefaultRefreshCookieName

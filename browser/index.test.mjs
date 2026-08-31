@@ -30,6 +30,23 @@ test('keeps access credentials in memory and sends cookie-bound requests', async
   assert.equal(new Headers(requests[1][1].headers).get('X-Workspace-ID'), 'workspace-a')
 })
 
+test('omits workspace scope so the initialized installation resolves it and rejects the reserved legacy value', async () => {
+  const requests = []
+  const client = new IdentityClient({
+    endpoint: 'https://runtime.example.test', applicationKey: 'runtime-app',
+    fetch: async (url, init) => {
+      requests.push([url, init])
+      return new Response(JSON.stringify(session), { status: 200, headers: { 'content-type': 'application/json' } })
+    },
+  })
+
+  await client.loginWithPassword('user@example.test', 'secret')
+
+  assert.equal(new Headers(requests[0][1].headers).has('X-Workspace-ID'), false)
+  assert.equal('workspace_id' in JSON.parse(requests[0][1].body), false)
+  assert.throws(() => new IdentityClient({ workspaceId: 'default', applicationKey: 'runtime-app' }), /initialized workspace/)
+})
+
 test('targets Identity management endpoints through the configured Identity base URL', async () => {
 	const requests = []
 	const client = new IdentityClient({

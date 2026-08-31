@@ -16,12 +16,17 @@ export class IdentityClient {
 	#fetch: typeof globalThis.fetch
 	#endpoint: string
 	#managementEndpoint: string
+  #workspaceId: string
   #listeners = new Set<(session: IdentitySession | null) => void>()
   #refreshInFlight: Promise<IdentitySession> | null = null
 
   constructor(private readonly configuration: IdentityClientConfiguration) {
-    if (!configuration.workspaceId.trim() || !configuration.applicationKey.trim()) {
-      throw new Error('workspaceId and applicationKey are required')
+    this.#workspaceId = configuration.workspaceId?.trim() || ''
+    if (this.#workspaceId.toLowerCase() === 'default') {
+      throw new Error('workspaceId must identify an initialized workspace')
+    }
+    if (!configuration.applicationKey.trim()) {
+      throw new Error('applicationKey is required')
     }
 		this.#endpoint = (configuration.endpoint || '').replace(/\/$/, '')
 		this.#managementEndpoint = (configuration.managementEndpoint || configuration.endpoint || '').replace(/\/$/, '')
@@ -189,7 +194,7 @@ export class IdentityClient {
   #send(path: string, init: RequestInit): Promise<Response> {
     const headers = new Headers(init.headers)
     headers.set('Accept', 'application/json')
-    headers.set('X-Workspace-ID', this.configuration.workspaceId)
+    this.#setWorkspaceHeader(headers)
     if (init.body) headers.set('Content-Type', 'application/json')
     if (this.#accessToken) headers.set('Authorization', `Bearer ${this.#accessToken}`)
     return this.#fetch(this.#endpoint + path, { ...init, headers, credentials: 'include' })
@@ -198,7 +203,7 @@ export class IdentityClient {
   #body(value: Record<string, unknown>): string {
     return JSON.stringify({
       tenant_id: this.configuration.tenantId,
-      workspace_id: this.configuration.workspaceId,
+      workspace_id: this.#workspaceId || undefined,
       ...value,
     })
   }
@@ -216,7 +221,7 @@ export class IdentityClient {
 
   #authorizedInit(init: RequestInit): RequestInit {
     const headers = new Headers(init.headers)
-    headers.set('X-Workspace-ID', this.configuration.workspaceId)
+    this.#setWorkspaceHeader(headers)
     if (this.#accessToken) headers.set('Authorization', `Bearer ${this.#accessToken}`)
     else headers.delete('Authorization')
     return { ...init, headers }
@@ -230,12 +235,17 @@ export class IdentityClient {
     return Boolean(headers.get('Idempotency-Key')?.trim())
   }
 
+  #setWorkspaceHeader(headers: Headers): void {
+    if (this.#workspaceId) headers.set('X-Workspace-ID', this.#workspaceId)
+    else headers.delete('X-Workspace-ID')
+  }
+
   async #withCrossTabRefreshLock<T>(operation: () => Promise<T>): Promise<T> {
     const lockManager = globalThis.navigator?.locks
     if (!lockManager) return operation()
 
     const endpoint = this.#endpoint || globalThis.location?.origin || 'same-origin'
-    const lockName = `domainry.identity.refresh:${endpoint}:${this.configuration.workspaceId}`
+    const lockName = `domainry.identity.refresh:${endpoint}:${this.#workspaceId || 'initialized-workspace'}`
     return lockManager.request(lockName, operation)
   }
 }

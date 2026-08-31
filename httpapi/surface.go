@@ -4,33 +4,25 @@
 // authentication and administration handlers.
 package httpapi
 
-import "net/http"
+import "github.com/domainry/domainry-foundation/modulehttp"
 
-const ContractVersion = "domainry-identity-http-surface-v1"
+// These aliases preserve the Identity SDK import surface while moving the
+// actual host contract to the shared module HTTP owner. New modules import
+// modulehttp directly; this package can be retired after downstream migration.
+const ContractVersion = modulehttp.ContractVersion
 
-type Exposure string
+type Exposure = modulehttp.Exposure
+type Authentication = modulehttp.Authentication
+type Route = modulehttp.Route
+type Surface = modulehttp.Surface
+type Provider = modulehttp.Provider
 
 const (
-	ExposurePublic      Exposure = "public"
-	ExposureTenantAdmin Exposure = "tenant_admin"
+	ExposurePublic      = modulehttp.ExposurePublic
+	ExposureTenantAdmin = modulehttp.ExposureTenantAdmin
+	ExposureOps         = modulehttp.ExposureOps
+
+	AuthenticationAnonymous     = modulehttp.AuthenticationAnonymous
+	AuthenticationAuthenticated = modulehttp.AuthenticationAuthenticated
+	AuthenticationService       = modulehttp.AuthenticationService
 )
-
-type Route struct {
-	Pattern   string
-	Exposures []Exposure
-}
-
-// Surface is an immutable, explicitly routed HTTP boundary. Hosts register
-// only the declared routes and must never install Handler as a catch-all.
-type Surface interface {
-	ContractVersion() string
-	Name() string
-	Routes() []Route
-	Handler() http.Handler
-}
-
-// Provider is implemented by in-process bindings only. A SaaS binding owns
-// its HTTP endpoints remotely and therefore does not implement Provider.
-type Provider interface {
-	HTTPSurfaces() []Surface
-}

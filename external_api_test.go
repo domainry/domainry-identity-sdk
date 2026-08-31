@@ -60,7 +60,7 @@ var (
 	}
 	command := exec.Command("go", "test", "./...")
 	command.Dir = consumer
-	command.Env = append(os.Environ(), "GOWORK=off", "GOSUMDB=off")
+	command.Env = append(os.Environ(), "GOWORK=off", "GOSUMDB=off", "GOFLAGS=-mod=mod")
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("external consumer compile: %v\n%s", err, output)
 	}

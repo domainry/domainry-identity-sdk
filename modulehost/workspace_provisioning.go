@@ -9,6 +9,23 @@ import "context"
 // must reject transaction types they cannot safely join.
 type Transaction struct {
 	Native any
+	// WorkspaceProvisionFailures is an optional in-process acceptance seam.
+	// The host selects it once at startup; public requests cannot set it.
+	WorkspaceProvisionFailures WorkspaceProvisionFailureInjector
+}
+
+const (
+	WorkspaceProvisionFailureAfterIdentityUser   = "after_identity_user"
+	WorkspaceProvisionFailureAfterIdentityRole   = "after_identity_role"
+	WorkspaceProvisionFailureAfterRoleAssignment = "after_role_assignment"
+	WorkspaceProvisionFailureAfterCredential     = "after_credential"
+)
+
+// WorkspaceProvisionFailureInjector lets an embedded host verify that each
+// Identity-owned write remains inside the host transaction. Implementations
+// must return a stable, non-sensitive error.
+type WorkspaceProvisionFailureInjector interface {
+	InjectWorkspaceProvisionFailure(point string) error
 }
 
 type WorkspaceIdentityProvisionRequest struct {

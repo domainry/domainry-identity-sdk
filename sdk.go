@@ -224,8 +224,17 @@ type ProjectRoleCatalog = authorization.ProjectRoleCatalog
 type ProjectRoleCatalogReceipt = authorization.ProjectRoleCatalogReceipt
 type ProjectRoleCatalogPublisher = authorization.ProjectRoleCatalogPublisher
 type EmbeddedTransaction = modulehost.Transaction
+type WorkspaceProvisionFailureInjector = modulehost.WorkspaceProvisionFailureInjector
 type WorkspaceIdentityProvisionRequest = modulehost.WorkspaceIdentityProvisionRequest
 type WorkspaceIdentityProvisionResult = modulehost.WorkspaceIdentityProvisionResult
+
+const (
+	WorkspaceProvisionFailureAfterIdentityUser   = modulehost.WorkspaceProvisionFailureAfterIdentityUser
+	WorkspaceProvisionFailureAfterIdentityRole   = modulehost.WorkspaceProvisionFailureAfterIdentityRole
+	WorkspaceProvisionFailureAfterRoleAssignment = modulehost.WorkspaceProvisionFailureAfterRoleAssignment
+	WorkspaceProvisionFailureAfterCredential     = modulehost.WorkspaceProvisionFailureAfterCredential
+)
+
 type WorkspaceRoleReconcileRequest = modulehost.WorkspaceRoleReconcileRequest
 type WorkspaceRoleReconcileResult = modulehost.WorkspaceRoleReconcileResult
 type EmbeddedWorkspaceProvisioner = modulehost.WorkspaceProvisioner

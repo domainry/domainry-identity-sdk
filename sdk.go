@@ -10,6 +10,7 @@ import (
 	"github.com/domainry/domainry-identity-sdk/authentication"
 	"github.com/domainry/domainry-identity-sdk/authorization"
 	identitymodel "github.com/domainry/domainry-identity-sdk/identity"
+	"github.com/domainry/domainry-identity-sdk/modulehost"
 )
 
 type DeploymentMode string
@@ -222,6 +223,12 @@ type ProjectRoleDefinition = authorization.ProjectRoleDefinition
 type ProjectRoleCatalog = authorization.ProjectRoleCatalog
 type ProjectRoleCatalogReceipt = authorization.ProjectRoleCatalogReceipt
 type ProjectRoleCatalogPublisher = authorization.ProjectRoleCatalogPublisher
+type EmbeddedTransaction = modulehost.Transaction
+type WorkspaceIdentityProvisionRequest = modulehost.WorkspaceIdentityProvisionRequest
+type WorkspaceIdentityProvisionResult = modulehost.WorkspaceIdentityProvisionResult
+type WorkspaceRoleReconcileRequest = modulehost.WorkspaceRoleReconcileRequest
+type WorkspaceRoleReconcileResult = modulehost.WorkspaceRoleReconcileResult
+type EmbeddedWorkspaceProvisioner = modulehost.WorkspaceProvisioner
 type OrganizationScopes = authorization.OrganizationScopes
 type Principal = authorization.Principal
 type RequestIdentity = authorization.RequestIdentity

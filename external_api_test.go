@@ -14,8 +14,12 @@ func TestExternalConsumerCompilesEveryPublicGoPackage(t *testing.T) {
 		t.Fatal("resolve SDK repository path")
 	}
 	repository := filepath.Dir(sourceFile)
+	foundationRepository := filepath.Join(filepath.Dir(repository), "domainry-foundation")
+	if _, err := os.Stat(filepath.Join(foundationRepository, "modulecapability", "contract.go")); err != nil {
+		t.Fatalf("resolve Foundation repository used by the current SDK contract: %v", err)
+	}
 	consumer := t.TempDir()
-	goMod := "module example.com/identity-consumer\n\ngo 1.26.0\n\nrequire github.com/domainry/domainry-identity-sdk v0.0.0\n\nreplace github.com/domainry/domainry-identity-sdk => " + repository + "\n"
+	goMod := "module example.com/identity-consumer\n\ngo 1.26.0\n\nrequire (\n\tgithub.com/domainry/domainry-foundation v0.0.0\n\tgithub.com/domainry/domainry-identity-sdk v0.0.0\n)\n\nreplace github.com/domainry/domainry-foundation => " + foundationRepository + "\n\nreplace github.com/domainry/domainry-identity-sdk => " + repository + "\n"
 	if err := os.WriteFile(filepath.Join(consumer, "go.mod"), []byte(goMod), 0o600); err != nil {
 		t.Fatal(err)
 	}

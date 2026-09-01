@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/domainry/domainry-foundation/modulecapability"
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
@@ -33,6 +34,15 @@ type binding struct {
 }
 
 func (value *binding) Descriptor() identity.Descriptor { return value.descriptor }
+func (value *binding) CapabilitySummary(ctx context.Context) (modulecapability.ModuleSummary, error) {
+	return value.delegate.CapabilitySummary(ctx)
+}
+func (value *binding) CapabilityCategory(ctx context.Context, key string) (modulecapability.CategoryDocument, error) {
+	return value.delegate.CapabilityCategory(ctx, key)
+}
+func (value *binding) ValidateCapabilityCandidate(ctx context.Context, request modulecapability.ValidationRequest) (modulecapability.ValidationResult, error) {
+	return value.delegate.ValidateCapabilityCandidate(ctx, request)
+}
 func (value *binding) Authentication() identity.Authentication {
 	return authentication{binding: value}
 }

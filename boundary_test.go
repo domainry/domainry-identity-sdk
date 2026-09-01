@@ -151,6 +151,7 @@ func TestSDKDoesNotDependOnIdentityImplementationOrPlane(t *testing.T) {
 	repositoryRoot := sdkRepositoryRoot(t)
 	forbidden := []string{
 		"github.com/domainry/domainry-plane",
+		"github.com/domainry/domainry-runtime",
 		"github.com/domainry/domainry-identity/internal",
 	}
 	err := filepath.WalkDir(repositoryRoot, func(path string, entry fs.DirEntry, walkErr error) error {

@@ -9,10 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/domainry/domainry-foundation/modulecapability"
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
 type testBinding struct {
+	modulecapability.Binding
 	auth        *testAuthentication
 	credentials testCredentials
 }

@@ -5,11 +5,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/domainry/domainry-foundation/modulecapability"
 	identity "github.com/domainry/domainry-identity-sdk"
 	identityprincipal "github.com/domainry/domainry-identity-sdk/authorization/principal"
 )
 
 type resolverBinding struct {
+	modulecapability.Binding
 	auth   *resolverAuthentication
 	tokens resolverTokens
 	author *resolverAuthorization

@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/domainry/domainry-foundation/modulecapability"
 	"github.com/domainry/domainry-identity-sdk/authentication"
 	"github.com/domainry/domainry-identity-sdk/authorization"
 	identitymodel "github.com/domainry/domainry-identity-sdk/identity"
@@ -33,6 +34,7 @@ type Descriptor struct {
 // Binding is the sole deployment-neutral Runtime dependency. An in-process
 // module and the remote SaaS adapter expose the same cohesive capabilities.
 type Binding interface {
+	modulecapability.Binding
 	Descriptor() Descriptor
 	Authentication() Authentication
 	Tokens() TokenVerifier

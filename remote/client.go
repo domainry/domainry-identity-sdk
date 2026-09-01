@@ -196,6 +196,13 @@ func (c *client) execute(ctx context.Context, method, endpoint, accessToken, con
 	}
 	if c.workspaceID != "" {
 		request.Header.Set("X-Workspace-ID", c.workspaceID)
+		request.Header.Set("X-Domainry-Workspace-ID", c.workspaceID)
+	}
+	if c.tenantID != "" {
+		request.Header.Set("X-Domainry-Tenant-ID", c.tenantID)
+	}
+	if c.applicationKey != "" {
+		request.Header.Set("X-Domainry-Application-Key", c.applicationKey)
 	}
 	if accessToken = strings.TrimSpace(accessToken); accessToken != "" {
 		request.Header.Set("Authorization", "Bearer "+accessToken)

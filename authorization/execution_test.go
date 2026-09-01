@@ -8,9 +8,9 @@ import (
 func TestDeriveExecutionAccessAddsOnlyDeclaredExecutionCapability(t *testing.T) {
 	now := time.Date(2026, 8, 27, 1, 2, 3, 0, time.UTC)
 	bundle := AccessBundle{
-		ContractVersion: CurrentPolicyBundleVersion, CatalogRevision: "catalog-1", AuthorizationRevision: "auth-1", ExpiresAt: now.Add(time.Hour),
+		ContractVersion: CurrentPolicyBundleVersion, AuthorizationRevision: "auth-1", ExpiresAt: now.Add(time.Hour),
 		Subject:       Subject{WorkspaceID: "workspace", SubjectID: "user"},
-		DataPolicies:  []DataPolicy{{Key: "owned", Resource: "customer", Action: "update", Effect: EffectAllow, Predicate: Predicate{Fact: "owner_id", Operator: OperatorEqual, Value: "$subject.id"}}},
+		DataPolicies:  []DataPolicy{{Key: "owned", Resource: "customer", Action: DataActionWrite, Effect: EffectAllow, Predicate: Predicate{Fact: "owner_id", Operator: OperatorEqual, Value: "$subject.id"}}},
 		FieldPolicies: []FieldPolicy{{Resource: "customer", Field: "name", Read: true}},
 	}
 	derived, err := DeriveExecutionAccess(bundle, ExecutionGrant{Resource: "customer", Action: "update", Fields: []string{"name", "status"}}, now)
@@ -31,7 +31,7 @@ func TestDeriveExecutionAccessAddsOnlyDeclaredExecutionCapability(t *testing.T) 
 func TestDeriveExecutionAccessCannotOverrideFunctionDeny(t *testing.T) {
 	now := time.Date(2026, 8, 27, 1, 2, 3, 0, time.UTC)
 	bundle := AccessBundle{
-		ContractVersion: CurrentPolicyBundleVersion, CatalogRevision: "catalog-1", AuthorizationRevision: "auth-1", ExpiresAt: now.Add(time.Hour),
+		ContractVersion: CurrentPolicyBundleVersion, AuthorizationRevision: "auth-1", ExpiresAt: now.Add(time.Hour),
 		Subject:        Subject{WorkspaceID: "workspace", SubjectID: "user"},
 		FunctionGrants: []FunctionGrant{{Resource: "customer", Action: "update", Effect: EffectDeny}},
 	}

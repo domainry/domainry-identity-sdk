@@ -18,7 +18,7 @@ func retryableIdentityRequest(method, endpoint string, headers http.Header) bool
 		return true
 	}
 	switch "/" + strings.TrimLeft(endpoint, "/") {
-	case "/identity/access-bundle", "/identity/reauthorize", "/identity/catalog/revision":
+	case "/identity/access-bundle", "/identity/reauthorize":
 		return true
 	default:
 		return false

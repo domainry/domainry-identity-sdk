@@ -48,13 +48,21 @@ type ApplicationServicePrincipal struct {
 	ExpiresAt             time.Time                           `json:"expires_at"`
 }
 
+// ApplicationServiceTokenVerifier validates one exact audience and grant at a
+// resource service. It is intentionally independent from token exchange so a
+// local Identity binding does not advertise an exchange capability it cannot
+// safely provide without the caller's static application credential.
+type ApplicationServiceTokenVerifier interface {
+	Verify(context.Context, VerifyApplicationServiceTokenRequest) (ApplicationServicePrincipal, error)
+}
+
 // ApplicationServiceAuthentication exchanges a long-lived, application-bound
 // static credential only at Identity and verifies the resulting short-lived
 // service token at a resource service. Static credentials are never forwarded
 // to downstream SaaS services.
 type ApplicationServiceAuthentication interface {
+	ApplicationServiceTokenVerifier
 	Exchange(context.Context, ExchangeApplicationServiceTokenRequest) (ApplicationServiceToken, error)
-	Verify(context.Context, VerifyApplicationServiceTokenRequest) (ApplicationServicePrincipal, error)
 }
 
 func (grant ApplicationServiceGrant) Valid() bool {

@@ -15,17 +15,17 @@ type RecordFilter struct {
 
 // CompileRecordFilter returns one bounded portable filter. Runtimes translate
 // it once per query; they must not call remote authorization per row.
-func CompileRecordFilter(bundle identity.AccessBundle, resource identity.ResourceType, action identity.Action, now time.Time) (RecordFilter, error) {
+func CompileRecordFilter(bundle identity.AccessBundle, resource identity.ResourceType, action identity.Action, dataAction identity.DataAction, now time.Time) (RecordFilter, error) {
 	filter := RecordFilter{Allow: []identity.Predicate{}, Deny: []identity.Predicate{}}
 	if err := bundle.Validate(now); err != nil {
 		return RecordFilter{}, err
 	}
-	if !resource.Valid() || !action.Valid() {
+	if !resource.Valid() || !action.Valid() || !dataAction.Valid() {
 		return RecordFilter{}, &identity.Error{Code: "identity.access_request_invalid"}
 	}
 	functionAllowed := false
 	for _, grant := range bundle.FunctionGrants {
-		if !resourceMatches(grant.Resource, resource) || !actionMatches(grant.Action, action) {
+		if grant.Resource != resource || grant.Action != action {
 			continue
 		}
 		if grant.Effect == identity.EffectDeny {
@@ -46,7 +46,7 @@ func CompileRecordFilter(bundle identity.AccessBundle, resource identity.Resourc
 		filter.Deny = append(filter.Deny, *guardrail.Predicate)
 	}
 	for _, policy := range bundle.DataPolicies {
-		if !resourceMatches(policy.Resource, resource) || !dataActionMatches(policy.Action, action) {
+		if !resourceMatches(policy.Resource, resource) || policy.Action != dataAction {
 			continue
 		}
 		if err := policy.Predicate.Validate(); err != nil {

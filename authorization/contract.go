@@ -23,10 +23,11 @@ type DecisionRequest struct {
 }
 
 type AccessRequest struct {
-	ObjectKey string `json:"object_key"`
-	Action    string `json:"action"`
-	FieldKey  string `json:"field_key,omitempty"`
-	RecordID  string `json:"record_id,omitempty"`
+	ObjectKey  string     `json:"object_key"`
+	Action     string     `json:"action"`
+	DataAction DataAction `json:"data_action"`
+	FieldKey   string     `json:"field_key,omitempty"`
+	RecordID   string     `json:"record_id,omitempty"`
 }
 
 type AccessDecision struct {
@@ -68,7 +69,6 @@ type GrantSource struct {
 
 type AccessBundle struct {
 	ContractVersion       string                `json:"contract_version"`
-	CatalogRevision       CatalogRevision       `json:"catalog_revision"`
 	AuthorizationRevision AuthorizationRevision `json:"authorization_revision"`
 	ExpiresAt             time.Time             `json:"expires_at"`
 	Subject               Subject               `json:"subject"`
@@ -105,10 +105,21 @@ const (
 	EffectDeny  Effect = "deny"
 )
 
+// DataAction is the deliberately coarse record-policy dimension. Action is
+// still the exact executable/function key; callers supply this second value
+// from the owning ActionDefinition's effect classification when a real data
+// object is being authorized.
+type DataAction string
+
+const (
+	DataActionRead  DataAction = "read"
+	DataActionWrite DataAction = "write"
+)
+
 type DataPolicy struct {
 	Key         string       `json:"key"`
 	Resource    ResourceType `json:"resource"`
-	Action      Action       `json:"action"`
+	Action      DataAction   `json:"action"`
 	Effect      Effect       `json:"effect"`
 	Predicate   Predicate    `json:"predicate"`
 	AuditDenial bool         `json:"audit_denial,omitempty"`

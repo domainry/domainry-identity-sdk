@@ -14,7 +14,7 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 	if bundle.ContractVersion != CurrentPolicyBundleVersion {
 		return &Error{Code: "identity.access_bundle_version_unsupported"}
 	}
-	if !bundle.CatalogRevision.Valid() || !bundle.AuthorizationRevision.Valid() || !bundle.Subject.WorkspaceID.Valid() || !bundle.Subject.SubjectID.Valid() {
+	if !bundle.AuthorizationRevision.Valid() || !bundle.Subject.WorkspaceID.Valid() || !bundle.Subject.SubjectID.Valid() {
 		return &Error{Code: "identity.access_bundle_identity_invalid"}
 	}
 	if bundle.ExpiresAt.IsZero() || !bundle.ExpiresAt.After(now) {
@@ -30,7 +30,7 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 	}
 	functionKeys := map[string]struct{}{}
 	for _, grant := range bundle.FunctionGrants {
-		if !grant.Resource.Valid() || !grant.Action.Valid() || !grant.Effect.Valid() {
+		if !grant.Resource.Valid() || !grant.Action.Valid() || grant.Resource == "*" || grant.Action == "*" || !grant.Effect.Valid() {
 			return &Error{Code: "identity.function_grant_invalid"}
 		}
 		key := string(grant.Resource) + "\x00" + string(grant.Action) + "\x00" + string(grant.Effect)
@@ -41,7 +41,7 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 	}
 	dataKeys := map[string]struct{}{}
 	for _, policy := range bundle.DataPolicies {
-		if strings.TrimSpace(policy.Key) == "" || !policy.Resource.Valid() || !policy.Action.Valid() || !policy.Effect.Valid() {
+		if strings.TrimSpace(policy.Key) == "" || !policy.Resource.Valid() || policy.Resource == "*" || !policy.Action.Valid() || !policy.Effect.Valid() {
 			return &Error{Code: "identity.data_policy_invalid"}
 		}
 		if _, duplicate := dataKeys[policy.Key]; duplicate {
@@ -138,6 +138,10 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 }
 
 func (effect Effect) Valid() bool { return effect == EffectAllow || effect == EffectDeny }
+
+func (action DataAction) Valid() bool {
+	return action == DataActionRead || action == DataActionWrite
+}
 
 func (effect FieldEffect) Valid() bool {
 	switch effect {
@@ -388,8 +392,22 @@ func (bundle AccessBundle) CacheKey(now time.Time) (string, error) {
 		Workspace WorkspaceID           `json:"workspace"`
 		Subject   SubjectID             `json:"subject"`
 		Revision  AuthorizationRevision `json:"revision"`
-		Catalog   CatalogRevision       `json:"catalog"`
-	}{bundle.Subject.WorkspaceID, bundle.Subject.SubjectID, bundle.AuthorizationRevision, bundle.CatalogRevision})
+	}{bundle.Subject.WorkspaceID, bundle.Subject.SubjectID, bundle.AuthorizationRevision})
 	digest := sha256.Sum256(payload)
 	return "identity-access:" + hex.EncodeToString(digest[:]), nil
+}
+
+func uniqueNonBlank(values []string) bool {
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return false
+		}
+		if _, duplicate := seen[value]; duplicate {
+			return false
+		}
+		seen[value] = struct{}{}
+	}
+	return true
 }

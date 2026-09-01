@@ -37,10 +37,10 @@ func TestPrincipalPermissionUsesAccessBundleAsAuthoritativeState(t *testing.T) {
 	}
 }
 
-func TestPrincipalPermissionSupportsExplicitGlobalWildcardGrant(t *testing.T) {
+func TestPrincipalPermissionRejectsWildcardAuthority(t *testing.T) {
 	principal := Principal{AccessBundle: &AccessBundle{FunctionGrants: []FunctionGrant{{Resource: "*", Action: "*", Effect: EffectAllow}}}}
-	if !principal.HasPermission("customer.read") || !principal.HasPermission("platform.workflow.definition.read") {
-		t.Fatalf("global wildcard did not match concrete permission: %#v", principal.AccessBundle.FunctionGrants)
+	if principal.HasPermission("customer.read") || principal.HasPermission("platform.workflow.definition.read") {
+		t.Fatalf("wildcard grant authorized a concrete permission: %#v", principal.AccessBundle.FunctionGrants)
 	}
 }
 

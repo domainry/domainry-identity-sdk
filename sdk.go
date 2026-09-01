@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	actioncontract "github.com/domainry/domainry-foundation/action"
 	"github.com/domainry/domainry-foundation/modulecapability"
 	"github.com/domainry/domainry-identity-sdk/authentication"
 	"github.com/domainry/domainry-identity-sdk/authorization"
@@ -22,13 +23,13 @@ const (
 )
 
 type Descriptor struct {
-	ProtocolVersion string         `json:"protocol_version"`
-	BundleVersion   string         `json:"bundle_version"`
-	CatalogVersion  string         `json:"catalog_version"`
-	Mode            DeploymentMode `json:"mode"`
-	Issuer          string         `json:"issuer,omitempty"`
-	Audience        string         `json:"audience,omitempty"`
-	Capabilities    []string       `json:"capabilities"`
+	ProtocolVersion      string         `json:"protocol_version"`
+	BundleVersion        string         `json:"bundle_version"`
+	AuthorizationVersion string         `json:"authorization_version"`
+	Mode                 DeploymentMode `json:"mode"`
+	Issuer               string         `json:"issuer,omitempty"`
+	Audience             string         `json:"audience,omitempty"`
+	Capabilities         []string       `json:"capabilities"`
 }
 
 // Binding is the sole deployment-neutral Runtime dependency. An in-process
@@ -41,13 +42,22 @@ type Binding interface {
 	Authorization() Authorization
 	Principals() PrincipalResolver
 	Directory() Directory
-	Catalog() CatalogClient
+	Applications() ApplicationRegistry
+	Permissions() PermissionRegistry
 	Credentials() CredentialManager
 	Close(context.Context) error
 }
 
 type Factory interface {
 	Open(context.Context, ApplicationRef) (Binding, error)
+}
+
+// PermissionUsageProviderBinder is implemented only by an embedded Identity
+// module. The host binds its live Action registry projection after composing
+// all Runtime and module Actions. Remote Identity queries the same contract
+// over HTTP and therefore does not implement this in-process capability.
+type PermissionUsageProviderBinder interface {
+	BindPermissionUsageProvider(actioncontract.PermissionUsageProvider) error
 }
 
 // DatabaseHandle is a project-owned database pool borrowed by an in-process
@@ -116,14 +126,19 @@ type Clock interface {
 
 const (
 	ProtocolVersionV1               = "domainry-identity-protocol-v1"
-	CurrentProtocolVersion          = ProtocolVersionV1
+	ProtocolVersionV2               = "domainry-identity-protocol-v2"
+	CurrentProtocolVersion          = ProtocolVersionV2
 	PolicyBundleVersionV1           = authorization.PolicyBundleVersionV1
 	PolicyBundleVersionV2           = authorization.PolicyBundleVersionV2
+	PolicyBundleVersionV3           = authorization.PolicyBundleVersionV3
+	PolicyBundleVersionV4           = authorization.PolicyBundleVersionV4
 	CurrentPolicyBundleVersion      = authorization.CurrentPolicyBundleVersion
-	CatalogVersionV1                = authorization.CatalogVersionV1
+	AuthorizationContractVersionV1  = authorization.AuthorizationContractVersionV1
 	PrincipalContextContractVersion = authorization.PrincipalContextContractVersion
 	EffectAllow                     = authorization.EffectAllow
 	EffectDeny                      = authorization.EffectDeny
+	DataActionRead                  = authorization.DataActionRead
+	DataActionWrite                 = authorization.DataActionWrite
 	ExportModeDeny                  = authorization.ExportModeDeny
 	ExportModeAllowList             = authorization.ExportModeAllowList
 	OperatorEqual                   = authorization.OperatorEqual
@@ -154,8 +169,8 @@ type SessionID = identitymodel.SessionID
 type ApplicationKey = identitymodel.ApplicationKey
 type ResourceType = identitymodel.ResourceType
 type Action = identitymodel.Action
+type DataAction = authorization.DataAction
 type AuthorizationRevision = identitymodel.AuthorizationRevision
-type CatalogRevision = identitymodel.CatalogRevision
 type User = identitymodel.User
 type Department = identitymodel.Department
 type Role = identitymodel.Role
@@ -192,8 +207,18 @@ type ExchangeApplicationServiceTokenRequest = authentication.ExchangeApplication
 type ApplicationServiceToken = authentication.ApplicationServiceToken
 type VerifyApplicationServiceTokenRequest = authentication.VerifyApplicationServiceTokenRequest
 type ApplicationServicePrincipal = authentication.ApplicationServicePrincipal
+type ApplicationServiceTokenVerifier = authentication.ApplicationServiceTokenVerifier
 type ApplicationServiceAuthentication = authentication.ApplicationServiceAuthentication
 
+// ApplicationServiceVerificationBinding is the narrow resource-service
+// capability for verifying already-issued short-lived service tokens.
+type ApplicationServiceVerificationBinding interface {
+	ApplicationServiceVerifier() ApplicationServiceTokenVerifier
+}
+
+// ApplicationServiceBinding is the full Identity service-token capability.
+// It is exposed only where both credential exchange and token verification are
+// implemented.
 type ApplicationServiceBinding interface {
 	ApplicationServices() ApplicationServiceAuthentication
 }
@@ -229,13 +254,25 @@ type RelationDirection = authorization.RelationDirection
 type Operator = authorization.Operator
 type ResourceFacts = authorization.ResourceFacts
 type ApplicationRef = authorization.ApplicationRef
-type AuthorizationCatalog = authorization.AuthorizationCatalog
-type ResourceDefinition = authorization.ResourceDefinition
-type ReferenceDefinition = authorization.ReferenceDefinition
-type ReferenceTargetAuthority = authorization.ReferenceTargetAuthority
-type ActionDefinition = authorization.ActionDefinition
-type CatalogReceipt = authorization.CatalogReceipt
-type CatalogClient = authorization.CatalogClient
+type ApplicationRegistration = authorization.ApplicationRegistration
+type ApplicationRegistrationReceipt = authorization.ApplicationRegistrationReceipt
+type ApplicationRegistry = authorization.ApplicationRegistry
+type PermissionDefinition = authorization.PermissionDefinition
+type PermissionReconcileRequest = authorization.PermissionReconcileRequest
+type PermissionReconcileReceipt = authorization.PermissionReconcileReceipt
+type PermissionRegistry = authorization.PermissionRegistry
+type PermissionSourceSnapshotRequest = authorization.PermissionSourceSnapshotRequest
+type PermissionSourceSnapshot = authorization.PermissionSourceSnapshot
+type PermissionSnapshotReader = authorization.PermissionSnapshotReader
+
+func NewPermissionReconcileRequest(application ApplicationRef, sourceOwner, previousSnapshotHash string, definitions []PermissionDefinition) (PermissionReconcileRequest, error) {
+	return authorization.NewPermissionReconcileRequest(application, sourceOwner, previousSnapshotHash, definitions)
+}
+
+func PermissionSnapshotHash(sourceOwner string, definitions []PermissionDefinition) (string, error) {
+	return authorization.PermissionSnapshotHash(sourceOwner, definitions)
+}
+
 type ProjectRoleDefinition = authorization.ProjectRoleDefinition
 type ProjectRoleCatalog = authorization.ProjectRoleCatalog
 type ProjectRoleCatalogReceipt = authorization.ProjectRoleCatalogReceipt
@@ -271,9 +308,5 @@ var DeriveExecutionAccess = authorization.DeriveExecutionAccess
 var RestrictAccess = authorization.RestrictAccess
 
 const (
-	ReferenceTargetApplication = authorization.ReferenceTargetApplication
-	ReferenceTargetIdentity    = authorization.ReferenceTargetIdentity
-	IdentityUserResource       = authorization.IdentityUserResource
-	IdentityDepartmentResource = authorization.IdentityDepartmentResource
-	UserStatusActive           = identitymodel.UserStatusActive
+	UserStatusActive = identitymodel.UserStatusActive
 )

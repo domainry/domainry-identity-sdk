@@ -86,6 +86,9 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 	if session.SubjectID != "" && session.SubjectID != verified.SubjectID || session.WorkspaceID != "" && session.WorkspaceID != verified.WorkspaceID || strings.TrimSpace(session.User.ID) != "" && identity.SubjectID(session.User.ID) != verified.SubjectID {
 		return identity.Principal{}, &identity.Error{Code: "identity.session_subject_mismatch"}
 	}
+	if session.AuthorizationRevision != "" && identity.AuthorizationRevision(session.AuthorizationRevision) != verified.AuthorizationRevision {
+		return identity.Principal{}, &identity.Error{Code: "identity.authorization_revision_stale"}
+	}
 	requestIdentity := identity.RequestIdentity{Principal: identity.Principal{Known: true, WorkspaceID: string(verified.WorkspaceID), UserID: string(verified.SubjectID), AuthorizationRevision: string(verified.AuthorizationRevision)}, AccessToken: accessToken}
 	bundle, err := resolver.binding.Authorization().ResolveAccess(ctx, identity.AccessBundleRequest{Identity: requestIdentity})
 	if err != nil {

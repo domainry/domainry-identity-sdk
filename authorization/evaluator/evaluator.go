@@ -28,15 +28,15 @@ type Decision struct {
 // action is configured as auditable. It is intentionally independent of
 // record facts so callers can decide after a not-found projection without
 // reconstructing Identity policy semantics.
-func AuditDenialRequired(bundle identity.AccessBundle, resource identity.ResourceType, action identity.Action, now time.Time) (bool, error) {
+func AuditDenialRequired(bundle identity.AccessBundle, resource identity.ResourceType, dataAction identity.DataAction, now time.Time) (bool, error) {
 	if err := bundle.Validate(now); err != nil {
 		return false, err
 	}
-	if !resource.Valid() || !action.Valid() {
+	if !resource.Valid() || !dataAction.Valid() {
 		return false, &identity.Error{Code: "identity.access_request_invalid"}
 	}
 	for _, policy := range bundle.DataPolicies {
-		if resourceMatches(policy.Resource, resource) && dataActionMatches(policy.Action, action) && policy.AuditDenial {
+		if resourceMatches(policy.Resource, resource) && policy.Action == dataAction && policy.AuditDenial {
 			return true, nil
 		}
 	}
@@ -55,12 +55,13 @@ func EvaluateWithContext(bundle identity.AccessBundle, request identity.AccessRe
 		return Decision{Code: "access_bundle_invalid"}, err
 	}
 	resource, action := identity.ResourceType(strings.TrimSpace(request.ObjectKey)), identity.Action(strings.TrimSpace(request.Action))
-	if !resource.Valid() || !action.Valid() {
+	dataAction := identity.DataAction(strings.TrimSpace(string(request.DataAction)))
+	if !resource.Valid() || !action.Valid() || !dataAction.Valid() {
 		return Decision{Code: "access_request_invalid"}, &identity.Error{Code: "identity.access_request_invalid"}
 	}
 	functionAllowed := false
 	for _, grant := range bundle.FunctionGrants {
-		if !resourceMatches(grant.Resource, resource) || !actionMatches(grant.Action, action) {
+		if grant.Resource != resource || grant.Action != action {
 			continue
 		}
 		if grant.Effect == identity.EffectDeny {
@@ -94,7 +95,7 @@ func EvaluateWithContext(bundle identity.AccessBundle, request identity.AccessRe
 	}
 	matchedAllow, hasPolicies, auditDenial := false, false, false
 	for _, policy := range bundle.DataPolicies {
-		if !resourceMatches(policy.Resource, resource) || !dataActionMatches(policy.Action, action) {
+		if !resourceMatches(policy.Resource, resource) || policy.Action != dataAction {
 			continue
 		}
 		hasPolicies = true
@@ -306,26 +307,6 @@ func resourceMatches(configured, requested identity.ResourceType) bool {
 
 func actionMatches(configured, requested identity.Action) bool {
 	return configured == requested || configured == "*"
-}
-
-// dataActionMatches bridges the deliberately coarse role data contract
-// (read/write) with exact Runtime operations. Function grants and guardrails
-// remain exact: this widening applies only after an exact functional grant has
-// already authorized the requested operation.
-func dataActionMatches(configured, requested identity.Action) bool {
-	if actionMatches(configured, requested) {
-		return true
-	}
-	configuredValue := strings.ToLower(strings.TrimSpace(string(configured)))
-	requestedValue := strings.ToLower(strings.TrimSpace(string(requested)))
-	switch configuredValue {
-	case "read":
-		return requestedValue == "export"
-	case "write":
-		return requestedValue != "" && requestedValue != "read" && requestedValue != "export"
-	default:
-		return false
-	}
 }
 
 func referenceGuardrailDenied(bundle identity.AccessBundle, resource identity.ResourceType, reference string) bool {

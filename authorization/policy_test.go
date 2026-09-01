@@ -9,7 +9,7 @@ import (
 func TestAccessBundleCanonicalJSONIsOrderIndependent(t *testing.T) {
 	now := time.Date(2026, 8, 27, 1, 0, 0, 0, time.UTC)
 	first := AccessBundle{
-		ContractVersion: CurrentPolicyBundleVersion, CatalogRevision: "catalog-1", AuthorizationRevision: "authz-1", ExpiresAt: now.Add(time.Hour),
+		ContractVersion: CurrentPolicyBundleVersion, AuthorizationRevision: "authz-1", ExpiresAt: now.Add(time.Hour),
 		Subject:        Subject{WorkspaceID: "workspace-1", SubjectID: "user-1", ReportingSubjectIDs: []SubjectID{"user-3", "user-2"}, OrganizationScopes: map[string][]string{"team_ids": {"team-b", "team-a"}}},
 		FunctionGrants: []FunctionGrant{{Resource: "order", Action: "update", Effect: EffectDeny}, {Resource: "order", Action: "read", Effect: EffectAllow}},
 		DataPolicies: []DataPolicy{
@@ -52,7 +52,7 @@ func TestAccessBundleCanonicalJSONIsOrderIndependent(t *testing.T) {
 
 func TestAccessBundleRejectsAmbiguousEffectivePolicies(t *testing.T) {
 	now := time.Now().UTC()
-	base := AccessBundle{ContractVersion: CurrentPolicyBundleVersion, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute), Subject: Subject{WorkspaceID: "workspace", SubjectID: "user"}}
+	base := AccessBundle{ContractVersion: CurrentPolicyBundleVersion, AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute), Subject: Subject{WorkspaceID: "workspace", SubjectID: "user"}}
 	duplicateFunction := base
 	duplicateFunction.FunctionGrants = []FunctionGrant{{Resource: "order", Action: "read", Effect: EffectAllow}, {Resource: "order", Action: "read", Effect: EffectAllow}}
 	if err := duplicateFunction.Validate(now); err == nil {
@@ -84,7 +84,7 @@ func TestAccessBundleV2PreservesContextualAndRelationshipPolicy(t *testing.T) {
 		Path: []RelationSegment{{Direction: RelationForward, Reference: "account_id", TargetResource: "account"}},
 	}
 	bundle := AccessBundle{
-		ContractVersion: CurrentPolicyBundleVersion, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
+		ContractVersion: CurrentPolicyBundleVersion, AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
 		Subject:      Subject{WorkspaceID: "workspace", SubjectID: "user"},
 		DataPolicies: []DataPolicy{{Key: "owned-account", Resource: "invoice", Action: "read", Effect: EffectAllow, Predicate: predicate, AuditDenial: true}},
 		FieldPolicies: []FieldPolicy{{

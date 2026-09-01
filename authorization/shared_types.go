@@ -9,7 +9,6 @@ type ApplicationKey = identity.ApplicationKey
 type ResourceType = identity.ResourceType
 type Action = identity.Action
 type AuthorizationRevision = identity.AuthorizationRevision
-type CatalogRevision = identity.CatalogRevision
 type Error = identity.Error
 type User = identity.User
 type Role = identity.Role

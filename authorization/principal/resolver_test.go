@@ -2,6 +2,7 @@ package principal_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ func newResolverBinding() *resolverBinding {
 		clock:  clock,
 		tokens: resolverTokens{claims: identity.VerifiedToken{SubjectID: "user-1", WorkspaceID: "workspace-1", SessionID: "session-1", AuthorizationRevision: "revision-1", TokenID: "token-1", IssuedAt: clock.now.Add(-time.Minute).Unix(), ExpiresAt: clock.now.Add(time.Hour).Unix()}},
 		auth:   &resolverAuthentication{session: identity.SessionView{WorkspaceID: "workspace-1", SubjectID: "user-1", AuthorizationRevision: "revision-1", User: identity.User{ID: "user-1"}, Roles: []identity.Role{{Key: "admin"}}, Permissions: []string{"workspace.admin"}}},
-		author: &resolverAuthorization{bundle: identity.AccessBundle{ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "revision-1", CatalogRevision: "catalog-1", ExpiresAt: clock.now.Add(5 * time.Minute), Subject: identity.Subject{WorkspaceID: "workspace-1", SubjectID: "user-1", DepartmentPath: "/company/sales", ReportingPath: "/manager/user-1"}, FunctionGrants: []identity.FunctionGrant{{Resource: "orders", Action: "read", Effect: identity.EffectAllow}, {Resource: "workspace", Action: "admin", Effect: identity.EffectAllow}}}},
+		author: &resolverAuthorization{bundle: identity.AccessBundle{ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "revision-1", ExpiresAt: clock.now.Add(5 * time.Minute), Subject: identity.Subject{WorkspaceID: "workspace-1", SubjectID: "user-1", DepartmentPath: "/company/sales", ReportingPath: "/manager/user-1"}, FunctionGrants: []identity.FunctionGrant{{Resource: "orders", Action: "read", Effect: identity.EffectAllow}, {Resource: "workspace", Action: "admin", Effect: identity.EffectAllow}}}},
 	}
 }
 
@@ -34,7 +35,8 @@ func (binding *resolverBinding) Tokens() identity.TokenVerifier          { retur
 func (binding *resolverBinding) Authorization() identity.Authorization   { return binding.author }
 func (*resolverBinding) Principals() identity.PrincipalResolver          { return nil }
 func (*resolverBinding) Directory() identity.Directory                   { return nil }
-func (*resolverBinding) Catalog() identity.CatalogClient                 { return nil }
+func (*resolverBinding) Applications() identity.ApplicationRegistry      { return nil }
+func (*resolverBinding) Permissions() identity.PermissionRegistry        { return nil }
 func (*resolverBinding) Credentials() identity.CredentialManager         { return nil }
 func (*resolverBinding) Close(context.Context) error                     { return nil }
 
@@ -119,6 +121,35 @@ func TestResolverCachesByTokenAndAuthorizationRevision(t *testing.T) {
 	}
 	if binding.auth.calls != 2 || binding.author.calls != 2 {
 		t.Fatalf("invalidate did not evict: session=%d bundle=%d", binding.auth.calls, binding.author.calls)
+	}
+}
+
+func TestResolverRejectsStaleAuthorizationRevisionAfterMaximumCacheWindow(t *testing.T) {
+	binding := newResolverBinding()
+	resolver, err := identityprincipal.NewResolver(binding, identityprincipal.Options{Clock: binding.clock, MaxCacheTTL: time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := resolver.Authenticate(t.Context(), "access")
+	if err != nil || !resolved.HasPermission("orders.read") {
+		t.Fatalf("initial principal=%#v err=%v", resolved, err)
+	}
+	binding.auth.session.AuthorizationRevision = "revision-2"
+	binding.author.bundle.AuthorizationRevision = "revision-2"
+	binding.author.bundle.FunctionGrants = nil
+	// The bounded cache may serve the already-issued immutable snapshot until
+	// MaxCacheTTL, but it must revalidate after that explicit stale window.
+	binding.clock.now = binding.clock.now.Add(time.Minute + time.Second)
+	if _, err := resolver.Authenticate(t.Context(), "access"); err == nil {
+		t.Fatal("stale authorization revision was accepted")
+	} else {
+		var identityError *identity.Error
+		if !errors.As(err, &identityError) || identityError.Code != "identity.authorization_revision_stale" {
+			t.Fatalf("stale token error=%v", err)
+		}
+	}
+	if binding.auth.calls != 2 || binding.author.calls != 1 {
+		t.Fatalf("stale revision calls: session=%d bundle=%d", binding.auth.calls, binding.author.calls)
 	}
 }
 

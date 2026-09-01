@@ -9,6 +9,8 @@ import (
 
 type applicationServices struct{ binding *binding }
 
+type applicationServiceVerifier struct{ binding *binding }
+
 func (value applicationServices) delegate() (identity.ApplicationServiceAuthentication, error) {
 	capability, ok := value.binding.delegate.(identity.ApplicationServiceBinding)
 	if !ok || capability.ApplicationServices() == nil {
@@ -27,14 +29,27 @@ func (value applicationServices) Exchange(ctx context.Context, request identity.
 }
 
 func (value applicationServices) Verify(ctx context.Context, request identity.VerifyApplicationServiceTokenRequest) (identity.ApplicationServicePrincipal, error) {
+	return verifyApplicationServiceToken(ctx, value.binding, request)
+}
+
+func (value applicationServiceVerifier) Verify(ctx context.Context, request identity.VerifyApplicationServiceTokenRequest) (identity.ApplicationServicePrincipal, error) {
+	return verifyApplicationServiceToken(ctx, value.binding, request)
+}
+
+func verifyApplicationServiceToken(ctx context.Context, binding *binding, request identity.VerifyApplicationServiceTokenRequest) (identity.ApplicationServicePrincipal, error) {
 	if request.Audience == "" {
-		request.Audience = value.binding.application.ApplicationKey
-	} else if request.Audience != value.binding.application.ApplicationKey {
+		request.Audience = binding.application.ApplicationKey
+	} else if request.Audience != binding.application.ApplicationKey {
 		return identity.ApplicationServicePrincipal{}, scopeError(http.StatusForbidden, "identity.application_mismatch")
 	}
-	capability, err := value.delegate()
-	if err != nil {
-		return identity.ApplicationServicePrincipal{}, err
+	if capability, ok := binding.delegate.(identity.ApplicationServiceVerificationBinding); ok && capability.ApplicationServiceVerifier() != nil {
+		return capability.ApplicationServiceVerifier().Verify(ctx, request)
 	}
-	return capability.Verify(ctx, request)
+	if capability, ok := binding.delegate.(identity.ApplicationServiceBinding); ok && capability.ApplicationServices() != nil {
+		return capability.ApplicationServices().Verify(ctx, request)
+	}
+	return identity.ApplicationServicePrincipal{}, scopeError(http.StatusNotImplemented, "identity.application_service_verification_unavailable")
 }
+
+var _ identity.ApplicationServiceAuthentication = applicationServices{}
+var _ identity.ApplicationServiceTokenVerifier = applicationServiceVerifier{}

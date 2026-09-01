@@ -9,9 +9,39 @@ import (
 	"testing"
 	"time"
 
+	actioncontract "github.com/domainry/domainry-foundation/action"
 	"github.com/domainry/domainry-foundation/modulecapability"
 	identity "github.com/domainry/domainry-identity-sdk"
 )
+
+func TestBrowserGatewayRoutesProjectOneFrozenActionManifest(t *testing.T) {
+	definitions, err := ActionDefinitions("/browser")
+	if err != nil {
+		t.Fatal(err)
+	}
+	patterns, err := RoutePatterns("/browser")
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := actioncontract.NewRegistry()
+	if err := registry.Register(definitions...); err != nil {
+		t.Fatal(err)
+	}
+	if err := registry.Freeze(); err != nil {
+		t.Fatal(err)
+	}
+	if len(definitions) != 14 || len(patterns) != len(definitions) {
+		t.Fatalf("definitions=%d patterns=%d", len(definitions), len(patterns))
+	}
+	for index, definition := range definitions {
+		if definition.Permission != nil || definition.HTTP == nil || patterns[index] != definition.HTTP.Method+" "+definition.HTTP.RouteTemplate {
+			t.Fatalf("definition[%d]=%#v pattern=%q", index, definition, patterns[index])
+		}
+		if _, found := registry.ResolveHTTP(definition.HTTP.Method, definition.HTTP.RouteTemplate); !found {
+			t.Fatalf("action %q did not resolve", definition.Key)
+		}
+	}
+}
 
 type testBinding struct {
 	modulecapability.Binding
@@ -25,7 +55,8 @@ func (testBinding) Tokens() identity.TokenVerifier                  { return nil
 func (testBinding) Authorization() identity.Authorization           { return nil }
 func (testBinding) Principals() identity.PrincipalResolver          { return nil }
 func (testBinding) Directory() identity.Directory                   { return nil }
-func (testBinding) Catalog() identity.CatalogClient                 { return nil }
+func (testBinding) Applications() identity.ApplicationRegistry      { return nil }
+func (testBinding) Permissions() identity.PermissionRegistry        { return nil }
 func (binding testBinding) Credentials() identity.CredentialManager { return binding.credentials }
 func (testBinding) Close(context.Context) error                     { return nil }
 
@@ -92,7 +123,7 @@ func browserSession(refreshToken string) identity.AuthSession {
 func newTestGateway(t *testing.T, authentication *testAuthentication) *http.ServeMux {
 	t.Helper()
 	gateway, err := New(testBinding{auth: authentication}, Config{
-		ApplicationKey: "identity-admin", AllowedReturnURLs: []string{"http://localhost:3100/auth/callback"},
+		ApplicationKey:     "identity-admin",
 		DefaultWorkspaceID: "workspace-primary",
 		Cookie:             CookieConfig{Path: "/browser/auth", MaxAge: time.Hour},
 	})

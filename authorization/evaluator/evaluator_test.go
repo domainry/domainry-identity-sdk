@@ -11,7 +11,7 @@ import (
 func TestEvaluatorEnforcesFunctionDataFieldReferenceAndExportPolicies(t *testing.T) {
 	now := time.Now().UTC()
 	bundle := identity.AccessBundle{
-		ContractVersion: identity.CurrentPolicyBundleVersion, CatalogRevision: "catalog-1", AuthorizationRevision: "authz-1", ExpiresAt: now.Add(time.Minute),
+		ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "authz-1", ExpiresAt: now.Add(time.Minute),
 		Subject:           identity.Subject{WorkspaceID: "workspace-a", SubjectID: "user-1", DepartmentID: "department-a"},
 		FunctionGrants:    []identity.FunctionGrant{{Resource: "invoice", Action: "read", Effect: identity.EffectAllow}},
 		DataPolicies:      []identity.DataPolicy{{Key: "same-department", Resource: "invoice", Action: "read", Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "department_id", Operator: identity.OperatorEqual, Value: "$subject.department_id"}}},
@@ -19,19 +19,19 @@ func TestEvaluatorEnforcesFunctionDataFieldReferenceAndExportPolicies(t *testing
 		ReferencePolicies: []identity.ReferencePolicy{{SourceResource: "invoice", Reference: "customer", TargetResource: "customer", Allowed: true, DisplayFields: []string{"name"}}},
 		ExportPolicies:    []identity.ExportPolicy{{Resource: "invoice", Mode: "allow_list", Fields: []string{"number"}}},
 	}
-	decision, err := Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read"}, identity.ResourceFacts{"department_id": "department-a"}, now)
+	decision, err := Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read", DataAction: identity.DataActionRead}, identity.ResourceFacts{"department_id": "department-a"}, now)
 	if err != nil || !decision.Allowed {
 		t.Fatalf("allowed decision=%+v err=%v", decision, err)
 	}
-	decision, err = Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read"}, identity.ResourceFacts{"department_id": "department-b"}, now)
+	decision, err = Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read", DataAction: identity.DataActionRead}, identity.ResourceFacts{"department_id": "department-b"}, now)
 	if err != nil || decision.Allowed || decision.Code != "data_policy_not_granted" {
 		t.Fatalf("denied decision=%+v err=%v", decision, err)
 	}
-	decision, err = Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read", FieldKey: "amount"}, identity.ResourceFacts{"department_id": "department-a"}, now)
+	decision, err = Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read", DataAction: identity.DataActionRead, FieldKey: "amount"}, identity.ResourceFacts{"department_id": "department-a"}, now)
 	if err != nil || !decision.Allowed {
 		t.Fatalf("readable field decision=%+v err=%v", decision, err)
 	}
-	decision, err = Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read", FieldKey: "secret"}, identity.ResourceFacts{"department_id": "department-a"}, now)
+	decision, err = Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read", DataAction: identity.DataActionRead, FieldKey: "secret"}, identity.ResourceFacts{"department_id": "department-a"}, now)
 	if err != nil || decision.Allowed || decision.Code != "field_not_granted" {
 		t.Fatalf("unknown field decision=%+v err=%v", decision, err)
 	}
@@ -51,13 +51,13 @@ func TestEvaluatorEnforcesFunctionDataFieldReferenceAndExportPolicies(t *testing
 
 func TestEvaluatorAndSQLCompilerFailClosed(t *testing.T) {
 	now := time.Now().UTC()
-	bundle := identity.AccessBundle{ContractVersion: identity.CurrentPolicyBundleVersion, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute), Subject: identity.Subject{WorkspaceID: "workspace", SubjectID: "subject"}, FunctionGrants: []identity.FunctionGrant{{Resource: "invoice", Action: "read", Effect: identity.EffectAllow}}, DataPolicies: []identity.DataPolicy{{Key: "unsupported", Resource: "invoice", Action: "read", Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "owner_id", Operator: "regex", Value: ".*"}}}}
-	if _, err := Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read"}, identity.ResourceFacts{"owner_id": "subject"}, now); err == nil {
+	bundle := identity.AccessBundle{ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute), Subject: identity.Subject{WorkspaceID: "workspace", SubjectID: "subject"}, FunctionGrants: []identity.FunctionGrant{{Resource: "invoice", Action: "read", Effect: identity.EffectAllow}}, DataPolicies: []identity.DataPolicy{{Key: "unsupported", Resource: "invoice", Action: "read", Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "owner_id", Operator: "regex", Value: ".*"}}}}
+	if _, err := Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read", DataAction: identity.DataActionRead}, identity.ResourceFacts{"owner_id": "subject"}, now); err == nil {
 		t.Fatal("unsupported operator did not fail closed")
 	}
 	bundle.DataPolicies[0].Predicate.Operator = identity.OperatorEqual
 	bundle.DataPolicies[0].Predicate.Value = "$subject.id"
-	filter, err := CompileRecordFilter(bundle, "invoice", "read", now)
+	filter, err := CompileRecordFilter(bundle, "invoice", "read", identity.DataActionRead, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,15 +75,15 @@ func TestEvaluatorAndSQLCompilerFailClosed(t *testing.T) {
 func TestFunctionGrantDoesNotInventRecordAccess(t *testing.T) {
 	now := time.Now().UTC()
 	bundle := identity.AccessBundle{
-		ContractVersion: identity.CurrentPolicyBundleVersion, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
+		ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
 		Subject:        identity.Subject{WorkspaceID: "workspace", SubjectID: "subject"},
 		FunctionGrants: []identity.FunctionGrant{{Resource: "invoice", Action: "read", Effect: identity.EffectAllow}},
 	}
-	decision, err := Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read"}, identity.ResourceFacts{"id": "invoice-1"}, now)
+	decision, err := Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read", DataAction: identity.DataActionRead}, identity.ResourceFacts{"id": "invoice-1"}, now)
 	if err != nil || decision.Allowed || decision.Code != "data_policy_not_granted" {
 		t.Fatalf("decision=%+v err=%v", decision, err)
 	}
-	filter, err := CompileRecordFilter(bundle, "invoice", "read", now)
+	filter, err := CompileRecordFilter(bundle, "invoice", "read", identity.DataActionRead, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,28 +93,28 @@ func TestFunctionGrantDoesNotInventRecordAccess(t *testing.T) {
 	}
 }
 
-func TestEvaluatorAppliesWildcardBundleEntriesWithoutWeakeningExplicitDenies(t *testing.T) {
+func TestEvaluatorAppliesExactBundleEntriesWithoutWeakeningExplicitDenies(t *testing.T) {
 	now := time.Now().UTC()
 	bundle := identity.AccessBundle{
-		ContractVersion: identity.CurrentPolicyBundleVersion, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
+		ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
 		Subject:        identity.Subject{WorkspaceID: "workspace", SubjectID: "subject"},
-		FunctionGrants: []identity.FunctionGrant{{Resource: "*", Action: "*", Effect: identity.EffectAllow}, {Resource: "invoice", Action: "delete", Effect: identity.EffectDeny}},
-		DataPolicies:   []identity.DataPolicy{{Key: "all", Resource: "*", Action: "*", Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "id", Operator: identity.OperatorExists, Value: true}}},
+		FunctionGrants: []identity.FunctionGrant{{Resource: "invoice", Action: "read", Effect: identity.EffectAllow}, {Resource: "invoice", Action: "delete", Effect: identity.EffectDeny}},
+		DataPolicies:   []identity.DataPolicy{{Key: "invoice-read", Resource: "invoice", Action: identity.DataActionRead, Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "id", Operator: identity.OperatorExists, Value: true}}},
 		FieldPolicies:  []identity.FieldPolicy{{Resource: "*", Field: "*", Read: true, Write: true, Export: true}, {Resource: "invoice", Field: "secret", Read: false}},
 	}
-	decision, err := Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read", FieldKey: "number"}, identity.ResourceFacts{"id": "invoice-1"}, now)
+	decision, err := Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read", DataAction: identity.DataActionRead, FieldKey: "number"}, identity.ResourceFacts{"id": "invoice-1"}, now)
 	if err != nil || !decision.Allowed {
 		t.Fatalf("wildcard read decision=%+v err=%v", decision, err)
 	}
-	decision, err = Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read", FieldKey: "secret"}, identity.ResourceFacts{"id": "invoice-1"}, now)
+	decision, err = Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "read", DataAction: identity.DataActionRead, FieldKey: "secret"}, identity.ResourceFacts{"id": "invoice-1"}, now)
 	if err != nil || decision.Allowed || decision.Code != "field_not_granted" {
 		t.Fatalf("exact field restriction decision=%+v err=%v", decision, err)
 	}
-	decision, err = Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "delete"}, identity.ResourceFacts{"id": "invoice-1"}, now)
+	decision, err = Evaluate(bundle, identity.AccessRequest{ObjectKey: "invoice", Action: "delete", DataAction: identity.DataActionWrite}, identity.ResourceFacts{"id": "invoice-1"}, now)
 	if err != nil || decision.Allowed || decision.Code != "function_denied" {
 		t.Fatalf("exact function deny decision=%+v err=%v", decision, err)
 	}
-	filter, err := CompileRecordFilter(bundle, "invoice", "read", now)
+	filter, err := CompileRecordFilter(bundle, "invoice", "read", identity.DataActionRead, now)
 	if err != nil || len(filter.Allow) != 1 {
 		t.Fatalf("wildcard filter=%+v err=%v", filter, err)
 	}
@@ -138,11 +138,11 @@ func TestAllowedReferencesMergesFieldsAndAppliesFieldGuardrail(t *testing.T) {
 func TestRecordFilterRequiresCurrentFunctionGrantAndAppliesGuardrails(t *testing.T) {
 	now := time.Now().UTC()
 	bundle := identity.AccessBundle{
-		ContractVersion: identity.CurrentPolicyBundleVersion, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
+		ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
 		Subject:      identity.Subject{WorkspaceID: "workspace", SubjectID: "subject", DepartmentPath: "/company/sales"},
 		DataPolicies: []identity.DataPolicy{{Key: "all", Resource: "invoice", Action: "read", Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "id", Operator: identity.OperatorExists, Value: true}}},
 	}
-	filter, err := CompileRecordFilter(bundle, "invoice", "read", now)
+	filter, err := CompileRecordFilter(bundle, "invoice", "read", identity.DataActionRead, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestRecordFilterRequiresCurrentFunctionGrantAndAppliesGuardrails(t *testing
 
 	bundle.FunctionGrants = []identity.FunctionGrant{{Resource: "invoice", Action: "read", Effect: identity.EffectAllow}}
 	bundle.Guardrails = []identity.Guardrail{{Key: "outside-department", Resource: "invoice", Action: "read", Effect: identity.EffectDeny, Predicate: &identity.Predicate{Fact: "department_path", Operator: identity.OperatorPrefix, Value: "$subject.department_path"}}}
-	filter, err = CompileRecordFilter(bundle, "invoice", "read", now)
+	filter, err = CompileRecordFilter(bundle, "invoice", "read", identity.DataActionRead, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestRecordFilterRequiresCurrentFunctionGrantAndAppliesGuardrails(t *testing
 	}
 
 	bundle.FunctionGrants = append(bundle.FunctionGrants, identity.FunctionGrant{Resource: "invoice", Action: "read", Effect: identity.EffectDeny})
-	filter, err = CompileRecordFilter(bundle, "invoice", "read", now)
+	filter, err = CompileRecordFilter(bundle, "invoice", "read", identity.DataActionRead, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestRecordFilterRequiresCurrentFunctionGrantAndAppliesGuardrails(t *testing
 	}
 
 	bundle.ExpiresAt = now.Add(-time.Second)
-	if _, err := CompileRecordFilter(bundle, "invoice", "read", now); err == nil {
+	if _, err := CompileRecordFilter(bundle, "invoice", "read", identity.DataActionRead, now); err == nil {
 		t.Fatal("expired access bundle compiled into a record filter")
 	}
 }
@@ -190,7 +190,7 @@ func TestRecordFilterRequiresCurrentFunctionGrantAndAppliesGuardrails(t *testing
 func TestWriteDataPolicyAuthorizesExactMutationOperationsOnlyAfterFunctionGrant(t *testing.T) {
 	now := time.Now().UTC()
 	bundle := identity.AccessBundle{
-		ContractVersion: identity.CurrentPolicyBundleVersion, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
+		ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
 		Subject: identity.Subject{WorkspaceID: "workspace", SubjectID: "wechat-user"},
 		FunctionGrants: []identity.FunctionGrant{
 			{Resource: "course_favorite", Action: "create", Effect: identity.EffectAllow},
@@ -203,14 +203,14 @@ func TestWriteDataPolicyAuthorizesExactMutationOperationsOnlyAfterFunctionGrant(
 	}
 
 	for _, request := range []identity.AccessRequest{
-		{ObjectKey: "course_favorite", Action: "create"},
-		{ObjectKey: "member", Action: "self_enroll"},
+		{ObjectKey: "course_favorite", Action: "create", DataAction: identity.DataActionWrite},
+		{ObjectKey: "member", Action: "self_enroll", DataAction: identity.DataActionWrite},
 	} {
 		decision, err := Evaluate(bundle, request, identity.ResourceFacts{"identity_user_id": "wechat-user"}, now)
 		if err != nil || !decision.Allowed {
 			t.Fatalf("request=%+v decision=%+v err=%v", request, decision, err)
 		}
-		filter, err := CompileRecordFilter(bundle, identity.ResourceType(request.ObjectKey), identity.Action(request.Action), now)
+		filter, err := CompileRecordFilter(bundle, identity.ResourceType(request.ObjectKey), identity.Action(request.Action), request.DataAction, now)
 		if err != nil || len(filter.Allow) != 1 {
 			t.Fatalf("request=%+v filter=%+v err=%v", request, filter, err)
 		}
@@ -218,14 +218,14 @@ func TestWriteDataPolicyAuthorizesExactMutationOperationsOnlyAfterFunctionGrant(
 
 	withoutExactFunction := bundle
 	withoutExactFunction.FunctionGrants = []identity.FunctionGrant{{Resource: "course_favorite", Action: "read", Effect: identity.EffectAllow}}
-	decision, err := Evaluate(withoutExactFunction, identity.AccessRequest{ObjectKey: "course_favorite", Action: "create"}, identity.ResourceFacts{"identity_user_id": "wechat-user"}, now)
+	decision, err := Evaluate(withoutExactFunction, identity.AccessRequest{ObjectKey: "course_favorite", Action: "create", DataAction: identity.DataActionWrite}, identity.ResourceFacts{"identity_user_id": "wechat-user"}, now)
 	if err != nil || decision.Allowed || decision.Code != "function_not_granted" {
 		t.Fatalf("write data policy widened function authority: decision=%+v err=%v", decision, err)
 	}
 
 	readRequest := bundle
 	readRequest.FunctionGrants = []identity.FunctionGrant{{Resource: "course_favorite", Action: "read", Effect: identity.EffectAllow}}
-	decision, err = Evaluate(readRequest, identity.AccessRequest{ObjectKey: "course_favorite", Action: "read"}, identity.ResourceFacts{"identity_user_id": "wechat-user"}, now)
+	decision, err = Evaluate(readRequest, identity.AccessRequest{ObjectKey: "course_favorite", Action: "read", DataAction: identity.DataActionRead}, identity.ResourceFacts{"identity_user_id": "wechat-user"}, now)
 	if err != nil || decision.Allowed || decision.Code != "data_policy_not_granted" {
 		t.Fatalf("write data policy authorized read: decision=%+v err=%v", decision, err)
 	}
@@ -234,17 +234,17 @@ func TestWriteDataPolicyAuthorizesExactMutationOperationsOnlyAfterFunctionGrant(
 func TestWriteDataPolicyCarriesAuditDenialAcrossMutationActions(t *testing.T) {
 	now := time.Now().UTC()
 	bundle := identity.AccessBundle{
-		ContractVersion: identity.CurrentPolicyBundleVersion, CatalogRevision: "catalog", AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
+		ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "authz", ExpiresAt: now.Add(time.Minute),
 		Subject:      identity.Subject{WorkspaceID: "workspace", SubjectID: "subject"},
 		DataPolicies: []identity.DataPolicy{{Key: "owned", Resource: "favorite", Action: "write", Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "owner_id", Operator: identity.OperatorEqual, Value: "$subject.id"}, AuditDenial: true}},
 	}
 	for _, action := range []identity.Action{"create", "update", "delete", "self_enroll"} {
-		required, err := AuditDenialRequired(bundle, "favorite", action, now)
+		required, err := AuditDenialRequired(bundle, "favorite", identity.DataActionWrite, now)
 		if err != nil || !required {
 			t.Fatalf("action=%s required=%v err=%v", action, required, err)
 		}
 	}
-	required, err := AuditDenialRequired(bundle, "favorite", "read", now)
+	required, err := AuditDenialRequired(bundle, "favorite", identity.DataActionRead, now)
 	if err != nil || required {
 		t.Fatalf("write audit policy leaked to read: required=%v err=%v", required, err)
 	}
@@ -363,19 +363,18 @@ func TestAuditDenialRequiredMatchesResourceAndAction(t *testing.T) {
 	now := time.Now().UTC()
 	bundle := identity.AccessBundle{
 		ContractVersion:       identity.CurrentPolicyBundleVersion,
-		CatalogRevision:       "catalog",
 		AuthorizationRevision: "authorization",
 		ExpiresAt:             now.Add(time.Hour),
 		Subject:               identity.Subject{WorkspaceID: "workspace", SubjectID: "user"},
 		DataPolicies: []identity.DataPolicy{
 			{Key: "order-read", Resource: "order", Action: "read", Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "id", Operator: identity.OperatorExists, Value: true}},
-			{Key: "order-write", Resource: "order", Action: "update", Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "id", Operator: identity.OperatorExists, Value: true}, AuditDenial: true},
+			{Key: "order-write", Resource: "order", Action: identity.DataActionWrite, Effect: identity.EffectAllow, Predicate: identity.Predicate{Fact: "id", Operator: identity.OperatorExists, Value: true}, AuditDenial: true},
 		},
 	}
-	if required, err := AuditDenialRequired(bundle, "order", "read", now); err != nil || required {
+	if required, err := AuditDenialRequired(bundle, "order", identity.DataActionRead, now); err != nil || required {
 		t.Fatalf("read audit decision required=%v err=%v", required, err)
 	}
-	if required, err := AuditDenialRequired(bundle, "order", "update", now); err != nil || !required {
+	if required, err := AuditDenialRequired(bundle, "order", identity.DataActionWrite, now); err != nil || !required {
 		t.Fatalf("update audit decision required=%v err=%v", required, err)
 	}
 }

@@ -11,15 +11,16 @@ import (
 )
 
 type Fixture struct {
-	Binding         identity.Binding
-	TenantID        identity.TenantID
-	WorkspaceID     identity.WorkspaceID
-	ApplicationKey  identity.ApplicationKey
-	Login           string
-	Password        string
-	Resource        identity.ResourceType
-	Action          identity.Action
-	CatalogRevision identity.CatalogRevision
+	Binding        identity.Binding
+	TenantID       identity.TenantID
+	WorkspaceID    identity.WorkspaceID
+	ApplicationKey identity.ApplicationKey
+	Login          string
+	Password       string
+	Resource       identity.ResourceType
+	Action         identity.Action
+	DataAction     identity.DataAction
+	DataAllowed    bool
 }
 
 func Run(t *testing.T, fixture Fixture) {
@@ -27,14 +28,14 @@ func Run(t *testing.T, fixture Fixture) {
 	if fixture.Binding == nil {
 		t.Fatal("Identity binding is required")
 	}
-	if fixture.Binding.Authentication() == nil || fixture.Binding.Tokens() == nil || fixture.Binding.Authorization() == nil || fixture.Binding.Principals() == nil || fixture.Binding.Directory() == nil || fixture.Binding.Catalog() == nil || fixture.Binding.Credentials() == nil {
+	if fixture.Binding.Authentication() == nil || fixture.Binding.Tokens() == nil || fixture.Binding.Authorization() == nil || fixture.Binding.Principals() == nil || fixture.Binding.Directory() == nil || fixture.Binding.Applications() == nil || fixture.Binding.Permissions() == nil || fixture.Binding.Credentials() == nil {
 		t.Fatal("Identity binding does not expose the complete Runtime contract")
 	}
 	if !fixture.ApplicationKey.Valid() {
 		t.Fatal("Identity application key is required")
 	}
 	descriptor := fixture.Binding.Descriptor()
-	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.CurrentPolicyBundleVersion || descriptor.CatalogVersion != identity.CatalogVersionV1 {
+	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.CurrentPolicyBundleVersion || descriptor.AuthorizationVersion != identity.AuthorizationContractVersionV1 {
 		t.Fatalf("unsupported descriptor: %+v", descriptor)
 	}
 	if identity.ApplicationKey(descriptor.Audience) != fixture.ApplicationKey || descriptor.Issuer == "" {
@@ -75,29 +76,26 @@ func Run(t *testing.T, fixture Fixture) {
 	principal := identity.Principal{ContractVersion: identity.PrincipalContextContractVersion, Known: true, WorkspaceID: string(verified.WorkspaceID), UserID: string(verified.SubjectID), AuthorizationRevision: string(verified.AuthorizationRevision)}
 	requestIdentity := identity.RequestIdentity{Principal: principal, AccessToken: session.AccessToken}
 	bundle, err := fixture.Binding.Authorization().ResolveAccess(ctx, identity.AccessBundleRequest{Identity: requestIdentity, ResourceType: fixture.Resource, Action: fixture.Action})
-	if err != nil || bundle.AuthorizationRevision != verified.AuthorizationRevision || fixture.CatalogRevision != "" && bundle.CatalogRevision != fixture.CatalogRevision {
+	if err != nil || bundle.AuthorizationRevision != verified.AuthorizationRevision {
 		t.Fatalf("bundle=%+v err=%v", bundle, err)
+	}
+	if !fixture.DataAction.Valid() {
+		t.Fatal("contract fixture data action is required")
 	}
 	decision, err := fixture.Binding.Authorization().Reauthorize(ctx, identity.DecisionRequest{
 		Identity: requestIdentity,
-		Access:   identity.AccessRequest{ObjectKey: string(fixture.Resource), Action: string(fixture.Action), RecordID: "contract-record"},
+		Access:   identity.AccessRequest{ObjectKey: string(fixture.Resource), Action: string(fixture.Action), DataAction: fixture.DataAction, RecordID: "contract-record"},
 		Facts:    identity.ResourceFacts{"id": "contract-record"},
 	})
-	if err != nil || !decision.Allowed || decision.AuthorizationRevision != string(bundle.AuthorizationRevision) {
+	if err != nil || decision.Allowed != fixture.DataAllowed || decision.AuthorizationRevision != string(bundle.AuthorizationRevision) {
 		t.Fatalf("reauthorization decision=%+v err=%v", decision, err)
 	}
 	denied, err := fixture.Binding.Authorization().Reauthorize(ctx, identity.DecisionRequest{
 		Identity: requestIdentity,
-		Access:   identity.AccessRequest{ObjectKey: string(fixture.Resource), Action: string(fixture.Action), RecordID: "contract-record"},
+		Access:   identity.AccessRequest{ObjectKey: string(fixture.Resource), Action: string(fixture.Action), DataAction: fixture.DataAction, RecordID: "contract-record"},
 	})
 	if err != nil || denied.Allowed {
 		t.Fatalf("reauthorization without resource facts must fail closed: decision=%+v err=%v", denied, err)
-	}
-	if fixture.CatalogRevision != "" {
-		receipt, revisionErr := fixture.Binding.Catalog().CurrentRevision(ctx, identity.ApplicationRef{WorkspaceID: fixture.WorkspaceID, ApplicationKey: verified.Audience})
-		if revisionErr != nil || receipt.Revision != fixture.CatalogRevision || receipt.SHA256 == "" {
-			t.Fatalf("catalog receipt=%+v err=%v", receipt, revisionErr)
-		}
 	}
 	application := identity.ApplicationScope{TenantID: fixture.TenantID, WorkspaceID: fixture.WorkspaceID, ApplicationKey: fixture.ApplicationKey}
 	user, found, err := fixture.Binding.Directory().FindUser(ctx, identity.UserLookup{Application: application, UserID: verified.SubjectID})
@@ -120,7 +118,7 @@ func Run(t *testing.T, fixture Fixture) {
 		t.Fatalf("directory workforce: %v", err)
 	}
 	resolution, err := fixture.Binding.Principals().Resolve(ctx, identity.PrincipalResolutionRequest{Application: application, SubjectID: verified.SubjectID})
-	if err != nil || !resolution.Principal.Known || resolution.Principal.UserID != string(verified.SubjectID) || resolution.AccessBundle.Subject.SubjectID != verified.SubjectID || resolution.AccessBundle.CatalogRevision != bundle.CatalogRevision {
+	if err != nil || !resolution.Principal.Known || resolution.Principal.UserID != string(verified.SubjectID) || resolution.AccessBundle.Subject.SubjectID != verified.SubjectID || resolution.AccessBundle.AuthorizationRevision != bundle.AuthorizationRevision {
 		t.Fatalf("principal resolution=%+v err=%v", resolution, err)
 	}
 	otherApplication := application

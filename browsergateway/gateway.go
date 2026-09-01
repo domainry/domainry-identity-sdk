@@ -27,7 +27,6 @@ type CookieConfig struct {
 
 type Config struct {
 	ApplicationKey     identity.ApplicationKey
-	AllowedReturnURLs  []string
 	DefaultWorkspaceID identity.WorkspaceID
 	Cookie             CookieConfig
 	MaxRequestBodySize int64
@@ -72,26 +71,21 @@ func (gateway *Gateway) RegisterRoutes(mux *http.ServeMux, prefix string) error 
 	if gateway == nil || mux == nil {
 		return errors.New("Identity browser gateway and ServeMux are required")
 	}
-	prefix, err := normalizeRoutePrefix(prefix)
+	definitions, err := ActionDefinitions(prefix)
 	if err != nil {
 		return err
 	}
-	path := func(suffix string) string { return prefix + suffix }
-
-	mux.HandleFunc("GET "+path("/auth/session"), gateway.Session)
-	mux.HandleFunc("POST "+path("/auth/code/exchange"), gateway.ExchangeAuthorizationCode)
-	mux.HandleFunc("POST "+path("/auth/login"), gateway.Login)
-	mux.HandleFunc("POST "+path("/auth/refresh"), gateway.Refresh)
-	mux.HandleFunc("POST "+path("/auth/logout"), gateway.Logout)
-	mux.HandleFunc("POST "+path("/auth/change-password"), gateway.ChangePassword)
-	mux.HandleFunc("POST "+path("/auth/reset-password"), gateway.ResetPassword)
-	mux.HandleFunc("POST "+path("/auth/sessions/revoke-others"), gateway.RevokeSessions)
-	mux.HandleFunc("GET "+path("/auth/providers"), gateway.Providers)
-	mux.HandleFunc("GET "+path("/auth/providers/{provider}/start"), gateway.StartProvider)
-	mux.HandleFunc("POST "+path("/auth/providers/{provider}/start"), gateway.StartProvider)
-	mux.HandleFunc("GET "+path("/auth/providers/{provider}/callback"), gateway.ProviderCallback)
-	mux.HandleFunc("POST "+path("/auth/providers/{provider}/callback"), gateway.ProviderCallback)
-	mux.HandleFunc("POST "+path("/auth/providers/{provider}/verify"), gateway.VerifyProvider)
+	specs := browserGatewayRouteSpecs()
+	if len(definitions) != len(specs) {
+		return errors.New("Identity browser gateway Action manifest is incomplete")
+	}
+	for index, definition := range definitions {
+		handler := gateway.routeHandler(specs[index].handlerKey)
+		if handler == nil || definition.HTTP == nil {
+			return fmt.Errorf("Identity browser gateway action %q has no handler", definition.Key)
+		}
+		mux.HandleFunc(definition.HTTP.Method+" "+definition.HTTP.RouteTemplate, handler)
+	}
 	return nil
 }
 
@@ -99,27 +93,15 @@ func (gateway *Gateway) RegisterRoutes(mux *http.ServeMux, prefix string) error 
 // SDK. Hosts can use it for listener inventories and OpenAPI/surface checks
 // without duplicating authentication routes.
 func RoutePatterns(prefix string) ([]string, error) {
-	prefix, err := normalizeRoutePrefix(prefix)
+	definitions, err := ActionDefinitions(prefix)
 	if err != nil {
 		return nil, err
 	}
-	path := func(suffix string) string { return prefix + suffix }
-	return []string{
-		"GET " + path("/auth/session"),
-		"POST " + path("/auth/code/exchange"),
-		"POST " + path("/auth/login"),
-		"POST " + path("/auth/refresh"),
-		"POST " + path("/auth/logout"),
-		"POST " + path("/auth/change-password"),
-		"POST " + path("/auth/reset-password"),
-		"POST " + path("/auth/sessions/revoke-others"),
-		"GET " + path("/auth/providers"),
-		"GET " + path("/auth/providers/{provider}/start"),
-		"POST " + path("/auth/providers/{provider}/start"),
-		"GET " + path("/auth/providers/{provider}/callback"),
-		"POST " + path("/auth/providers/{provider}/callback"),
-		"POST " + path("/auth/providers/{provider}/verify"),
-	}, nil
+	patterns := make([]string, 0, len(definitions))
+	for _, definition := range definitions {
+		patterns = append(patterns, definition.HTTP.Method+" "+definition.HTTP.RouteTemplate)
+	}
+	return patterns, nil
 }
 
 func normalizeRoutePrefix(prefix string) (string, error) {

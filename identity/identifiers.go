@@ -13,7 +13,6 @@ type ApplicationKey string
 type ResourceType string
 type Action string
 type AuthorizationRevision string
-type CatalogRevision string
 
 func (value TenantID) Valid() bool              { return validTenantBoundaryIdentifier(string(value)) }
 func (value WorkspaceID) Valid() bool           { return validTenantBoundaryIdentifier(string(value)) }
@@ -23,7 +22,6 @@ func (value ApplicationKey) Valid() bool        { return validIdentifier(string(
 func (value ResourceType) Valid() bool          { return validIdentifier(string(value)) }
 func (value Action) Valid() bool                { return validIdentifier(string(value)) }
 func (value AuthorizationRevision) Valid() bool { return validIdentifier(string(value)) }
-func (value CatalogRevision) Valid() bool       { return validIdentifier(string(value)) }
 
 func ValidateIdentifier(name, value string) error {
 	if !validIdentifier(value) {

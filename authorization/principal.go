@@ -52,11 +52,7 @@ func (p Principal) HasPermission(expected string) bool {
 	allowed := false
 	for _, grant := range p.AccessBundle.FunctionGrants {
 		permission := strings.TrimSpace(string(grant.Resource)) + "." + strings.TrimSpace(string(grant.Action))
-		matches := permission == expected || grant.Resource == "*" && grant.Action == "*"
-		if grant.Action == "*" {
-			matches = matches || strings.HasPrefix(expected, strings.TrimSpace(string(grant.Resource))+".")
-		}
-		if !matches {
+		if permission != expected {
 			continue
 		}
 		if grant.Effect == EffectDeny {

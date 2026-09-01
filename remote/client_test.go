@@ -217,12 +217,12 @@ func TestConfigurationAndRemoteErrors(t *testing.T) {
 
 func TestDiscoveryRequiresCompatibleSaaSIssuerAndCapabilities(t *testing.T) {
 	valid := identity.Descriptor{
-		ProtocolVersion: identity.CurrentProtocolVersion,
-		BundleVersion:   identity.CurrentPolicyBundleVersion,
-		CatalogVersion:  identity.CatalogVersionV1,
-		Mode:            identity.DeploymentModeSaaS,
-		Issuer:          "https://identity.example.com",
-		Capabilities:    []string{"authentication", "token_verification", "authorization", "principal_resolution", "directory_projection", "catalog"},
+		ProtocolVersion:      identity.CurrentProtocolVersion,
+		BundleVersion:        identity.CurrentPolicyBundleVersion,
+		AuthorizationVersion: identity.AuthorizationContractVersionV1,
+		Mode:                 identity.DeploymentModeSaaS,
+		Issuer:               "https://identity.example.com",
+		Capabilities:         []string{"authentication", "token_verification", "authorization", "principal_resolution", "directory_projection", "application_registration", "permission_reconciliation"},
 	}
 	if err := validateDiscovery(valid, valid.Issuer); err != nil {
 		t.Fatal(err)

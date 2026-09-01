@@ -38,8 +38,8 @@ func (gateway *Gateway) StartProvider(w http.ResponseWriter, r *http.Request) {
 	if request.ReturnURL == "" {
 		request.ReturnURL = strings.TrimSpace(r.URL.Query().Get("return_url"))
 	}
-	if request.ReturnURL != "" && !gateway.allowedReturnURL(request.ReturnURL) {
-		gateway.writeCode(w, http.StatusBadRequest, "identity.redirect_url_not_registered")
+	if request.ReturnURL != "" && !validReturnURL(request.ReturnURL) {
+		gateway.writeCode(w, http.StatusBadRequest, "identity.redirect_url_invalid")
 		return
 	}
 	challenge, err := gateway.binding.Authentication().BeginFederatedLogin(r.Context(), identity.BeginFederatedLoginRequest{
@@ -78,8 +78,8 @@ func (gateway *Gateway) ProviderCallback(w http.ResponseWriter, r *http.Request)
 		gateway.writeError(w, err)
 		return
 	}
-	if !gateway.allowedReturnURL(completion.ReturnURL) {
-		gateway.writeCode(w, http.StatusBadRequest, "identity.redirect_url_not_registered")
+	if !validReturnURL(completion.ReturnURL) {
+		gateway.writeCode(w, http.StatusBadGateway, "identity.provider_redirect_invalid")
 		return
 	}
 	redirect, err := url.Parse(completion.ReturnURL)
@@ -126,8 +126,8 @@ func (gateway *Gateway) ExchangeAuthorizationCode(w http.ResponseWriter, r *http
 	}
 	request.WorkspaceID = workspaceID
 	request.ApplicationKey = gateway.config.ApplicationKey
-	if !gateway.allowedReturnURL(request.ReturnURL) {
-		gateway.writeCode(w, http.StatusBadRequest, "identity.redirect_url_not_registered")
+	if !validReturnURL(request.ReturnURL) {
+		gateway.writeCode(w, http.StatusBadRequest, "identity.redirect_url_invalid")
 		return
 	}
 	session, err := gateway.binding.Authentication().ExchangeAuthorizationCode(r.Context(), request)
@@ -143,17 +143,7 @@ func validatedReturnURL(raw string) (*url.URL, bool) {
 	return parsed, err == nil && parsed.IsAbs() && (parsed.Scheme == "https" || parsed.Scheme == "http" && (parsed.Hostname() == "localhost" || parsed.Hostname() == "127.0.0.1"))
 }
 
-func (gateway *Gateway) allowedReturnURL(raw string) bool {
-	parsed, valid := validatedReturnURL(raw)
-	if !valid {
-		return false
-	}
-	canonical := parsed.String()
-	for _, candidate := range gateway.config.AllowedReturnURLs {
-		allowed, ok := validatedReturnURL(candidate)
-		if ok && allowed.String() == canonical {
-			return true
-		}
-	}
-	return false
+func validReturnURL(raw string) bool {
+	_, valid := validatedReturnURL(raw)
+	return valid
 }

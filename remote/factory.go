@@ -60,8 +60,8 @@ func (factory *Factory) Open(ctx context.Context, application identity.Applicati
 	}
 	delegate := &binding{client: client, tokens: verifier, descriptor: identity.Descriptor{
 		ProtocolVersion: identity.CurrentProtocolVersion, BundleVersion: identity.CurrentPolicyBundleVersion,
-		CatalogVersion: identity.CatalogVersionV1, Mode: identity.DeploymentModeSaaS, Issuer: issuer, Audience: audience,
-		Capabilities: []string{"authentication", "token_verification", "authorization", "principal_resolution", "directory_projection", "catalog", "credentials", "oidc", "saml"},
+		AuthorizationVersion: identity.AuthorizationContractVersionV1, Mode: identity.DeploymentModeSaaS, Issuer: issuer, Audience: audience,
+		Capabilities: []string{"authentication", "token_verification", "authorization", "principal_resolution", "directory_projection", "application_registration", "permission_reconciliation", "credentials", "oidc", "saml"},
 	}, capabilities: capabilities}
 	return identityapplication.Bind(delegate, application)
 }
@@ -91,13 +91,13 @@ func remoteApplication(config Config, application identity.ApplicationRef) (Conf
 }
 
 func validateDiscovery(descriptor identity.Descriptor, expectedIssuer string) error {
-	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.CurrentPolicyBundleVersion || descriptor.CatalogVersion != identity.CatalogVersionV1 || descriptor.Mode != identity.DeploymentModeSaaS {
+	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.CurrentPolicyBundleVersion || descriptor.AuthorizationVersion != identity.AuthorizationContractVersionV1 || descriptor.Mode != identity.DeploymentModeSaaS {
 		return &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.protocol_incompatible"}
 	}
 	if strings.TrimSpace(descriptor.Issuer) != strings.TrimSpace(expectedIssuer) {
 		return &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.issuer_mismatch"}
 	}
-	required := map[string]bool{"authentication": false, "token_verification": false, "authorization": false, "principal_resolution": false, "directory_projection": false, "catalog": false}
+	required := map[string]bool{"authentication": false, "token_verification": false, "authorization": false, "principal_resolution": false, "directory_projection": false, "application_registration": false, "permission_reconciliation": false}
 	for _, capability := range descriptor.Capabilities {
 		if _, exists := required[capability]; exists {
 			required[capability] = true
@@ -138,12 +138,20 @@ func (value *binding) Authorization() identity.Authorization {
 func (value *binding) Principals() identity.PrincipalResolver {
 	return principalResolver{client: value.client}
 }
-func (value *binding) Directory() identity.Directory   { return directoryClient{client: value.client} }
-func (value *binding) Catalog() identity.CatalogClient { return catalogClient{client: value.client} }
+func (value *binding) Directory() identity.Directory { return directoryClient{client: value.client} }
+func (value *binding) Applications() identity.ApplicationRegistry {
+	return applicationRegistry{client: value.client}
+}
+func (value *binding) Permissions() identity.PermissionRegistry {
+	return permissionRegistry{client: value.client}
+}
 func (value *binding) Credentials() identity.CredentialManager {
 	return credentialClient{client: value.client}
 }
 func (value *binding) ApplicationServices() identity.ApplicationServiceAuthentication {
+	return applicationServices{client: value.client}
+}
+func (value *binding) ApplicationServiceVerifier() identity.ApplicationServiceTokenVerifier {
 	return applicationServices{client: value.client}
 }
 func (value *binding) Close(context.Context) error { return nil }
@@ -151,3 +159,4 @@ func (value *binding) Close(context.Context) error { return nil }
 var _ identity.Factory = (*Factory)(nil)
 var _ identity.Binding = (*binding)(nil)
 var _ identity.ApplicationServiceBinding = (*binding)(nil)
+var _ identity.ApplicationServiceVerificationBinding = (*binding)(nil)

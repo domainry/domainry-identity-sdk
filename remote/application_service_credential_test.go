@@ -9,22 +9,22 @@ import (
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
-func TestApplicationServiceCredentialProtectsCatalogAndDirectoryRequests(t *testing.T) {
+func TestApplicationServiceCredentialProtectsRegistrationAndDirectoryRequests(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer application-service-secret" {
 			t.Fatalf("%s authorization=%q", r.URL.Path, got)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/identity/catalog/revision":
-			var application identity.ApplicationRef
-			if err := json.NewDecoder(r.Body).Decode(&application); err != nil {
+		case "/identity/applications/current":
+			var request identity.ApplicationRegistration
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 				t.Fatal(err)
 			}
-			if application.WorkspaceID != "workspace-a" || application.ApplicationKey != "runtime-app" {
-				t.Fatalf("catalog application=%+v", application)
+			if request.Application.WorkspaceID != "workspace-a" || request.Application.ApplicationKey != "runtime-app" {
+				t.Fatalf("application registration=%+v", request)
 			}
-			_, _ = w.Write([]byte(`{"revision":"revision-1","sha256":"hash","published_at":"2026-01-01T00:00:00Z"}`))
+			_, _ = w.Write([]byte(`{"application":{"workspace_id":"workspace-a","application_key":"runtime-app"},"status":"active"}`))
 		case "/identity/runtime/directory/users":
 			var request identity.DirectoryQuery
 			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -46,7 +46,7 @@ func TestApplicationServiceCredentialProtectsCatalogAndDirectoryRequests(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (catalogClient{client: client}).CurrentRevision(t.Context(), identity.ApplicationRef{}); err != nil {
+	if _, err := (applicationRegistry{client: client}).Register(t.Context(), identity.ApplicationRegistration{Application: identity.ApplicationRef{WorkspaceID: "workspace-a", ApplicationKey: "runtime-app"}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := (directoryClient{client: client}).ListUsers(t.Context(), identity.DirectoryQuery{}); err != nil {

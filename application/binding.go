@@ -24,7 +24,14 @@ func Bind(delegate identity.Binding, application identity.ApplicationRef) (ident
 		return nil, scopeError(http.StatusForbidden, "identity.application_scope_mismatch")
 	}
 	descriptor.Audience = string(application.ApplicationKey)
-	return &binding{delegate: delegate, application: application, descriptor: descriptor}, nil
+	scoped := &binding{delegate: delegate, application: application, descriptor: descriptor}
+	if services, ok := delegate.(identity.ApplicationServiceBinding); ok && services.ApplicationServices() != nil {
+		return &applicationServiceBinding{Binding: scoped, binding: scoped}, nil
+	}
+	if verifier, ok := delegate.(identity.ApplicationServiceVerificationBinding); ok && verifier.ApplicationServiceVerifier() != nil {
+		return &applicationServiceVerificationBinding{Binding: scoped, binding: scoped}, nil
+	}
+	return scoped, nil
 }
 
 type binding struct {
@@ -52,12 +59,14 @@ func (value *binding) Authorization() identity.Authorization {
 }
 func (value *binding) Principals() identity.PrincipalResolver { return principals{binding: value} }
 func (value *binding) Directory() identity.Directory          { return directory{binding: value} }
-func (value *binding) Catalog() identity.CatalogClient        { return catalog{binding: value} }
+func (value *binding) Applications() identity.ApplicationRegistry {
+	return applications{binding: value}
+}
+func (value *binding) Permissions() identity.PermissionRegistry {
+	return permissions{binding: value}
+}
 func (value *binding) Credentials() identity.CredentialManager {
 	return credentials{binding: value}
-}
-func (value *binding) ApplicationServices() identity.ApplicationServiceAuthentication {
-	return applicationServices{binding: value}
 }
 func (value *binding) Close(ctx context.Context) error { return value.delegate.Close(ctx) }
 
@@ -126,4 +135,30 @@ func scopeError(status int, code string) error {
 }
 
 var _ identity.Binding = (*binding)(nil)
-var _ identity.ApplicationServiceBinding = (*binding)(nil)
+
+type applicationServiceBinding struct {
+	identity.Binding
+	binding *binding
+}
+
+func (value *applicationServiceBinding) ApplicationServices() identity.ApplicationServiceAuthentication {
+	return applicationServices{binding: value.binding}
+}
+func (value *applicationServiceBinding) ApplicationServiceVerifier() identity.ApplicationServiceTokenVerifier {
+	return applicationServiceVerifier{binding: value.binding}
+}
+
+type applicationServiceVerificationBinding struct {
+	identity.Binding
+	binding *binding
+}
+
+func (value *applicationServiceVerificationBinding) ApplicationServiceVerifier() identity.ApplicationServiceTokenVerifier {
+	return applicationServiceVerifier{binding: value.binding}
+}
+
+var _ identity.Binding = (*applicationServiceBinding)(nil)
+var _ identity.ApplicationServiceBinding = (*applicationServiceBinding)(nil)
+var _ identity.ApplicationServiceVerificationBinding = (*applicationServiceBinding)(nil)
+var _ identity.Binding = (*applicationServiceVerificationBinding)(nil)
+var _ identity.ApplicationServiceVerificationBinding = (*applicationServiceVerificationBinding)(nil)

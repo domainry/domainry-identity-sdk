@@ -17,16 +17,11 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 	if !bundle.AuthorizationRevision.Valid() || !bundle.Subject.WorkspaceID.Valid() || !bundle.Subject.SubjectID.Valid() {
 		return &Error{Code: "identity.access_bundle_identity_invalid"}
 	}
+	if !uniqueNonBlank(bundle.Subject.OrgScopeIDs) || !uniqueSubjectIDs(bundle.Subject.ReportingScopeUserIDs) {
+		return &Error{Code: "identity.access_bundle_scope_invalid"}
+	}
 	if bundle.ExpiresAt.IsZero() || !bundle.ExpiresAt.After(now) {
 		return &Error{Code: "identity.access_bundle_expired"}
-	}
-	if !uniqueSubjectIDs(bundle.Subject.ReportingSubjectIDs) {
-		return &Error{Code: "identity.access_bundle_subject_invalid"}
-	}
-	for key, values := range bundle.Subject.OrganizationScopes {
-		if strings.TrimSpace(key) == "" || !uniqueNonBlank(values) {
-			return &Error{Code: "identity.access_bundle_subject_invalid"}
-		}
 	}
 	functionKeys := map[string]struct{}{}
 	for _, grant := range bundle.FunctionGrants {
@@ -249,17 +244,12 @@ func (bundle AccessBundle) CanonicalJSON(now time.Time) ([]byte, error) {
 		return nil, err
 	}
 	clone := bundle
-	clone.Subject.ReportingSubjectIDs = append([]SubjectID(nil), bundle.Subject.ReportingSubjectIDs...)
-	sort.Slice(clone.Subject.ReportingSubjectIDs, func(i, j int) bool {
-		return clone.Subject.ReportingSubjectIDs[i] < clone.Subject.ReportingSubjectIDs[j]
+	clone.Subject.OrgScopeIDs = append([]string(nil), bundle.Subject.OrgScopeIDs...)
+	sort.Strings(clone.Subject.OrgScopeIDs)
+	clone.Subject.ReportingScopeUserIDs = append([]SubjectID(nil), bundle.Subject.ReportingScopeUserIDs...)
+	sort.Slice(clone.Subject.ReportingScopeUserIDs, func(left, right int) bool {
+		return clone.Subject.ReportingScopeUserIDs[left] < clone.Subject.ReportingScopeUserIDs[right]
 	})
-	if bundle.Subject.OrganizationScopes != nil {
-		clone.Subject.OrganizationScopes = make(map[string][]string, len(bundle.Subject.OrganizationScopes))
-		for key, values := range bundle.Subject.OrganizationScopes {
-			clone.Subject.OrganizationScopes[key] = append([]string(nil), values...)
-			sort.Strings(clone.Subject.OrganizationScopes[key])
-		}
-	}
 	clone.FunctionGrants = append([]FunctionGrant(nil), bundle.FunctionGrants...)
 	clone.DataPolicies = append([]DataPolicy(nil), bundle.DataPolicies...)
 	for index := range clone.DataPolicies {

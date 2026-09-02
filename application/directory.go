@@ -23,13 +23,13 @@ func (value directory) FindUser(ctx context.Context, input identity.UserLookup) 
 	return value.binding.delegate.Directory().FindUser(ctx, input)
 }
 
-func (value directory) FindDepartment(ctx context.Context, input identity.DepartmentLookup) (identity.Department, bool, error) {
+func (value directory) FindOrganizationUnit(ctx context.Context, input identity.OrganizationUnitLookup) (identity.OrganizationUnit, bool, error) {
 	scope, err := value.binding.applicationScope(input.Application)
 	if err != nil {
-		return identity.Department{}, false, err
+		return identity.OrganizationUnit{}, false, err
 	}
 	input.Application = scope
-	return value.binding.delegate.Directory().FindDepartment(ctx, input)
+	return value.binding.delegate.Directory().FindOrganizationUnit(ctx, input)
 }
 
 func (value directory) ListUsers(ctx context.Context, input identity.DirectoryQuery) ([]identity.User, error) {
@@ -55,12 +55,4 @@ func (value directory) ListUserRoleAssignments(ctx context.Context, input identi
 	}
 	input.Application = scope
 	return value.binding.delegate.Directory().ListUserRoleAssignments(ctx, input)
-}
-
-func (value directory) ListWorkforce(ctx context.Context, input identity.DirectoryQuery) ([]identity.WorkforceEntry, error) {
-	input, err := value.query(input)
-	if err != nil {
-		return nil, err
-	}
-	return value.binding.delegate.Directory().ListWorkforce(ctx, input)
 }

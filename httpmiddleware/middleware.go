@@ -169,11 +169,7 @@ func (m *Middleware) PermissionFunc(permission string) func(http.HandlerFunc) ht
 }
 
 func (m *Middleware) RequirePermission(permission string, next http.Handler) http.Handler {
-	return m.RequireAllPermissions([]string{permission}, next)
-}
-
-func (m *Middleware) RequireAllPermissions(permissions []string, next http.Handler) http.Handler {
-	required := normalizedPermissions(permissions)
+	required := strings.TrimSpace(permission)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		identity, ok := identitysdk.RequestIdentityFromContext(r.Context())
 		if !ok {
@@ -184,43 +180,15 @@ func (m *Middleware) RequireAllPermissions(permissions []string, next http.Handl
 			m.writeError(w, r, http.StatusInternalServerError, "identity.middleware_handler_required")
 			return
 		}
-		if len(required) == 0 {
+		if required == "" {
 			m.writeError(w, r, http.StatusForbidden, "auth.permission_required")
 			return
 		}
-		for _, permission := range required {
-			if !identity.Principal.HasPermission(permission) {
-				m.writeError(w, r, http.StatusForbidden, "auth.permission_denied")
-				return
-			}
+		if !identity.Principal.HasPermission(required) {
+			m.writeError(w, r, http.StatusForbidden, "auth.permission_denied")
+			return
 		}
 		next.ServeHTTP(w, r)
-	})
-}
-
-func (m *Middleware) RequireAnyPermission(permissions []string, next http.Handler) http.Handler {
-	required := normalizedPermissions(permissions)
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		identity, ok := identitysdk.RequestIdentityFromContext(r.Context())
-		if !ok {
-			m.writeError(w, r, http.StatusUnauthorized, "auth.token_required")
-			return
-		}
-		if next == nil {
-			m.writeError(w, r, http.StatusInternalServerError, "identity.middleware_handler_required")
-			return
-		}
-		for _, permission := range required {
-			if identity.Principal.HasPermission(permission) {
-				next.ServeHTTP(w, r)
-				return
-			}
-		}
-		code := "auth.permission_denied"
-		if len(required) == 0 {
-			code = "auth.permission_required"
-		}
-		m.writeError(w, r, http.StatusForbidden, code)
 	})
 }
 
@@ -246,21 +214,6 @@ func authenticationError(err error) (int, string) {
 		}
 	}
 	return http.StatusUnauthorized, "auth.token_invalid"
-}
-
-func normalizedPermissions(values []string) []string {
-	result := make([]string, 0, len(values))
-	seen := map[string]bool{}
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		key := strings.ToLower(value)
-		if value == "" || seen[key] {
-			continue
-		}
-		seen[key] = true
-		result = append(result, value)
-	}
-	return result
 }
 
 func writeJSONError(w http.ResponseWriter, _ *http.Request, status int, code string) {

@@ -10,30 +10,20 @@ import (
 
 const PrincipalContextContractVersion = "domainry-principal-context-v1"
 
-type OrganizationScopes struct {
-	TeamIDs      []string `json:"team_ids"`
-	StoreIDs     []string `json:"store_ids"`
-	TerritoryIDs []string `json:"territory_ids"`
-	WarehouseIDs []string `json:"warehouse_ids"`
-}
-
 // Principal contains authenticated, non-secret identity facts. Access tokens
 // are held by RequestIdentity and are never serialized with a Principal.
 type Principal struct {
-	ContractVersion       string             `json:"contract_version"`
-	Known                 bool               `json:"known"`
-	WorkspaceID           string             `json:"workspace_id"`
-	UserID                string             `json:"user_id"`
-	RoleKey               string             `json:"role_key,omitempty"`
-	AuthorizationRevision string             `json:"authorization_revision,omitempty"`
-	WorkforceProfileID    string             `json:"workforce_profile_id,omitempty"`
-	DepartmentID          string             `json:"department_id,omitempty"`
-	DepartmentPath        string             `json:"department_path,omitempty"`
-	ReportingPath         string             `json:"reporting_path,omitempty"`
-	ReportingUserIDs      []string           `json:"reporting_user_ids"`
-	OrganizationScopes    OrganizationScopes `json:"organization_scopes"`
-	User                  User               `json:"user"`
-	Roles                 []Role             `json:"roles"`
+	ContractVersion       string   `json:"contract_version"`
+	Known                 bool     `json:"known"`
+	WorkspaceID           string   `json:"workspace_id"`
+	UserID                string   `json:"user_id"`
+	RoleKey               string   `json:"role_key,omitempty"`
+	AuthorizationRevision string   `json:"authorization_revision,omitempty"`
+	OrgID                 string   `json:"org_id,omitempty"`
+	OrgScopeIDs           []string `json:"org_scope_ids,omitempty"`
+	ReportingScopeUserIDs []string `json:"reporting_scope_user_ids,omitempty"`
+	User                  User     `json:"user"`
+	Roles                 []Role   `json:"roles"`
 	// Permissions is a presentation-only projection for clients. Runtime
 	// authorization is exclusively backed by AccessBundle and fails closed
 	// when the bundle is absent.

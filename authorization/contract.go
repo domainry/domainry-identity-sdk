@@ -61,7 +61,6 @@ type GrantSource struct {
 	AssignmentSource   string `json:"assignment_source,omitempty"`
 	BindingKey         string `json:"binding_key,omitempty"`
 	ProfileID          string `json:"profile_id,omitempty"`
-	WorkforceProfileID string `json:"workforce_profile_id,omitempty"`
 	ValidFrom          string `json:"valid_from,omitempty"`
 	ValidUntil         string `json:"valid_until,omitempty"`
 	ExpiresAt          string `json:"expires_at,omitempty"`
@@ -81,15 +80,12 @@ type AccessBundle struct {
 }
 
 type Subject struct {
-	TenantID            TenantID            `json:"tenant_id,omitempty"`
-	WorkspaceID         WorkspaceID         `json:"workspace_id"`
-	SubjectID           SubjectID           `json:"subject_id"`
-	WorkforceProfileID  string              `json:"workforce_profile_id,omitempty"`
-	DepartmentID        string              `json:"department_id,omitempty"`
-	DepartmentPath      string              `json:"department_path,omitempty"`
-	ReportingPath       string              `json:"reporting_path,omitempty"`
-	ReportingSubjectIDs []SubjectID         `json:"reporting_subject_ids,omitempty"`
-	OrganizationScopes  map[string][]string `json:"organization_scopes,omitempty"`
+	TenantID              TenantID    `json:"tenant_id,omitempty"`
+	WorkspaceID           WorkspaceID `json:"workspace_id"`
+	SubjectID             SubjectID   `json:"subject_id"`
+	OrgID                 string      `json:"org_id,omitempty"`
+	OrgScopeIDs           []string    `json:"org_scope_ids,omitempty"`
+	ReportingScopeUserIDs []SubjectID `json:"reporting_scope_user_ids,omitempty"`
 }
 
 type FunctionGrant struct {

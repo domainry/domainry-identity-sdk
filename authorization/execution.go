@@ -72,13 +72,8 @@ func DeriveExecutionAccess(bundle AccessBundle, grant ExecutionGrant, now time.T
 
 func cloneAccessBundle(bundle AccessBundle) AccessBundle {
 	clone := bundle
-	clone.Subject.ReportingSubjectIDs = append([]SubjectID(nil), bundle.Subject.ReportingSubjectIDs...)
-	if bundle.Subject.OrganizationScopes != nil {
-		clone.Subject.OrganizationScopes = make(map[string][]string, len(bundle.Subject.OrganizationScopes))
-		for key, values := range bundle.Subject.OrganizationScopes {
-			clone.Subject.OrganizationScopes[key] = append([]string(nil), values...)
-		}
-	}
+	clone.Subject.OrgScopeIDs = append([]string(nil), bundle.Subject.OrgScopeIDs...)
+	clone.Subject.ReportingScopeUserIDs = append([]SubjectID(nil), bundle.Subject.ReportingScopeUserIDs...)
 	clone.FunctionGrants = append([]FunctionGrant(nil), bundle.FunctionGrants...)
 	clone.DataPolicies = append([]DataPolicy(nil), bundle.DataPolicies...)
 	for index := range clone.DataPolicies {

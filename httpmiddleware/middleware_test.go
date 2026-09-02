@@ -121,13 +121,12 @@ func TestPermissionGatesRequireAuthenticatedContext(t *testing.T) {
 
 	for _, handler := range []http.Handler{
 		middleware.RequirePermission("order.read", next),
-		middleware.RequireAllPermissions([]string{"order.read", "order.export"}, next),
-		middleware.RequireAnyPermission([]string{"missing", "order.export"}, next),
+		middleware.RequirePermission("order.export", next),
 	} {
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)
 	}
-	if nextCalls != 3 {
+	if nextCalls != 2 {
 		t.Fatalf("next calls = %d", nextCalls)
 	}
 
@@ -135,6 +134,12 @@ func TestPermissionGatesRequireAuthenticatedContext(t *testing.T) {
 	middleware.RequirePermission("order.write", next).ServeHTTP(denied, request)
 	if denied.Code != http.StatusForbidden || !strings.Contains(denied.Body.String(), "auth.permission_denied") {
 		t.Fatalf("denied status=%d body=%s", denied.Code, denied.Body.String())
+	}
+
+	empty := httptest.NewRecorder()
+	middleware.RequirePermission(" ", next).ServeHTTP(empty, request)
+	if empty.Code != http.StatusForbidden || !strings.Contains(empty.Body.String(), "auth.permission_required") {
+		t.Fatalf("empty status=%d body=%s", empty.Code, empty.Body.String())
 	}
 
 	unauthenticated := httptest.NewRecorder()

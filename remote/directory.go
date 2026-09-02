@@ -27,22 +27,22 @@ func (adapter directoryClient) FindUser(ctx context.Context, request identity.Us
 	return response.User, response.Found, nil
 }
 
-func (adapter directoryClient) FindDepartment(ctx context.Context, request identity.DepartmentLookup) (identity.Department, bool, error) {
+func (adapter directoryClient) FindOrganizationUnit(ctx context.Context, request identity.OrganizationUnitLookup) (identity.OrganizationUnit, bool, error) {
 	if err := adapter.normalizeScope(&request.Application); err != nil {
-		return identity.Department{}, false, err
+		return identity.OrganizationUnit{}, false, err
 	}
-	request.DepartmentID = strings.TrimSpace(request.DepartmentID)
-	if request.DepartmentID == "" {
-		return identity.Department{}, false, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.department_id_invalid"}
+	request.OrgID = strings.TrimSpace(request.OrgID)
+	if request.OrgID == "" {
+		return identity.OrganizationUnit{}, false, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.org_id_invalid"}
 	}
 	var response struct {
-		Department identity.Department `json:"department"`
-		Found      bool                `json:"found"`
+		OrganizationUnit identity.OrganizationUnit `json:"organization_unit"`
+		Found            bool                      `json:"found"`
 	}
-	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/runtime/directory/department", adapter.client.serviceAccessToken, request, &response); err != nil {
-		return identity.Department{}, false, err
+	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/runtime/directory/organization-unit", adapter.client.serviceAccessToken, request, &response); err != nil {
+		return identity.OrganizationUnit{}, false, err
 	}
-	return response.Department, response.Found, nil
+	return response.OrganizationUnit, response.Found, nil
 }
 
 func (adapter directoryClient) ListUsers(ctx context.Context, request identity.DirectoryQuery) ([]identity.User, error) {
@@ -69,15 +69,6 @@ func (adapter directoryClient) ListUserRoleAssignments(ctx context.Context, requ
 	}
 	var values []identity.UserRoleAssignment
 	err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/runtime/directory/role-assignments", adapter.client.serviceAccessToken, request, &values)
-	return values, err
-}
-
-func (adapter directoryClient) ListWorkforce(ctx context.Context, request identity.DirectoryQuery) ([]identity.WorkforceEntry, error) {
-	if err := adapter.normalizeScope(&request.Application); err != nil {
-		return nil, err
-	}
-	var values []identity.WorkforceEntry
-	err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/runtime/directory/workforce", adapter.client.serviceAccessToken, request, &values)
 	return values, err
 }
 

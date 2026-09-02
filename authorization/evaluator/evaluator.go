@@ -357,24 +357,17 @@ func resolveIdentitySubjectValue(value any, subject identity.Subject) any {
 		return string(subject.SubjectID)
 	case "workspace_id":
 		return string(subject.WorkspaceID)
-	case "department_id":
-		return subject.DepartmentID
-	case "department_path":
-		return subject.DepartmentPath
-	case "reporting_path":
-		return subject.ReportingPath
-	case "workforce_profile_id":
-		return subject.WorkforceProfileID
-	case "reporting_subject_ids":
-		values := make([]string, len(subject.ReportingSubjectIDs))
-		for index, id := range subject.ReportingSubjectIDs {
+	case "org_id":
+		return subject.OrgID
+	case "org_scope_ids":
+		return append([]string(nil), subject.OrgScopeIDs...)
+	case "reporting_scope_user_ids":
+		values := make([]string, len(subject.ReportingScopeUserIDs))
+		for index, id := range subject.ReportingScopeUserIDs {
 			values[index] = string(id)
 		}
 		return values
 	default:
-		if scope, exists := strings.CutPrefix(strings.TrimPrefix(text, "$subject."), "organization_scopes."); exists {
-			return append([]string(nil), subject.OrganizationScopes[scope]...)
-		}
 		return value
 	}
 }

@@ -155,14 +155,22 @@ func principalFromResolution(token authentication.VerifiedToken, session authent
 	return identity.Principal{
 		ContractVersion: identity.PrincipalContextContractVersion, Known: true,
 		WorkspaceID: string(token.WorkspaceID), UserID: string(token.SubjectID), RoleKey: roleKey,
-		AuthorizationRevision: string(token.AuthorizationRevision), WorkforceProfileID: bundle.Subject.WorkforceProfileID,
-		DepartmentID: bundle.Subject.DepartmentID, DepartmentPath: bundle.Subject.DepartmentPath, ReportingPath: bundle.Subject.ReportingPath,
-		ReportingUserIDs:   subjectIDsToStrings(bundle.Subject.ReportingSubjectIDs),
-		OrganizationScopes: identity.OrganizationScopes{TeamIDs: cloneStrings(bundle.Subject.OrganizationScopes["team_ids"]), StoreIDs: cloneStrings(bundle.Subject.OrganizationScopes["store_ids"]), TerritoryIDs: cloneStrings(bundle.Subject.OrganizationScopes["territory_ids"]), WarehouseIDs: cloneStrings(bundle.Subject.OrganizationScopes["warehouse_ids"])},
-		User:               session.User, Roles: append([]identity.Role(nil), session.Roles...), Permissions: uniqueSortedStrings(permissions),
+		AuthorizationRevision: string(token.AuthorizationRevision),
+		OrgID:                 bundle.Subject.OrgID,
+		OrgScopeIDs:           cloneStrings(bundle.Subject.OrgScopeIDs),
+		ReportingScopeUserIDs: subjectIDsToStrings(bundle.Subject.ReportingScopeUserIDs),
+		User:                  session.User, Roles: append([]identity.Role(nil), session.Roles...), Permissions: uniqueSortedStrings(permissions),
 		MustChangePassword: session.MustChangePassword,
 		AccessBundle:       &bundle,
 	}
+}
+
+func subjectIDsToStrings(values []identity.SubjectID) []string {
+	result := make([]string, len(values))
+	for index, value := range values {
+		result[index] = string(value)
+	}
+	return result
 }
 
 func withoutDeniedPermissions(values []string, denied map[string]struct{}) []string {
@@ -171,14 +179,6 @@ func withoutDeniedPermissions(values []string, denied map[string]struct{}) []str
 		if _, blocked := denied[strings.ToLower(strings.TrimSpace(value))]; !blocked {
 			result = append(result, value)
 		}
-	}
-	return result
-}
-
-func subjectIDsToStrings(values []identity.SubjectID) []string {
-	result := make([]string, 0, len(values))
-	for _, value := range values {
-		result = append(result, string(value))
 	}
 	return result
 }
@@ -202,11 +202,8 @@ func uniqueSortedStrings(values []string) []string {
 }
 
 func clonePrincipal(value identity.Principal) identity.Principal {
-	value.ReportingUserIDs = cloneStrings(value.ReportingUserIDs)
-	value.OrganizationScopes.TeamIDs = cloneStrings(value.OrganizationScopes.TeamIDs)
-	value.OrganizationScopes.StoreIDs = cloneStrings(value.OrganizationScopes.StoreIDs)
-	value.OrganizationScopes.TerritoryIDs = cloneStrings(value.OrganizationScopes.TerritoryIDs)
-	value.OrganizationScopes.WarehouseIDs = cloneStrings(value.OrganizationScopes.WarehouseIDs)
+	value.OrgScopeIDs = cloneStrings(value.OrgScopeIDs)
+	value.ReportingScopeUserIDs = cloneStrings(value.ReportingScopeUserIDs)
 	value.Roles = append([]identity.Role(nil), value.Roles...)
 	value.Permissions = cloneStrings(value.Permissions)
 	if value.AccessBundle != nil {
@@ -217,8 +214,8 @@ func clonePrincipal(value identity.Principal) identity.Principal {
 }
 
 func cloneAccessBundle(bundle identity.AccessBundle) identity.AccessBundle {
-	bundle.Subject.ReportingSubjectIDs = append([]identity.SubjectID(nil), bundle.Subject.ReportingSubjectIDs...)
-	bundle.Subject.OrganizationScopes = cloneOrganizationScopes(bundle.Subject.OrganizationScopes)
+	bundle.Subject.OrgScopeIDs = cloneStrings(bundle.Subject.OrgScopeIDs)
+	bundle.Subject.ReportingScopeUserIDs = append([]identity.SubjectID(nil), bundle.Subject.ReportingScopeUserIDs...)
 	bundle.FunctionGrants = append([]identity.FunctionGrant(nil), bundle.FunctionGrants...)
 	bundle.DataPolicies = append([]identity.DataPolicy(nil), bundle.DataPolicies...)
 	for index := range bundle.DataPolicies {
@@ -241,17 +238,6 @@ func cloneAccessBundle(bundle identity.AccessBundle) identity.AccessBundle {
 		}
 	}
 	return bundle
-}
-
-func cloneOrganizationScopes(values map[string][]string) map[string][]string {
-	if values == nil {
-		return nil
-	}
-	result := make(map[string][]string, len(values))
-	for key, entries := range values {
-		result[key] = cloneStrings(entries)
-	}
-	return result
 }
 
 func clonePredicate(predicate identity.Predicate) identity.Predicate {

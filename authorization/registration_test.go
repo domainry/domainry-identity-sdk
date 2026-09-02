@@ -19,7 +19,7 @@ func TestApplicationRegistrationAndPermissionSnapshotValidation(t *testing.T) {
 	request := PermissionReconcileRequest{
 		Application: registration.Application,
 		SourceOwner: "application:runtime",
-		Definitions: []PermissionDefinition{{PermissionKey: "customer.read", ResourceKey: "customer", ActionKey: "read", Label: "Read customers", Category: "Customer", SourceKind: "object_default"}},
+		Definitions: []PermissionDefinition{{PermissionKey: "customer.read", ResourceKey: "customer", OperationKey: "read", Label: "Read customers", Category: "Customer", SourceKind: "object_default"}},
 	}
 	request.SnapshotHash, _ = PermissionSnapshotHash(request.SourceOwner, request.Definitions)
 	if err := request.ValidateContract(); err != nil {
@@ -48,7 +48,7 @@ func TestApplicationRegistrationAndPermissionSnapshotValidation(t *testing.T) {
 		t.Fatalf("invalid receipt error=%#v", err)
 	}
 	reordered := PermissionReconcileRequest{SourceOwner: request.SourceOwner, Definitions: []PermissionDefinition{
-		{PermissionKey: "customer.update", ResourceKey: "customer", ActionKey: "update", Label: "Update customers", Category: "Customer", SourceKind: "object_default"},
+		{PermissionKey: "customer.update", ResourceKey: "customer", OperationKey: "update", Label: "Update customers", Category: "Customer", SourceKind: "object_default"},
 		request.Definitions[0],
 	}}
 	firstHash, err := PermissionSnapshotHash(reordered.SourceOwner, reordered.Definitions)
@@ -97,7 +97,7 @@ func TestPermissionSourceSnapshotValidation(t *testing.T) {
 		SourceOwner: "module:notification",
 	}
 	definitions := []PermissionDefinition{{
-		PermissionKey: "notification.templates.list", ResourceKey: "notification.templates", ActionKey: "list",
+		PermissionKey: "notification.templates.list", ResourceKey: "notification.templates", OperationKey: "list",
 		Label: "List templates", Category: "Notification", SourceKind: "module_surface",
 	}}
 	hash, err := PermissionSnapshotHash(request.SourceOwner, definitions)

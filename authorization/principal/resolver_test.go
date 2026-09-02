@@ -3,6 +3,7 @@ package principal_test
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ func newResolverBinding() *resolverBinding {
 		clock:  clock,
 		tokens: resolverTokens{claims: identity.VerifiedToken{SubjectID: "user-1", WorkspaceID: "workspace-1", SessionID: "session-1", AuthorizationRevision: "revision-1", TokenID: "token-1", IssuedAt: clock.now.Add(-time.Minute).Unix(), ExpiresAt: clock.now.Add(time.Hour).Unix()}},
 		auth:   &resolverAuthentication{session: identity.SessionView{WorkspaceID: "workspace-1", SubjectID: "user-1", AuthorizationRevision: "revision-1", User: identity.User{ID: "user-1"}, Roles: []identity.Role{{Key: "admin"}}, Permissions: []string{"workspace.admin"}}},
-		author: &resolverAuthorization{bundle: identity.AccessBundle{ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "revision-1", ExpiresAt: clock.now.Add(5 * time.Minute), Subject: identity.Subject{WorkspaceID: "workspace-1", SubjectID: "user-1", DepartmentPath: "/company/sales", ReportingPath: "/manager/user-1"}, FunctionGrants: []identity.FunctionGrant{{Resource: "orders", Action: "read", Effect: identity.EffectAllow}, {Resource: "workspace", Action: "admin", Effect: identity.EffectAllow}}}},
+		author: &resolverAuthorization{bundle: identity.AccessBundle{ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "revision-1", ExpiresAt: clock.now.Add(5 * time.Minute), Subject: identity.Subject{WorkspaceID: "workspace-1", SubjectID: "user-1", OrgID: "sales", OrgScopeIDs: []string{"sales", "store-a"}, ReportingScopeUserIDs: []identity.SubjectID{"user-1", "user-2"}}, FunctionGrants: []identity.FunctionGrant{{Resource: "orders", Action: "read", Effect: identity.EffectAllow}, {Resource: "workspace", Action: "admin", Effect: identity.EffectAllow}}}},
 	}
 }
 
@@ -108,7 +109,7 @@ func TestResolverCachesByTokenAndAuthorizationRevision(t *testing.T) {
 		if resolveErr != nil {
 			t.Fatal(resolveErr)
 		}
-		if !resolved.Known || !resolved.HasPermission("workspace.admin") || !resolved.HasPermission("orders.read") || resolved.DepartmentPath != "/company/sales" || resolved.ReportingPath != "/manager/user-1" {
+		if !resolved.Known || !resolved.HasPermission("workspace.admin") || !resolved.HasPermission("orders.read") || !reflect.DeepEqual(resolved.OrgScopeIDs, []string{"sales", "store-a"}) || !reflect.DeepEqual(resolved.ReportingScopeUserIDs, []string{"user-1", "user-2"}) {
 			t.Fatalf("principal=%#v", resolved)
 		}
 	}
@@ -184,7 +185,6 @@ func TestResolverAppliesFunctionDenyOverSessionPermissions(t *testing.T) {
 
 func TestResolverCacheReturnsDeeplyIsolatedPolicySnapshots(t *testing.T) {
 	binding := newResolverBinding()
-	binding.author.bundle.Subject.OrganizationScopes = map[string][]string{"team_ids": {"team-a"}}
 	binding.author.bundle.DataPolicies = []identity.DataPolicy{{
 		Key: "team", Resource: "orders", Action: "read", Effect: identity.EffectAllow,
 		Predicate: identity.Predicate{Fact: "team_id", Operator: identity.OperatorIn, Value: []any{"team-a", map[string]any{"nested": []any{"original"}}}},
@@ -201,7 +201,6 @@ func TestResolverCacheReturnsDeeplyIsolatedPolicySnapshots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	first.AccessBundle.Subject.OrganizationScopes["team_ids"][0] = "mutated"
 	first.AccessBundle.DataPolicies[0].Predicate.Value.([]any)[1].(map[string]any)["nested"].([]any)[0] = "mutated"
 	first.AccessBundle.ReferencePolicies[0].DisplayFields[0] = "mutated"
 	first.AccessBundle.ExportPolicies[0].Fields[0] = "mutated"
@@ -210,9 +209,6 @@ func TestResolverCacheReturnsDeeplyIsolatedPolicySnapshots(t *testing.T) {
 	second, err := resolver.Authenticate(t.Context(), "access")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if got := second.AccessBundle.Subject.OrganizationScopes["team_ids"][0]; got != "team-a" {
-		t.Fatalf("organization scope cache was mutated: %q", got)
 	}
 	if got := second.AccessBundle.DataPolicies[0].Predicate.Value.([]any)[1].(map[string]any)["nested"].([]any)[0]; got != "original" {
 		t.Fatalf("predicate cache was mutated: %v", got)

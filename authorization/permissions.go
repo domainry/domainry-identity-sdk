@@ -12,7 +12,7 @@ import (
 type PermissionDefinition struct {
 	PermissionKey string `json:"permission_key"`
 	ResourceKey   string `json:"resource_key"`
-	ActionKey     string `json:"action_key"`
+	OperationKey  string `json:"operation_key"`
 	Label         string `json:"label"`
 	Description   string `json:"description,omitempty"`
 	Category      string `json:"category"`
@@ -141,8 +141,8 @@ func (request PermissionReconcileRequest) ValidateContract() error {
 	for _, definition := range request.Definitions {
 		key := strings.TrimSpace(definition.PermissionKey)
 		resourceKey := strings.TrimSpace(definition.ResourceKey)
-		actionKey := strings.TrimSpace(definition.ActionKey)
-		if key == "" || resourceKey == "" || actionKey == "" || strings.TrimSpace(definition.Label) == "" || strings.TrimSpace(definition.Category) == "" || strings.TrimSpace(definition.SourceKind) == "" || key != resourceKey+"."+actionKey {
+		operationKey := strings.TrimSpace(definition.OperationKey)
+		if key == "" || resourceKey == "" || operationKey == "" || strings.TrimSpace(definition.Label) == "" || strings.TrimSpace(definition.Category) == "" || strings.TrimSpace(definition.SourceKind) == "" || key != resourceKey+"."+operationKey {
 			return &Error{Code: "identity.permission_definition_invalid"}
 		}
 		if _, duplicate := seen[key]; duplicate {
@@ -183,22 +183,22 @@ func PermissionSnapshotHash(sourceOwner string, definitions []PermissionDefiniti
 	for _, definition := range definitions {
 		key := strings.TrimSpace(definition.PermissionKey)
 		resourceKey := strings.TrimSpace(definition.ResourceKey)
-		actionKey := strings.TrimSpace(definition.ActionKey)
+		operationKey := strings.TrimSpace(definition.OperationKey)
 		canonical := struct {
 			PermissionKey string `json:"permission_key"`
 			ResourceKey   string `json:"resource_key"`
-			ActionKey     string `json:"action_key"`
+			OperationKey  string `json:"operation_key"`
 			Label         string `json:"label"`
 			Description   string `json:"description"`
 			Category      string `json:"category"`
 			SourceKind    string `json:"source_kind"`
 			SourceOwner   string `json:"source_owner"`
 		}{
-			PermissionKey: key, ResourceKey: resourceKey, ActionKey: actionKey,
+			PermissionKey: key, ResourceKey: resourceKey, OperationKey: operationKey,
 			Label: strings.TrimSpace(definition.Label), Description: strings.TrimSpace(definition.Description),
 			Category: strings.TrimSpace(definition.Category), SourceKind: strings.TrimSpace(definition.SourceKind), SourceOwner: sourceOwner,
 		}
-		if canonical.PermissionKey == "" || canonical.ResourceKey == "" || canonical.ActionKey == "" || canonical.Label == "" || canonical.Category == "" || canonical.SourceKind == "" || canonical.PermissionKey != canonical.ResourceKey+"."+canonical.ActionKey {
+		if canonical.PermissionKey == "" || canonical.ResourceKey == "" || canonical.OperationKey == "" || canonical.Label == "" || canonical.Category == "" || canonical.SourceKind == "" || canonical.PermissionKey != canonical.ResourceKey+"."+canonical.OperationKey {
 			return "", &Error{Code: "identity.permission_definition_invalid"}
 		}
 		if _, duplicate := seen[key]; duplicate {

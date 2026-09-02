@@ -10,7 +10,7 @@ func TestAccessBundleCanonicalJSONIsOrderIndependent(t *testing.T) {
 	now := time.Date(2026, 8, 27, 1, 0, 0, 0, time.UTC)
 	first := AccessBundle{
 		ContractVersion: CurrentPolicyBundleVersion, AuthorizationRevision: "authz-1", ExpiresAt: now.Add(time.Hour),
-		Subject:        Subject{WorkspaceID: "workspace-1", SubjectID: "user-1", ReportingSubjectIDs: []SubjectID{"user-3", "user-2"}, OrganizationScopes: map[string][]string{"team_ids": {"team-b", "team-a"}}},
+		Subject:        Subject{WorkspaceID: "workspace-1", SubjectID: "user-1", OrgID: "sales", OrgScopeIDs: []string{"sales-east", "sales"}, ReportingScopeUserIDs: []SubjectID{"user-2", "user-1"}},
 		FunctionGrants: []FunctionGrant{{Resource: "order", Action: "update", Effect: EffectDeny}, {Resource: "order", Action: "read", Effect: EffectAllow}},
 		DataPolicies: []DataPolicy{
 			{Key: "team", Resource: "order", Action: "read", Effect: EffectAllow, Predicate: Predicate{Any: []Predicate{{Fact: "team_id", Operator: OperatorIn, Value: []string{"team-b", "team-a"}}, {Fact: "owner_id", Operator: OperatorEqual, Value: "$subject.id"}}}},
@@ -22,8 +22,8 @@ func TestAccessBundleCanonicalJSONIsOrderIndependent(t *testing.T) {
 		Guardrails:        []Guardrail{{Key: "locked", Resource: "order", Action: "update", Effect: EffectDeny, Predicate: &Predicate{All: []Predicate{{Fact: "locked", Operator: OperatorEqual, Value: true}, {Fact: "status", Operator: OperatorNotEqual, Value: "draft"}}}}},
 	}
 	second := first
-	second.Subject.ReportingSubjectIDs = []SubjectID{"user-2", "user-3"}
-	second.Subject.OrganizationScopes = map[string][]string{"team_ids": {"team-a", "team-b"}}
+	second.Subject.OrgScopeIDs = []string{"sales", "sales-east"}
+	second.Subject.ReportingScopeUserIDs = []SubjectID{"user-1", "user-2"}
 	second.FunctionGrants = []FunctionGrant{first.FunctionGrants[1], first.FunctionGrants[0]}
 	second.DataPolicies = []DataPolicy{first.DataPolicies[1], first.DataPolicies[0]}
 	second.DataPolicies[1].Predicate.Any = []Predicate{first.DataPolicies[0].Predicate.Any[1], {Fact: "team_id", Operator: OperatorIn, Value: []string{"team-a", "team-b"}}}

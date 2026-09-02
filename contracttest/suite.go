@@ -114,9 +114,6 @@ func Run(t *testing.T, fixture Fixture) {
 	if err != nil || len(assignments) == 0 {
 		t.Fatalf("directory role assignments=%+v err=%v", assignments, err)
 	}
-	if _, err := fixture.Binding.Directory().ListWorkforce(ctx, identity.DirectoryQuery{Application: application}); err != nil {
-		t.Fatalf("directory workforce: %v", err)
-	}
 	resolution, err := fixture.Binding.Principals().Resolve(ctx, identity.PrincipalResolutionRequest{Application: application, SubjectID: verified.SubjectID})
 	if err != nil || !resolution.Principal.Known || resolution.Principal.UserID != string(verified.SubjectID) || resolution.AccessBundle.Subject.SubjectID != verified.SubjectID || resolution.AccessBundle.AuthorizationRevision != bundle.AuthorizationRevision {
 		t.Fatalf("principal resolution=%+v err=%v", resolution, err)

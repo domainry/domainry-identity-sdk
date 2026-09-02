@@ -64,13 +64,12 @@ type PermissionUsageProviderBinder interface {
 // Identity module. The provider retains lifecycle ownership; consumers must
 // never close DB.
 type DatabaseHandle struct {
-	Pool                      any
-	Driver                    string
-	Schema                    string
-	FilePath                  string
-	OrganizationScopeResolver OrganizationScopeResolver
-	BusinessProfileResolver   BusinessProfileResolver
-	Migrations                EmbeddedMigrationRegistrar
+	Pool                    any
+	Driver                  string
+	Schema                  string
+	FilePath                string
+	BusinessProfileResolver BusinessProfileResolver
+	Migrations              EmbeddedMigrationRegistrar
 }
 
 // EmbeddedMigrationRegistrar lets an in-process Identity module execute its
@@ -79,11 +78,6 @@ type DatabaseHandle struct {
 type EmbeddedMigrationRegistrar interface {
 	ApplyOwnedMigration(context.Context, string, uint, string, string, func(context.Context) error) error
 }
-
-// OrganizationScopeResolver projects application-owned organization facts for
-// Identity principals. The embedding application supplies the implementation;
-// Identity never reads application business tables directly.
-type OrganizationScopeResolver func(context.Context, string, []string) (OrganizationScopes, error)
 
 // BusinessProfileBinding is an application-owned active profile fact. Identity
 // uses it only to reconcile published system-managed business roles; it never
@@ -172,14 +166,13 @@ type Action = identitymodel.Action
 type DataAction = authorization.DataAction
 type AuthorizationRevision = identitymodel.AuthorizationRevision
 type User = identitymodel.User
-type Department = identitymodel.Department
+type OrganizationUnit = identitymodel.OrganizationUnit
 type Role = identitymodel.Role
 type UserRoleAssignment = identitymodel.UserRoleAssignment
-type WorkforceEntry = identitymodel.WorkforceEntry
 type ApplicationScope = identitymodel.ApplicationScope
 type DirectoryQuery = identitymodel.DirectoryQuery
 type UserLookup = identitymodel.UserLookup
-type DepartmentLookup = identitymodel.DepartmentLookup
+type OrganizationUnitLookup = identitymodel.OrganizationUnitLookup
 type UserRoleAssignmentQuery = identitymodel.UserRoleAssignmentQuery
 type Directory = identitymodel.Directory
 
@@ -292,7 +285,6 @@ const (
 type WorkspaceRoleReconcileRequest = modulehost.WorkspaceRoleReconcileRequest
 type WorkspaceRoleReconcileResult = modulehost.WorkspaceRoleReconcileResult
 type EmbeddedWorkspaceProvisioner = modulehost.WorkspaceProvisioner
-type OrganizationScopes = authorization.OrganizationScopes
 type Principal = authorization.Principal
 type RequestIdentity = authorization.RequestIdentity
 type PrincipalAuthenticator = authorization.PrincipalAuthenticator

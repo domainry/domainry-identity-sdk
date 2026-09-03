@@ -13,7 +13,7 @@ func TestAccessBundleCanonicalJSONIsOrderIndependent(t *testing.T) {
 		Subject:        Subject{WorkspaceID: "workspace-1", SubjectID: "user-1", OrgID: "sales", OrgScopeIDs: []string{"sales-east", "sales"}, ReportingScopeUserIDs: []SubjectID{"user-2", "user-1"}},
 		FunctionGrants: []FunctionGrant{{Resource: "order", Action: "update", Effect: EffectDeny}, {Resource: "order", Action: "read", Effect: EffectAllow}},
 		DataPolicies: []DataPolicy{
-			{Key: "team", Resource: "order", Action: "read", Effect: EffectAllow, Predicate: Predicate{Any: []Predicate{{Fact: "team_id", Operator: OperatorIn, Value: []string{"team-b", "team-a"}}, {Fact: "owner_id", Operator: OperatorEqual, Value: "$subject.id"}}}},
+			{Key: "team", Resource: "order", Action: "read", Effect: EffectAllow, DataScopes: []DataScope{DataScopeOrg, DataScopeOwner}, Predicate: Predicate{Any: []Predicate{{Fact: "team_id", Operator: OperatorIn, Value: []string{"team-b", "team-a"}}, {Fact: "owner_id", Operator: OperatorEqual, Value: "$subject.id"}}}},
 			{Key: "blocked", Resource: "order", Action: "read", Effect: EffectDeny, Predicate: Predicate{Fact: "status", Operator: OperatorEqual, Value: "blocked"}},
 		},
 		FieldPolicies:     []FieldPolicy{{Resource: "order", Field: "total", Read: true}, {Resource: "order", Field: "number", Read: true, Export: true}},
@@ -26,6 +26,7 @@ func TestAccessBundleCanonicalJSONIsOrderIndependent(t *testing.T) {
 	second.Subject.ReportingScopeUserIDs = []SubjectID{"user-1", "user-2"}
 	second.FunctionGrants = []FunctionGrant{first.FunctionGrants[1], first.FunctionGrants[0]}
 	second.DataPolicies = []DataPolicy{first.DataPolicies[1], first.DataPolicies[0]}
+	second.DataPolicies[1].DataScopes = []DataScope{DataScopeOwner, DataScopeOrg}
 	second.DataPolicies[1].Predicate.Any = []Predicate{first.DataPolicies[0].Predicate.Any[1], {Fact: "team_id", Operator: OperatorIn, Value: []string{"team-a", "team-b"}}}
 	second.FieldPolicies = []FieldPolicy{first.FieldPolicies[1], first.FieldPolicies[0]}
 	second.ReferencePolicies = append([]ReferencePolicy(nil), first.ReferencePolicies...)
@@ -65,6 +66,16 @@ func TestAccessBundleRejectsAmbiguousEffectivePolicies(t *testing.T) {
 	}
 	if err := duplicateData.Validate(now); err == nil {
 		t.Fatal("duplicate data policy key accepted")
+	}
+	invalidDataScope := base
+	invalidDataScope.DataPolicies = []DataPolicy{{Key: "invalid-scope", Resource: "order", Action: "read", Effect: EffectAllow, DataScopes: []DataScope{"all_records"}, Predicate: Predicate{Fact: "id", Operator: OperatorExists, Value: true}}}
+	if err := invalidDataScope.Validate(now); err == nil {
+		t.Fatal("legacy data scope accepted in compiled policy metadata")
+	}
+	allWithPredicate := base
+	allWithPredicate.DataPolicies = []DataPolicy{{Key: "all", Resource: "order", Action: "read", Effect: EffectAllow, DataScopes: []DataScope{DataScopeAll}, Predicate: Predicate{Fact: "id", Operator: OperatorExists, Value: true}}}
+	if err := allWithPredicate.Validate(now); err == nil {
+		t.Fatal("all data scope accepted a fake predicate")
 	}
 	ambiguousGuardrail := base
 	ambiguousGuardrail.Guardrails = []Guardrail{{Key: "ambiguous", Action: "read", Effect: EffectDeny}}

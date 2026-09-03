@@ -9,18 +9,19 @@ import (
 )
 
 type RecordFilter struct {
-	Allow []identity.Predicate
-	Deny  []identity.Predicate
+	Allow        []identity.Predicate
+	Deny         []identity.Predicate
+	Unrestricted bool
 }
 
 // CompileRecordFilter returns one bounded portable filter. Runtimes translate
 // it once per query; they must not call remote authorization per row.
-func CompileRecordFilter(bundle identity.AccessBundle, resource identity.ResourceType, action identity.Action, dataAction identity.DataAction, now time.Time) (RecordFilter, error) {
+func CompileRecordFilter(bundle identity.AccessBundle, resource identity.ResourceType, action identity.Action, now time.Time) (RecordFilter, error) {
 	filter := RecordFilter{Allow: []identity.Predicate{}, Deny: []identity.Predicate{}}
 	if err := bundle.Validate(now); err != nil {
 		return RecordFilter{}, err
 	}
-	if !resource.Valid() || !action.Valid() || !dataAction.Valid() {
+	if !resource.Valid() || !action.Valid() {
 		return RecordFilter{}, &identity.Error{Code: "identity.access_request_invalid"}
 	}
 	functionAllowed := false
@@ -46,21 +47,31 @@ func CompileRecordFilter(bundle identity.AccessBundle, resource identity.Resourc
 		filter.Deny = append(filter.Deny, *guardrail.Predicate)
 	}
 	for _, policy := range bundle.DataPolicies {
-		if !resourceMatches(policy.Resource, resource) || policy.Action != dataAction {
+		if !resourceMatches(policy.Resource, resource) || policy.Action != action {
 			continue
-		}
-		if err := policy.Predicate.Validate(); err != nil {
-			return RecordFilter{}, err
 		}
 		if policy.Effect == identity.EffectDeny {
 			filter.Deny = append(filter.Deny, policy.Predicate)
 		} else if policy.Effect == identity.EffectAllow {
+			if containsDataScope(policy.DataScopes, identity.DataScopeAll) {
+				filter.Unrestricted = true
+				continue
+			}
 			filter.Allow = append(filter.Allow, policy.Predicate)
 		} else {
 			return RecordFilter{}, &identity.Error{Code: "identity.policy_effect_unsupported"}
 		}
 	}
 	return filter, nil
+}
+
+func containsDataScope(values []identity.DataScope, expected identity.DataScope) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
 }
 
 type SQLFilter struct {
@@ -78,27 +89,36 @@ func CompileSQLWithContext(filter RecordFilter, evaluation EvaluationContext, re
 	if resolve == nil {
 		return SQLFilter{}, &identity.Error{Code: "identity.policy_column_resolver_required"}
 	}
-	allow, allowArgs, err := compileGroup(filter.Allow, evaluation, resolve, " OR ")
-	if err != nil {
-		return SQLFilter{}, err
+	allow, allowArgs := "", []any{}
+	if !filter.Unrestricted {
+		var err error
+		allow, allowArgs, err = compileGroup(filter.Allow, evaluation, resolve, " OR ")
+		if err != nil {
+			return SQLFilter{}, err
+		}
 	}
 	deny, denyArgs, err := compileGroup(filter.Deny, evaluation, resolve, " OR ")
 	if err != nil {
 		return SQLFilter{}, err
 	}
-	if allow == "" && len(filter.Allow) > 0 {
+	if !filter.Unrestricted && allow == "" && len(filter.Allow) > 0 {
 		return SQLFilter{}, &identity.Error{Code: "identity.policy_translation_failed"}
 	}
 	// No explicit allow policy means no visible records. Function grants are
 	// deliberately not inputs to the SQL compiler and cannot become all rows.
 	clause := "0 = 1"
 	args := []any{}
-	if allow != "" {
+	if filter.Unrestricted {
+		clause = ""
+	} else if allow != "" {
 		clause = "(" + allow + ")"
 		args = append(args, allowArgs...)
 	}
 	if deny != "" {
-		clause += " AND NOT (" + deny + ")"
+		if clause != "" {
+			clause += " AND "
+		}
+		clause += "NOT (" + deny + ")"
 		args = append(args, denyArgs...)
 	}
 	return SQLFilter{Clause: clause, Args: args}, nil

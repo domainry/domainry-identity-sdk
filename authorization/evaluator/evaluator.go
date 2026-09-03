@@ -28,15 +28,15 @@ type Decision struct {
 // action is configured as auditable. It is intentionally independent of
 // record facts so callers can decide after a not-found projection without
 // reconstructing Identity policy semantics.
-func AuditDenialRequired(bundle identity.AccessBundle, resource identity.ResourceType, dataAction identity.DataAction, now time.Time) (bool, error) {
+func AuditDenialRequired(bundle identity.AccessBundle, resource identity.ResourceType, action identity.Action, now time.Time) (bool, error) {
 	if err := bundle.Validate(now); err != nil {
 		return false, err
 	}
-	if !resource.Valid() || !dataAction.Valid() {
+	if !resource.Valid() || !action.Valid() {
 		return false, &identity.Error{Code: "identity.access_request_invalid"}
 	}
 	for _, policy := range bundle.DataPolicies {
-		if resourceMatches(policy.Resource, resource) && policy.Action == dataAction && policy.AuditDenial {
+		if resourceMatches(policy.Resource, resource) && policy.Action == action && policy.AuditDenial {
 			return true, nil
 		}
 	}
@@ -55,8 +55,7 @@ func EvaluateWithContext(bundle identity.AccessBundle, request identity.AccessRe
 		return Decision{Code: "access_bundle_invalid"}, err
 	}
 	resource, action := identity.ResourceType(strings.TrimSpace(request.ObjectKey)), identity.Action(strings.TrimSpace(request.Action))
-	dataAction := identity.DataAction(strings.TrimSpace(string(request.DataAction)))
-	if !resource.Valid() || !action.Valid() || !dataAction.Valid() {
+	if !resource.Valid() || !action.Valid() {
 		return Decision{Code: "access_request_invalid"}, &identity.Error{Code: "identity.access_request_invalid"}
 	}
 	functionAllowed := false
@@ -95,23 +94,27 @@ func EvaluateWithContext(bundle identity.AccessBundle, request identity.AccessRe
 	}
 	matchedAllow, hasPolicies, auditDenial := false, false, false
 	for _, policy := range bundle.DataPolicies {
-		if !resourceMatches(policy.Resource, resource) || policy.Action != dataAction {
+		if !resourceMatches(policy.Resource, resource) || policy.Action != action {
 			continue
 		}
 		hasPolicies = true
 		auditDenial = auditDenial || policy.AuditDenial
-		matches, err := EvaluatePredicateWithContext(policy.Predicate, facts, evaluation)
-		if err != nil {
-			return Decision{Code: "data_policy_invalid"}, err
+		matches := policy.Effect == identity.EffectAllow && containsDataScope(policy.DataScopes, identity.DataScopeAll)
+		if !matches {
+			var err error
+			matches, err = EvaluatePredicateWithContext(policy.Predicate, facts, evaluation)
+			if err != nil {
+				return Decision{Code: "data_policy_invalid"}, err
+			}
 		}
 		if matches && policy.Effect == identity.EffectDeny {
 			return Decision{Code: "data_policy_denied", PolicyKey: policy.Key, AuditDenial: policy.AuditDenial}, nil
 		}
 		matchedAllow = matchedAllow || matches && policy.Effect == identity.EffectAllow
 	}
-	// Function permission never implies record visibility. Even an unrestricted
-	// scope is represented by an explicit allow predicate (for example, id
-	// exists), so an absent data policy fails closed.
+	// Function permission never implies record visibility. Canonical `all` is
+	// an explicit scoped grant even though it deliberately has no predicate;
+	// an absent data policy still fails closed.
 	if !hasPolicies || !matchedAllow {
 		return Decision{Code: "data_policy_not_granted", AuditDenial: auditDenial}, nil
 	}
@@ -361,6 +364,10 @@ func resolveIdentitySubjectValue(value any, subject identity.Subject) any {
 		return subject.OrgID
 	case "org_scope_ids":
 		return append([]string(nil), subject.OrgScopeIDs...)
+	case "support_org_id":
+		return subject.SupportOrgID
+	case "support_org_scope_ids":
+		return append([]string(nil), subject.SupportOrgScopeIDs...)
 	case "reporting_scope_user_ids":
 		values := make([]string, len(subject.ReportingScopeUserIDs))
 		for index, id := range subject.ReportingScopeUserIDs {

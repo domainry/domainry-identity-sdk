@@ -14,7 +14,7 @@ management CRUD, Plane types, or service-side domain implementation.
 - `authentication`: login, SSO, OTP, session, token, and credential contracts.
 - `authorization`: Principal, AccessBundle, policy, and catalog contracts.
 - `authorization/principal`: bounded token/session/AccessBundle resolution and
-  cache policy.
+  a pluggable cache contract with a five-minute absolute local default.
 - `authorization/evaluator`: local function, record, field, reference, and
   export evaluation.
 - `httpapi`: optional exact HTTP administration Surface for embedded modules;

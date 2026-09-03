@@ -219,7 +219,7 @@ func TestDiscoveryRequiresCompatibleSaaSIssuerAndCapabilities(t *testing.T) {
 	valid := identity.Descriptor{
 		ProtocolVersion:      identity.CurrentProtocolVersion,
 		BundleVersion:        identity.CurrentPolicyBundleVersion,
-		AuthorizationVersion: identity.AuthorizationContractVersionV1,
+		AuthorizationVersion: identity.CurrentAuthorizationContractVersion,
 		Mode:                 identity.DeploymentModeSaaS,
 		Issuer:               "https://identity.example.com",
 		Capabilities:         []string{"authentication", "token_verification", "authorization", "principal_resolution", "directory_projection", "application_registration", "permission_reconciliation"},

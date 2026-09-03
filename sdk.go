@@ -70,6 +70,7 @@ type DatabaseHandle struct {
 	FilePath                string
 	BusinessProfileResolver BusinessProfileResolver
 	Migrations              EmbeddedMigrationRegistrar
+	ModuleMigrations        modulehost.MigrationRegistrar
 }
 
 // EmbeddedMigrationRegistrar lets an in-process Identity module execute its
@@ -119,40 +120,42 @@ type Clock interface {
 }
 
 const (
-	ProtocolVersionV1               = "domainry-identity-protocol-v1"
-	ProtocolVersionV2               = "domainry-identity-protocol-v2"
-	CurrentProtocolVersion          = ProtocolVersionV2
-	PolicyBundleVersionV1           = authorization.PolicyBundleVersionV1
-	PolicyBundleVersionV2           = authorization.PolicyBundleVersionV2
-	PolicyBundleVersionV3           = authorization.PolicyBundleVersionV3
-	PolicyBundleVersionV4           = authorization.PolicyBundleVersionV4
-	CurrentPolicyBundleVersion      = authorization.CurrentPolicyBundleVersion
-	AuthorizationContractVersionV1  = authorization.AuthorizationContractVersionV1
-	PrincipalContextContractVersion = authorization.PrincipalContextContractVersion
-	EffectAllow                     = authorization.EffectAllow
-	EffectDeny                      = authorization.EffectDeny
-	DataActionRead                  = authorization.DataActionRead
-	DataActionWrite                 = authorization.DataActionWrite
-	ExportModeDeny                  = authorization.ExportModeDeny
-	ExportModeAllowList             = authorization.ExportModeAllowList
-	OperatorEqual                   = authorization.OperatorEqual
-	OperatorNotEqual                = authorization.OperatorNotEqual
-	OperatorIn                      = authorization.OperatorIn
-	OperatorNotIn                   = authorization.OperatorNotIn
-	OperatorExists                  = authorization.OperatorExists
-	OperatorPrefix                  = authorization.OperatorPrefix
-	OperatorContains                = authorization.OperatorContains
-	FieldEffectAllow                = authorization.FieldEffectAllow
-	FieldEffectDeny                 = authorization.FieldEffectDeny
-	FieldEffectHide                 = authorization.FieldEffectHide
-	FieldEffectMask                 = authorization.FieldEffectMask
-	MaskTypePhone                   = authorization.MaskTypePhone
-	MaskTypeIDNumber                = authorization.MaskTypeIDNumber
-	MaskTypeEmail                   = authorization.MaskTypeEmail
-	MaskTypeYearOnly                = authorization.MaskTypeYearOnly
-	MaskTypeLastN                   = authorization.MaskTypeLastN
-	RelationForward                 = authorization.RelationForward
-	RelationReverse                 = authorization.RelationReverse
+	ProtocolVersionV1                   = "domainry-identity-protocol-v1"
+	ProtocolVersionV2                   = "domainry-identity-protocol-v2"
+	ProtocolVersionV3                   = "domainry-identity-protocol-v3"
+	CurrentProtocolVersion              = ProtocolVersionV3
+	PolicyBundleVersionV1               = authorization.PolicyBundleVersionV1
+	PolicyBundleVersionV2               = authorization.PolicyBundleVersionV2
+	PolicyBundleVersionV3               = authorization.PolicyBundleVersionV3
+	PolicyBundleVersionV4               = authorization.PolicyBundleVersionV4
+	PolicyBundleVersionV5               = authorization.PolicyBundleVersionV5
+	CurrentPolicyBundleVersion          = authorization.CurrentPolicyBundleVersion
+	AuthorizationContractVersionV1      = authorization.AuthorizationContractVersionV1
+	AuthorizationContractVersionV2      = authorization.AuthorizationContractVersionV2
+	CurrentAuthorizationContractVersion = authorization.CurrentAuthorizationContractVersion
+	PrincipalContextContractVersion     = authorization.PrincipalContextContractVersion
+	EffectAllow                         = authorization.EffectAllow
+	EffectDeny                          = authorization.EffectDeny
+	ExportModeDeny                      = authorization.ExportModeDeny
+	ExportModeAllowList                 = authorization.ExportModeAllowList
+	OperatorEqual                       = authorization.OperatorEqual
+	OperatorNotEqual                    = authorization.OperatorNotEqual
+	OperatorIn                          = authorization.OperatorIn
+	OperatorNotIn                       = authorization.OperatorNotIn
+	OperatorExists                      = authorization.OperatorExists
+	OperatorPrefix                      = authorization.OperatorPrefix
+	OperatorContains                    = authorization.OperatorContains
+	FieldEffectAllow                    = authorization.FieldEffectAllow
+	FieldEffectDeny                     = authorization.FieldEffectDeny
+	FieldEffectHide                     = authorization.FieldEffectHide
+	FieldEffectMask                     = authorization.FieldEffectMask
+	MaskTypePhone                       = authorization.MaskTypePhone
+	MaskTypeIDNumber                    = authorization.MaskTypeIDNumber
+	MaskTypeEmail                       = authorization.MaskTypeEmail
+	MaskTypeYearOnly                    = authorization.MaskTypeYearOnly
+	MaskTypeLastN                       = authorization.MaskTypeLastN
+	RelationForward                     = authorization.RelationForward
+	RelationReverse                     = authorization.RelationReverse
 )
 
 type Error = identitymodel.Error
@@ -163,7 +166,6 @@ type SessionID = identitymodel.SessionID
 type ApplicationKey = identitymodel.ApplicationKey
 type ResourceType = identitymodel.ResourceType
 type Action = identitymodel.Action
-type DataAction = authorization.DataAction
 type AuthorizationRevision = identitymodel.AuthorizationRevision
 type User = identitymodel.User
 type OrganizationUnit = identitymodel.OrganizationUnit
@@ -267,9 +269,22 @@ func PermissionSnapshotHash(sourceOwner string, definitions []PermissionDefiniti
 }
 
 type ProjectRoleDefinition = authorization.ProjectRoleDefinition
+type ProjectRolePermission = authorization.ProjectRolePermission
+type DataScope = authorization.DataScope
 type ProjectRoleCatalog = authorization.ProjectRoleCatalog
 type ProjectRoleCatalogReceipt = authorization.ProjectRoleCatalogReceipt
 type ProjectRoleCatalogPublisher = authorization.ProjectRoleCatalogPublisher
+
+const (
+	DataScopeAll       = authorization.DataScopeAll
+	DataScopeOwner     = authorization.DataScopeOwner
+	DataScopeOrg       = authorization.DataScopeOrg
+	DataScopeOrgChild  = authorization.DataScopeOrgChild
+	DataScopeTargetOrg = authorization.DataScopeTargetOrg
+)
+
+var DataScopeValues = authorization.DataScopeValues
+
 type EmbeddedTransaction = modulehost.Transaction
 type WorkspaceProvisionFailureInjector = modulehost.WorkspaceProvisionFailureInjector
 type WorkspaceIdentityProvisionRequest = modulehost.WorkspaceIdentityProvisionRequest

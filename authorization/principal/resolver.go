@@ -6,7 +6,6 @@ import (
 	"context"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/domainry/domainry-identity-sdk/authentication"
@@ -30,21 +29,18 @@ type Clock interface {
 // and AccessBundle once, and caches only until the earliest token, bundle, or
 // configured expiry.
 type Resolver struct {
-	binding Binding
-	clock   Clock
-	maxTTL  time.Duration
-	mu      sync.RWMutex
-	entries map[string]resolvedPrincipal
+	binding      Binding
+	clock        Clock
+	maxTTL       time.Duration
+	cache        Cache
+	onCacheError func(error)
 }
 
 type Options struct {
-	Clock       Clock
-	MaxCacheTTL time.Duration
-}
-
-type resolvedPrincipal struct {
-	principal identity.Principal
-	expiresAt time.Time
+	Clock        Clock
+	MaxCacheTTL  time.Duration
+	Cache        Cache
+	OnCacheError func(error)
 }
 
 func NewResolver(binding Binding, options Options) (*Resolver, error) {
@@ -57,9 +53,13 @@ func NewResolver(binding Binding, options Options) (*Resolver, error) {
 	}
 	maxTTL := options.MaxCacheTTL
 	if maxTTL <= 0 {
-		maxTTL = time.Minute
+		maxTTL = DefaultMaxCacheTTL
 	}
-	return &Resolver{binding: binding, clock: clock, maxTTL: maxTTL, entries: map[string]resolvedPrincipal{}}, nil
+	cache := options.Cache
+	if cache == nil {
+		cache = NewMemoryCache()
+	}
+	return &Resolver{binding: binding, clock: clock, maxTTL: maxTTL, cache: cache, onCacheError: options.OnCacheError}, nil
 }
 
 func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) (identity.Principal, error) {
@@ -73,11 +73,16 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 	}
 	now := resolver.clock.Now()
 	cacheKey := resolverCacheKey(verified)
-	resolver.mu.RLock()
-	cached, found := resolver.entries[cacheKey]
-	resolver.mu.RUnlock()
-	if found && now.Before(cached.expiresAt) {
-		return clonePrincipal(cached.principal), nil
+	cached, found, cacheErr := resolver.cache.Get(ctx, cacheKey, now)
+	if cacheErr != nil {
+		resolver.handleCacheError(cacheErr)
+	} else if found {
+		if cachedPrincipalValid(cached, verified, now) {
+			return clonePrincipal(cached.Principal), nil
+		}
+		if err := resolver.cache.Delete(ctx, cacheKey); err != nil {
+			resolver.handleCacheError(err)
+		}
 	}
 	session, err := resolver.binding.Authentication().CurrentSession(ctx, authentication.CurrentSessionRequest{AccessToken: accessToken})
 	if err != nil {
@@ -108,30 +113,38 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 	if bundle.ExpiresAt.Before(expiresAt) {
 		expiresAt = bundle.ExpiresAt
 	}
-	resolver.mu.Lock()
-	resolver.entries[cacheKey] = resolvedPrincipal{principal: clonePrincipal(resolved), expiresAt: expiresAt}
-	for key, entry := range resolver.entries {
-		if !now.Before(entry.expiresAt) {
-			delete(resolver.entries, key)
-		}
+	if err := resolver.cache.Set(ctx, cacheKey, CacheEntry{Principal: resolved, ExpiresAt: expiresAt}, now); err != nil {
+		resolver.handleCacheError(err)
 	}
-	resolver.mu.Unlock()
 	return resolved, nil
 }
 
 func (resolver *Resolver) Invalidate(subject identity.SubjectID, workspace identity.WorkspaceID) {
-	resolver.mu.Lock()
-	defer resolver.mu.Unlock()
-	prefix := string(workspace) + "\x00" + string(subject) + "\x00"
-	for key := range resolver.entries {
-		if strings.HasPrefix(key, prefix) {
-			delete(resolver.entries, key)
-		}
+	if err := resolver.cache.Invalidate(context.Background(), subject, workspace); err != nil {
+		resolver.handleCacheError(err)
 	}
 }
 
-func resolverCacheKey(token authentication.VerifiedToken) string {
-	return string(token.WorkspaceID) + "\x00" + string(token.SubjectID) + "\x00" + string(token.AuthorizationRevision) + "\x00" + token.TokenID
+func (resolver *Resolver) handleCacheError(err error) {
+	if err != nil && resolver.onCacheError != nil {
+		resolver.onCacheError(err)
+	}
+}
+
+func resolverCacheKey(token authentication.VerifiedToken) CacheKey {
+	return CacheKey{WorkspaceID: token.WorkspaceID, SubjectID: token.SubjectID, AuthorizationRevision: token.AuthorizationRevision, TokenID: token.TokenID}
+}
+
+func cachedPrincipalValid(entry CacheEntry, token authentication.VerifiedToken, now time.Time) bool {
+	principal := entry.Principal
+	if !now.Before(entry.ExpiresAt) || !principal.Known || principal.ContractVersion != identity.PrincipalContextContractVersion || identity.WorkspaceID(principal.WorkspaceID) != token.WorkspaceID || identity.SubjectID(principal.UserID) != token.SubjectID || identity.AuthorizationRevision(principal.AuthorizationRevision) != token.AuthorizationRevision || principal.AccessBundle == nil {
+		return false
+	}
+	bundle := principal.AccessBundle
+	if err := bundle.Validate(now); err != nil {
+		return false
+	}
+	return bundle.Subject.WorkspaceID == token.WorkspaceID && bundle.Subject.SubjectID == token.SubjectID && bundle.AuthorizationRevision == token.AuthorizationRevision
 }
 
 func principalFromResolution(token authentication.VerifiedToken, session authentication.SessionView, bundle identity.AccessBundle) identity.Principal {
@@ -158,6 +171,8 @@ func principalFromResolution(token authentication.VerifiedToken, session authent
 		AuthorizationRevision: string(token.AuthorizationRevision),
 		OrgID:                 bundle.Subject.OrgID,
 		OrgScopeIDs:           cloneStrings(bundle.Subject.OrgScopeIDs),
+		SupportOrgID:          bundle.Subject.SupportOrgID,
+		SupportOrgScopeIDs:    cloneStrings(bundle.Subject.SupportOrgScopeIDs),
 		ReportingScopeUserIDs: subjectIDsToStrings(bundle.Subject.ReportingScopeUserIDs),
 		User:                  session.User, Roles: append([]identity.Role(nil), session.Roles...), Permissions: uniqueSortedStrings(permissions),
 		MustChangePassword: session.MustChangePassword,
@@ -203,6 +218,7 @@ func uniqueSortedStrings(values []string) []string {
 
 func clonePrincipal(value identity.Principal) identity.Principal {
 	value.OrgScopeIDs = cloneStrings(value.OrgScopeIDs)
+	value.SupportOrgScopeIDs = cloneStrings(value.SupportOrgScopeIDs)
 	value.ReportingScopeUserIDs = cloneStrings(value.ReportingScopeUserIDs)
 	value.Roles = append([]identity.Role(nil), value.Roles...)
 	value.Permissions = cloneStrings(value.Permissions)

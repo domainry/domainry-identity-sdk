@@ -21,6 +21,8 @@ type Principal struct {
 	AuthorizationRevision string   `json:"authorization_revision,omitempty"`
 	OrgID                 string   `json:"org_id,omitempty"`
 	OrgScopeIDs           []string `json:"org_scope_ids,omitempty"`
+	SupportOrgID          string   `json:"support_org_id,omitempty"`
+	SupportOrgScopeIDs    []string `json:"support_org_scope_ids,omitempty"`
 	ReportingScopeUserIDs []string `json:"reporting_scope_user_ids,omitempty"`
 	User                  User     `json:"user"`
 	Roles                 []Role   `json:"roles"`
@@ -36,10 +38,11 @@ type Principal struct {
 
 func (p Principal) HasPermission(expected string) bool {
 	expected = strings.TrimSpace(expected)
-	if expected == "" || p.AccessBundle == nil {
+	separator := strings.LastIndexByte(expected, '.')
+	if separator <= 0 || separator == len(expected)-1 || p.AccessBundle == nil {
 		return false
 	}
-	allowed := false
+	functionAllowed := false
 	for _, grant := range p.AccessBundle.FunctionGrants {
 		permission := strings.TrimSpace(string(grant.Resource)) + "." + strings.TrimSpace(string(grant.Action))
 		if permission != expected {
@@ -48,9 +51,33 @@ func (p Principal) HasPermission(expected string) bool {
 		if grant.Effect == EffectDeny {
 			return false
 		}
-		allowed = allowed || grant.Effect == EffectAllow
+		functionAllowed = functionAllowed || grant.Effect == EffectAllow
 	}
-	return allowed
+	if !functionAllowed {
+		return false
+	}
+	// Every exact Permission grant carries its own data scope. A function
+	// grant without a same-resource/action allow policy is incomplete and must
+	// fail closed on every Runtime and embedded-module interface.
+	dataAllowed := false
+	for _, policy := range p.AccessBundle.DataPolicies {
+		permission := strings.TrimSpace(string(policy.Resource)) + "." + strings.TrimSpace(string(policy.Action))
+		if permission == expected && policy.Effect == EffectAllow {
+			dataAllowed = true
+		}
+	}
+	if !dataAllowed {
+		return false
+	}
+	resource, action := expected[:separator], expected[separator+1:]
+	for _, guardrail := range p.AccessBundle.Guardrails {
+		resourceMatches := guardrail.Resource == "" || guardrail.Resource == "*" || strings.TrimSpace(string(guardrail.Resource)) == resource
+		actionMatches := guardrail.Action == "" || guardrail.Action == "*" || strings.TrimSpace(string(guardrail.Action)) == action
+		if resourceMatches && actionMatches && guardrail.Effect == EffectDeny && guardrail.Predicate == nil && strings.TrimSpace(guardrail.Field) == "" {
+			return false
+		}
+	}
+	return true
 }
 
 // HasAllPermissions requires every stable permission key and fails closed for

@@ -23,11 +23,10 @@ type DecisionRequest struct {
 }
 
 type AccessRequest struct {
-	ObjectKey  string     `json:"object_key"`
-	Action     string     `json:"action"`
-	DataAction DataAction `json:"data_action"`
-	FieldKey   string     `json:"field_key,omitempty"`
-	RecordID   string     `json:"record_id,omitempty"`
+	ObjectKey string `json:"object_key"`
+	Action    string `json:"action"`
+	FieldKey  string `json:"field_key,omitempty"`
+	RecordID  string `json:"record_id,omitempty"`
 }
 
 type AccessDecision struct {
@@ -85,6 +84,8 @@ type Subject struct {
 	SubjectID             SubjectID   `json:"subject_id"`
 	OrgID                 string      `json:"org_id,omitempty"`
 	OrgScopeIDs           []string    `json:"org_scope_ids,omitempty"`
+	SupportOrgID          string      `json:"support_org_id,omitempty"`
+	SupportOrgScopeIDs    []string    `json:"support_org_scope_ids,omitempty"`
 	ReportingScopeUserIDs []SubjectID `json:"reporting_scope_user_ids,omitempty"`
 }
 
@@ -101,23 +102,13 @@ const (
 	EffectDeny  Effect = "deny"
 )
 
-// DataAction is the deliberately coarse record-policy dimension. Action is
-// still the exact executable/function key; callers supply this second value
-// from the owning ActionDefinition's effect classification when a real data
-// object is being authorized.
-type DataAction string
-
-const (
-	DataActionRead  DataAction = "read"
-	DataActionWrite DataAction = "write"
-)
-
 type DataPolicy struct {
 	Key         string       `json:"key"`
 	Resource    ResourceType `json:"resource"`
-	Action      DataAction   `json:"action"`
+	Action      Action       `json:"action"`
 	Effect      Effect       `json:"effect"`
-	Predicate   Predicate    `json:"predicate"`
+	DataScopes  []DataScope  `json:"data_scopes,omitempty"`
+	Predicate   Predicate    `json:"predicate,omitzero"`
 	AuditDenial bool         `json:"audit_denial,omitempty"`
 }
 

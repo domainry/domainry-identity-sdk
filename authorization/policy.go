@@ -39,11 +39,28 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 		if strings.TrimSpace(policy.Key) == "" || !policy.Resource.Valid() || policy.Resource == "*" || !policy.Action.Valid() || !policy.Effect.Valid() {
 			return &Error{Code: "identity.data_policy_invalid"}
 		}
+		seenScopes := map[DataScope]struct{}{}
+		for _, scope := range policy.DataScopes {
+			if !scope.Valid() {
+				return &Error{Code: "identity.data_policy_scope_invalid"}
+			}
+			if _, duplicate := seenScopes[scope]; duplicate {
+				return &Error{Code: "identity.data_policy_scope_duplicate"}
+			}
+			seenScopes[scope] = struct{}{}
+		}
 		if _, duplicate := dataKeys[policy.Key]; duplicate {
 			return &Error{Code: "identity.data_policy_duplicate"}
 		}
 		dataKeys[policy.Key] = struct{}{}
-		if err := policy.Predicate.Validate(); err != nil {
+		unrestricted := containsDataScope(policy.DataScopes, DataScopeAll)
+		if unrestricted {
+			// `all` is the absence of a data-scope predicate. It must never be
+			// serialized or translated as an always-true WHERE condition.
+			if policy.Effect != EffectAllow || len(policy.DataScopes) != 1 || !policy.Predicate.IsZero() {
+				return &Error{Code: "identity.data_policy_scope_invalid"}
+			}
+		} else if err := policy.Predicate.Validate(); err != nil {
 			return err
 		}
 	}
@@ -133,10 +150,6 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 }
 
 func (effect Effect) Valid() bool { return effect == EffectAllow || effect == EffectDeny }
-
-func (action DataAction) Valid() bool {
-	return action == DataActionRead || action == DataActionWrite
-}
 
 func (effect FieldEffect) Valid() bool {
 	switch effect {
@@ -230,6 +243,23 @@ func (predicate Predicate) Validate() error {
 	return nil
 }
 
+// IsZero reports whether no executable predicate was supplied. A zero
+// predicate is valid only for an allow policy carrying the canonical `all`
+// data scope; every bounded policy still requires a real predicate.
+func (predicate Predicate) IsZero() bool {
+	return strings.TrimSpace(predicate.Fact) == "" && predicate.Operator == "" && predicate.Value == nil &&
+		len(predicate.Path) == 0 && len(predicate.All) == 0 && len(predicate.Any) == 0 && predicate.Not == nil
+}
+
+func containsDataScope(values []DataScope, expected DataScope) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
+}
+
 func (operator Operator) Valid() bool {
 	switch operator {
 	case OperatorEqual, OperatorNotEqual, OperatorIn, OperatorNotIn, OperatorExists, OperatorPrefix, OperatorContains:
@@ -253,7 +283,10 @@ func (bundle AccessBundle) CanonicalJSON(now time.Time) ([]byte, error) {
 	clone.FunctionGrants = append([]FunctionGrant(nil), bundle.FunctionGrants...)
 	clone.DataPolicies = append([]DataPolicy(nil), bundle.DataPolicies...)
 	for index := range clone.DataPolicies {
-		clone.DataPolicies[index].Predicate = canonicalPredicate(clone.DataPolicies[index].Predicate)
+		clone.DataPolicies[index].DataScopes = canonicalDataScopes(clone.DataPolicies[index].DataScopes)
+		if !clone.DataPolicies[index].Predicate.IsZero() {
+			clone.DataPolicies[index].Predicate = canonicalPredicate(clone.DataPolicies[index].Predicate)
+		}
 	}
 	clone.FieldPolicies = append([]FieldPolicy(nil), bundle.FieldPolicies...)
 	for index := range clone.FieldPolicies {
@@ -290,6 +323,23 @@ func (bundle AccessBundle) CanonicalJSON(now time.Time) ([]byte, error) {
 	sort.Slice(clone.ExportPolicies, func(i, j int) bool { return clone.ExportPolicies[i].Resource < clone.ExportPolicies[j].Resource })
 	sort.Slice(clone.Guardrails, func(i, j int) bool { return clone.Guardrails[i].Key < clone.Guardrails[j].Key })
 	return json.Marshal(clone)
+}
+
+func canonicalDataScopes(values []DataScope) []DataScope {
+	if values == nil {
+		return nil
+	}
+	seen := make(map[DataScope]bool, len(values))
+	for _, value := range values {
+		seen[value] = true
+	}
+	result := make([]DataScope, 0, len(seen))
+	for _, value := range DataScopeValues() {
+		if seen[value] {
+			result = append(result, value)
+		}
+	}
+	return result
 }
 
 func canonicalPredicate(predicate Predicate) Predicate {

@@ -30,10 +30,27 @@ func TestPrincipalPermissionUsesAccessBundleAsAuthoritativeState(t *testing.T) {
 	bundle := &AccessBundle{FunctionGrants: []FunctionGrant{
 		{Resource: "order", Action: "read", Effect: EffectAllow},
 		{Resource: "order", Action: "delete", Effect: EffectDeny},
-	}}
+	}, DataPolicies: []DataPolicy{{Key: "order.read", Resource: "order", Action: "read", Effect: EffectAllow, DataScopes: []DataScope{DataScopeAll}}}}
 	principal := Principal{Permissions: []string{"order.delete", "legacy.only"}, AccessBundle: bundle}
 	if !principal.HasPermission("order.read") || principal.HasPermission("order.delete") || principal.HasPermission("legacy.only") {
 		t.Fatalf("access bundle was not authoritative: %#v", principal)
+	}
+}
+
+func TestPrincipalPermissionRequiresSameExactDataPolicy(t *testing.T) {
+	principal := Principal{AccessBundle: &AccessBundle{
+		FunctionGrants: []FunctionGrant{{Resource: "order", Action: "read", Effect: EffectAllow}, {Resource: "order", Action: "update", Effect: EffectAllow}},
+		DataPolicies:   []DataPolicy{{Key: "order.read", Resource: "order", Action: "read", Effect: EffectAllow, DataScopes: []DataScope{DataScopeAll}}},
+	}}
+	if !principal.HasPermission("order.read") {
+		t.Fatal("exact function and data grant was denied")
+	}
+	if principal.HasPermission("order.update") {
+		t.Fatal("function-only grant bypassed the required per-Permission data scope")
+	}
+	principal.AccessBundle.Guardrails = []Guardrail{{Key: "deny-read", Resource: "order", Action: "read", Effect: EffectDeny}}
+	if principal.HasPermission("order.read") {
+		t.Fatal("unconditional guardrail did not deny the exact scoped Permission")
 	}
 }
 

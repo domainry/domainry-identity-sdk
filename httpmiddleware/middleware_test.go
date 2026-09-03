@@ -51,6 +51,10 @@ func permissionBundle(permissions ...string) *identitysdk.AccessBundle {
 		bundle.FunctionGrants = append(bundle.FunctionGrants, identitysdk.FunctionGrant{
 			Resource: identitysdk.ResourceType(resource), Action: identitysdk.Action(action), Effect: identitysdk.EffectAllow,
 		})
+		bundle.DataPolicies = append(bundle.DataPolicies, identitysdk.DataPolicy{
+			Key: permission, Resource: identitysdk.ResourceType(resource), Action: identitysdk.Action(action), Effect: identitysdk.EffectAllow,
+			DataScopes: []identitysdk.DataScope{identitysdk.DataScopeAll},
+		})
 	}
 	return bundle
 }

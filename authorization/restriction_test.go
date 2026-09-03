@@ -11,7 +11,7 @@ func TestRestrictAccessIntersectsCredentialScopesAndPreservesDenies(t *testing.T
 		},
 		DataPolicies: []DataPolicy{
 			{Key: "customer-read", Resource: "customer", Action: "read", Effect: EffectAllow},
-			{Key: "customer-write", Resource: "customer", Action: "write", Effect: EffectAllow},
+			{Key: "customer-update", Resource: "customer", Action: "update", Effect: EffectAllow},
 		},
 		FieldPolicies:     []FieldPolicy{{Resource: "customer", Field: "name", Read: true, Write: true, Export: true}},
 		ReferencePolicies: []ReferencePolicy{{SourceResource: "customer", Reference: "owner", Allowed: true}},
@@ -19,7 +19,7 @@ func TestRestrictAccessIntersectsCredentialScopesAndPreservesDenies(t *testing.T
 		Guardrails:        []Guardrail{{Key: "global-deny", Effect: EffectDeny}},
 	}
 	derived := RestrictAccess(bundle, []string{"customer.read"})
-	if len(derived.FunctionGrants) != 2 || len(derived.DataPolicies) != 2 || len(derived.FieldPolicies) != 1 {
+	if len(derived.FunctionGrants) != 2 || len(derived.DataPolicies) != 1 || len(derived.FieldPolicies) != 1 {
 		t.Fatalf("unexpected restricted bundle: %#v", derived)
 	}
 	if !derived.FieldPolicies[0].Read || derived.FieldPolicies[0].Write || derived.FieldPolicies[0].Export {

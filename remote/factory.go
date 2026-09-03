@@ -60,7 +60,7 @@ func (factory *Factory) Open(ctx context.Context, application identity.Applicati
 	}
 	delegate := &binding{client: client, tokens: verifier, descriptor: identity.Descriptor{
 		ProtocolVersion: identity.CurrentProtocolVersion, BundleVersion: identity.CurrentPolicyBundleVersion,
-		AuthorizationVersion: identity.AuthorizationContractVersionV1, Mode: identity.DeploymentModeSaaS, Issuer: issuer, Audience: audience,
+		AuthorizationVersion: identity.CurrentAuthorizationContractVersion, Mode: identity.DeploymentModeSaaS, Issuer: issuer, Audience: audience,
 		Capabilities: []string{"authentication", "token_verification", "authorization", "principal_resolution", "directory_projection", "application_registration", "permission_reconciliation", "credentials", "oidc", "saml"},
 	}, capabilities: capabilities}
 	return identityapplication.Bind(delegate, application)
@@ -91,7 +91,7 @@ func remoteApplication(config Config, application identity.ApplicationRef) (Conf
 }
 
 func validateDiscovery(descriptor identity.Descriptor, expectedIssuer string) error {
-	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.CurrentPolicyBundleVersion || descriptor.AuthorizationVersion != identity.AuthorizationContractVersionV1 || descriptor.Mode != identity.DeploymentModeSaaS {
+	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.CurrentPolicyBundleVersion || descriptor.AuthorizationVersion != identity.CurrentAuthorizationContractVersion || descriptor.Mode != identity.DeploymentModeSaaS {
 		return &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.protocol_incompatible"}
 	}
 	if strings.TrimSpace(descriptor.Issuer) != strings.TrimSpace(expectedIssuer) {

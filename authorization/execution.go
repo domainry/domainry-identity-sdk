@@ -11,9 +11,11 @@ import (
 // effect fields, but it never widens record predicates, exports, references,
 // or guardrails.
 type ExecutionGrant struct {
-	Resource ResourceType
-	Action   Action
-	Fields   []string
+	Resource       ResourceType
+	Action         Action
+	Fields         []string
+	SourceResource ResourceType
+	SourceAction   Action
 }
 
 // DeriveExecutionAccess returns an isolated bundle for one trusted operation.
@@ -25,8 +27,27 @@ func DeriveExecutionAccess(bundle AccessBundle, grant ExecutionGrant, now time.T
 	if !grant.Resource.Valid() || !grant.Action.Valid() {
 		return AccessBundle{}, &Error{Code: "identity.execution_grant_invalid"}
 	}
+	sourceSpecified := grant.SourceResource != "" || grant.SourceAction != ""
+	if sourceSpecified && (!grant.SourceResource.Valid() || !grant.SourceAction.Valid()) {
+		return AccessBundle{}, &Error{Code: "identity.execution_source_invalid"}
+	}
 
 	derived := cloneAccessBundle(bundle)
+	if sourceSpecified {
+		sourceAllowed := false
+		for _, existing := range derived.FunctionGrants {
+			if existing.Resource != grant.SourceResource || existing.Action != grant.SourceAction {
+				continue
+			}
+			if existing.Effect == EffectDeny {
+				return AccessBundle{}, &Error{Code: "identity.execution_source_denied"}
+			}
+			sourceAllowed = sourceAllowed || existing.Effect == EffectAllow
+		}
+		if !sourceAllowed {
+			return AccessBundle{}, &Error{Code: "identity.execution_source_not_granted"}
+		}
+	}
 	functionAllowed := false
 	for _, existing := range derived.FunctionGrants {
 		if existing.Resource != grant.Resource || existing.Action != grant.Action {
@@ -39,6 +60,9 @@ func DeriveExecutionAccess(bundle AccessBundle, grant ExecutionGrant, now time.T
 	}
 	if !functionAllowed {
 		derived.FunctionGrants = append(derived.FunctionGrants, FunctionGrant{Resource: grant.Resource, Action: grant.Action, Effect: EffectAllow})
+	}
+	if sourceSpecified && (grant.SourceResource != grant.Resource || grant.SourceAction != grant.Action) {
+		derived.DataPolicies = deriveExecutionDataPolicies(bundle.DataPolicies, grant)
 	}
 
 	seenFields := map[string]struct{}{}
@@ -68,6 +92,40 @@ func DeriveExecutionAccess(bundle AccessBundle, grant ExecutionGrant, now time.T
 		return AccessBundle{}, err
 	}
 	return derived, nil
+}
+
+// deriveExecutionDataPolicies projects only the already-authorized source
+// operation's predicates onto one compiler-declared internal effect. Existing
+// target allows are removed so broader CRUD authority cannot widen the source
+// Action's scope; explicit target denies remain authoritative.
+func deriveExecutionDataPolicies(policies []DataPolicy, grant ExecutionGrant) []DataPolicy {
+	result := make([]DataPolicy, 0, len(policies)*2)
+	keys := map[string]struct{}{}
+	appendPolicy := func(policy DataPolicy) {
+		if _, duplicate := keys[policy.Key]; duplicate {
+			return
+		}
+		keys[policy.Key] = struct{}{}
+		result = append(result, policy)
+	}
+	for _, policy := range policies {
+		if policy.Resource == grant.Resource && policy.Action == grant.Action && policy.Effect == EffectAllow {
+			continue
+		}
+		appendPolicy(policy)
+	}
+	for _, policy := range policies {
+		if policy.Resource != grant.SourceResource || policy.Action != grant.SourceAction {
+			continue
+		}
+		projected := policy
+		projected.Key = policy.Key + ".execution." + string(grant.Resource) + "." + string(grant.Action)
+		projected.Resource = grant.Resource
+		projected.Action = grant.Action
+		projected.Predicate = clonePredicate(policy.Predicate)
+		appendPolicy(projected)
+	}
+	return result
 }
 
 func cloneAccessBundle(bundle AccessBundle) AccessBundle {

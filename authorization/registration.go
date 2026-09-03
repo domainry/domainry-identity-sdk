@@ -7,7 +7,11 @@ import (
 	"strings"
 )
 
-const AuthorizationContractVersionV1 = "domainry-identity-authorization-v1"
+const (
+	AuthorizationContractVersionV1      = "domainry-identity-authorization-v1"
+	AuthorizationContractVersionV2      = "domainry-identity-authorization-v2"
+	CurrentAuthorizationContractVersion = AuthorizationContractVersionV2
+)
 
 type ApplicationRef struct {
 	TenantID       TenantID       `json:"tenant_id,omitempty"`

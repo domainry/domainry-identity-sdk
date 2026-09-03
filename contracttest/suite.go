@@ -19,7 +19,6 @@ type Fixture struct {
 	Password       string
 	Resource       identity.ResourceType
 	Action         identity.Action
-	DataAction     identity.DataAction
 	DataAllowed    bool
 }
 
@@ -35,7 +34,7 @@ func Run(t *testing.T, fixture Fixture) {
 		t.Fatal("Identity application key is required")
 	}
 	descriptor := fixture.Binding.Descriptor()
-	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.CurrentPolicyBundleVersion || descriptor.AuthorizationVersion != identity.AuthorizationContractVersionV1 {
+	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.CurrentPolicyBundleVersion || descriptor.AuthorizationVersion != identity.CurrentAuthorizationContractVersion {
 		t.Fatalf("unsupported descriptor: %+v", descriptor)
 	}
 	if identity.ApplicationKey(descriptor.Audience) != fixture.ApplicationKey || descriptor.Issuer == "" {
@@ -79,12 +78,9 @@ func Run(t *testing.T, fixture Fixture) {
 	if err != nil || bundle.AuthorizationRevision != verified.AuthorizationRevision {
 		t.Fatalf("bundle=%+v err=%v", bundle, err)
 	}
-	if !fixture.DataAction.Valid() {
-		t.Fatal("contract fixture data action is required")
-	}
 	decision, err := fixture.Binding.Authorization().Reauthorize(ctx, identity.DecisionRequest{
 		Identity: requestIdentity,
-		Access:   identity.AccessRequest{ObjectKey: string(fixture.Resource), Action: string(fixture.Action), DataAction: fixture.DataAction, RecordID: "contract-record"},
+		Access:   identity.AccessRequest{ObjectKey: string(fixture.Resource), Action: string(fixture.Action), RecordID: "contract-record"},
 		Facts:    identity.ResourceFacts{"id": "contract-record"},
 	})
 	if err != nil || decision.Allowed != fixture.DataAllowed || decision.AuthorizationRevision != string(bundle.AuthorizationRevision) {
@@ -92,7 +88,7 @@ func Run(t *testing.T, fixture Fixture) {
 	}
 	denied, err := fixture.Binding.Authorization().Reauthorize(ctx, identity.DecisionRequest{
 		Identity: requestIdentity,
-		Access:   identity.AccessRequest{ObjectKey: string(fixture.Resource), Action: string(fixture.Action), DataAction: fixture.DataAction, RecordID: "contract-record"},
+		Access:   identity.AccessRequest{ObjectKey: string(fixture.Resource), Action: string(fixture.Action), RecordID: "contract-record"},
 	})
 	if err != nil || denied.Allowed {
 		t.Fatalf("reauthorization without resource facts must fail closed: decision=%+v err=%v", denied, err)

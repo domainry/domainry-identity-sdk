@@ -102,7 +102,7 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 	if err := bundle.Validate(now); err != nil {
 		return identity.Principal{}, err
 	}
-	if bundle.Subject.SubjectID != verified.SubjectID || bundle.Subject.WorkspaceID != verified.WorkspaceID || bundle.AuthorizationRevision != verified.AuthorizationRevision {
+	if bundle.Subject.TenantID != verified.TenantID || bundle.Subject.SubjectID != verified.SubjectID || bundle.Subject.WorkspaceID != verified.WorkspaceID || bundle.AuthorizationRevision != verified.AuthorizationRevision {
 		return identity.Principal{}, &identity.Error{Code: "identity.access_bundle_subject_mismatch"}
 	}
 	resolved := principalFromResolution(verified, session, bundle)
@@ -144,7 +144,7 @@ func cachedPrincipalValid(entry CacheEntry, token authentication.VerifiedToken, 
 	if err := bundle.Validate(now); err != nil {
 		return false
 	}
-	return bundle.Subject.WorkspaceID == token.WorkspaceID && bundle.Subject.SubjectID == token.SubjectID && bundle.AuthorizationRevision == token.AuthorizationRevision
+	return bundle.Subject.TenantID == token.TenantID && bundle.Subject.WorkspaceID == token.WorkspaceID && bundle.Subject.SubjectID == token.SubjectID && bundle.AuthorizationRevision == token.AuthorizationRevision
 }
 
 func principalFromResolution(token authentication.VerifiedToken, session authentication.SessionView, bundle identity.AccessBundle) identity.Principal {

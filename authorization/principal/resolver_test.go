@@ -24,9 +24,9 @@ func newResolverBinding() *resolverBinding {
 	clock := &resolverClock{now: time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)}
 	return &resolverBinding{
 		clock:  clock,
-		tokens: resolverTokens{claims: identity.VerifiedToken{SubjectID: "user-1", WorkspaceID: "workspace-1", SessionID: "session-1", AuthorizationRevision: "revision-1", TokenID: "token-1", IssuedAt: clock.now.Add(-time.Minute).Unix(), ExpiresAt: clock.now.Add(time.Hour).Unix()}},
+		tokens: resolverTokens{claims: identity.VerifiedToken{SubjectID: "user-1", TenantID: "tenant-1", WorkspaceID: "workspace-1", SessionID: "session-1", AuthorizationRevision: "revision-1", TokenID: "token-1", IssuedAt: clock.now.Add(-time.Minute).Unix(), ExpiresAt: clock.now.Add(time.Hour).Unix()}},
 		auth:   &resolverAuthentication{session: identity.SessionView{WorkspaceID: "workspace-1", SubjectID: "user-1", AuthorizationRevision: "revision-1", User: identity.User{ID: "user-1"}, Roles: []identity.Role{{Key: "admin"}}, Permissions: []string{"workspace.admin"}}},
-		author: &resolverAuthorization{bundle: identity.AccessBundle{ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "revision-1", ExpiresAt: clock.now.Add(5 * time.Minute), Subject: identity.Subject{WorkspaceID: "workspace-1", SubjectID: "user-1", OrgID: "sales", OrgScopeIDs: []string{"sales", "store-a"}, ReportingScopeUserIDs: []identity.SubjectID{"user-1", "user-2"}}, FunctionGrants: []identity.FunctionGrant{{Resource: "orders", Action: "read", Effect: identity.EffectAllow}, {Resource: "workspace", Action: "admin", Effect: identity.EffectAllow}}, DataPolicies: []identity.DataPolicy{{Key: "orders.read", Resource: "orders", Action: "read", Effect: identity.EffectAllow, DataScopes: []identity.DataScope{identity.DataScopeAll}}, {Key: "workspace.admin", Resource: "workspace", Action: "admin", Effect: identity.EffectAllow, DataScopes: []identity.DataScope{identity.DataScopeAll}}}}},
+		author: &resolverAuthorization{bundle: identity.AccessBundle{ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "revision-1", ExpiresAt: clock.now.Add(5 * time.Minute), Subject: identity.Subject{TenantID: "tenant-1", WorkspaceID: "workspace-1", SubjectID: "user-1", OrgID: "sales", OrgScopeIDs: []string{"sales", "store-a"}, ReportingScopeUserIDs: []identity.SubjectID{"user-1", "user-2"}}, FunctionGrants: []identity.FunctionGrant{{Resource: "orders", Action: "read", Effect: identity.EffectAllow}, {Resource: "workspace", Action: "admin", Effect: identity.EffectAllow}}, DataPolicies: []identity.DataPolicy{{Key: "orders.read", Resource: "orders", Action: "read", Effect: identity.EffectAllow, DataScopes: []identity.DataScope{identity.DataScopeAll}}, {Key: "workspace.admin", Resource: "workspace", Action: "admin", Effect: identity.EffectAllow, DataScopes: []identity.DataScope{identity.DataScopeAll}}}}},
 	}
 }
 
@@ -163,6 +163,18 @@ func TestResolverRejectsBundleSubjectMismatch(t *testing.T) {
 	}
 	if _, err := resolver.Authenticate(t.Context(), "access"); err == nil {
 		t.Fatal("mismatched AccessBundle was accepted")
+	}
+}
+
+func TestResolverRejectsBundleTenantMismatch(t *testing.T) {
+	binding := newResolverBinding()
+	binding.author.bundle.Subject.TenantID = "other-tenant"
+	resolver, err := identityprincipal.NewResolver(binding, identityprincipal.Options{Clock: binding.clock})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolver.Authenticate(t.Context(), "access"); err == nil {
+		t.Fatal("cross-tenant AccessBundle was accepted")
 	}
 }
 

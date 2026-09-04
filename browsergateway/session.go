@@ -19,12 +19,33 @@ func (gateway *Gateway) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	request.WorkspaceID = workspaceID
 	request.ApplicationKey = gateway.config.ApplicationKey
+	if challengeBinding, ok := gateway.binding.(identity.ChallengeAuthenticationBinding); ok {
+		outcome, err := challengeBinding.ChallengeAuthentication().LoginWithPasswordOutcome(r.Context(), request)
+		if err != nil {
+			gateway.writeError(w, err)
+			return
+		}
+		gateway.writeBrowserAuthenticationOutcome(w, outcome)
+		return
+	}
 	session, err := gateway.binding.Authentication().LoginWithPassword(r.Context(), request)
 	if err != nil {
 		gateway.writeError(w, err)
 		return
 	}
 	gateway.writeBrowserSession(w, session)
+}
+
+func (gateway *Gateway) writeBrowserAuthenticationOutcome(w http.ResponseWriter, outcome identity.AuthenticationOutcome) {
+	if outcome.Status == identity.AuthenticationStatusChallengeRequired && outcome.Challenge != nil {
+		gateway.writeJSON(w, http.StatusOK, outcome)
+		return
+	}
+	if outcome.Status == identity.AuthenticationStatusAuthenticated && outcome.Session != nil {
+		gateway.writeBrowserSession(w, *outcome.Session)
+		return
+	}
+	gateway.writeCode(w, http.StatusBadGateway, "identity.authentication_response_invalid")
 }
 
 func (gateway *Gateway) Refresh(w http.ResponseWriter, r *http.Request) {

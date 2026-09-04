@@ -32,3 +32,28 @@ func TestProjectRolePermissionCarriesItsOwnClosedDataScope(t *testing.T) {
 		t.Fatalf("project role wire contract = %s", text)
 	}
 }
+
+func TestProjectRoleCatalogPreservesApplicationObjectCatalog(t *testing.T) {
+	catalog := ProjectRoleCatalog{
+		Application: ApplicationRef{WorkspaceID: "workspace-primary", ApplicationKey: "runtime"},
+		Objects:     json.RawMessage(`[{"key":"customer","fields":[{"key":"name"}]}]`),
+		Roles:       []ProjectRoleDefinition{},
+	}
+	payload, err := json.Marshal(catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roundTrip ProjectRoleCatalog
+	if err := json.Unmarshal(payload, &roundTrip); err != nil {
+		t.Fatal(err)
+	}
+	var objects []struct {
+		Key    string `json:"key"`
+		Fields []struct {
+			Key string `json:"key"`
+		} `json:"fields"`
+	}
+	if err := json.Unmarshal(roundTrip.Objects, &objects); err != nil || len(objects) != 1 || objects[0].Key != "customer" || len(objects[0].Fields) != 1 || objects[0].Fields[0].Key != "name" {
+		t.Fatalf("objects=%#v err=%v", objects, err)
+	}
+}

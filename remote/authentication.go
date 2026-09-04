@@ -2,6 +2,7 @@ package remote
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -23,23 +24,28 @@ func (adapter authentication) Providers(ctx context.Context, query identity.Prov
 }
 
 func (adapter authentication) LoginWithPassword(ctx context.Context, request identity.PasswordLoginRequest) (identity.AuthSession, error) {
+	outcome, err := adapter.LoginWithPasswordOutcome(ctx, request)
+	return authenticatedSession(outcome, err)
+}
+
+func (adapter authentication) LoginWithPasswordOutcome(ctx context.Context, request identity.PasswordLoginRequest) (identity.AuthenticationOutcome, error) {
 	if err := adapter.requireWorkspace(request.WorkspaceID); err != nil {
-		return identity.AuthSession{}, err
+		return identity.AuthenticationOutcome{}, err
 	}
 	request.WorkspaceID = identity.WorkspaceID(adapter.client.resolveWorkspace(string(request.WorkspaceID)))
 	applicationKey, err := adapter.client.resolveApplication(string(request.ApplicationKey))
 	if err != nil {
-		return identity.AuthSession{}, err
+		return identity.AuthenticationOutcome{}, err
 	}
 	request.ApplicationKey, request.Login = identity.ApplicationKey(applicationKey), strings.TrimSpace(request.Login)
 	if request.Login == "" || request.Password == "" {
-		return identity.AuthSession{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "auth.login_request_invalid"}
+		return identity.AuthenticationOutcome{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "auth.login_request_invalid"}
 	}
-	var session identity.AuthSession
-	if err := adapter.client.doJSON(ctx, http.MethodPost, "/auth/login", "", request, &session); err != nil {
-		return identity.AuthSession{}, err
+	var raw json.RawMessage
+	if err := adapter.client.doJSON(ctx, http.MethodPost, "/auth/login", "", request, &raw); err != nil {
+		return identity.AuthenticationOutcome{}, err
 	}
-	return session, nil
+	return decodeAuthenticationOutcome(raw)
 }
 
 func (adapter authentication) BeginFederatedLogin(ctx context.Context, request identity.BeginFederatedLoginRequest) (identity.ProviderChallenge, error) {
@@ -94,20 +100,58 @@ func (adapter authentication) ExchangeAuthorizationCode(ctx context.Context, req
 }
 
 func (adapter authentication) VerifyOTP(ctx context.Context, request identity.VerifyOTPRequest) (identity.AuthSession, error) {
+	outcome, err := adapter.VerifyOTPOutcome(ctx, request)
+	return authenticatedSession(outcome, err)
+}
+
+func (adapter authentication) VerifyOTPOutcome(ctx context.Context, request identity.VerifyOTPRequest) (identity.AuthenticationOutcome, error) {
 	if err := adapter.requireWorkspace(request.WorkspaceID); err != nil {
-		return identity.AuthSession{}, err
+		return identity.AuthenticationOutcome{}, err
 	}
 	request.Provider, request.State, request.Code = strings.TrimSpace(request.Provider), strings.TrimSpace(request.State), strings.TrimSpace(request.Code)
 	request.WorkspaceID = identity.WorkspaceID(adapter.client.resolveWorkspace(string(request.WorkspaceID)))
 	if request.Provider == "" || request.State == "" || request.Code == "" {
-		return identity.AuthSession{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "auth.provider_verify_request_invalid"}
+		return identity.AuthenticationOutcome{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "auth.provider_verify_request_invalid"}
 	}
-	var session identity.AuthSession
+	var raw json.RawMessage
 	endpoint := "/auth/providers/" + url.PathEscape(request.Provider) + "/verify"
-	if err := adapter.client.doJSON(ctx, http.MethodPost, endpoint, "", request, &session); err != nil {
+	if err := adapter.client.doJSON(ctx, http.MethodPost, endpoint, "", request, &raw); err != nil {
+		return identity.AuthenticationOutcome{}, err
+	}
+	return decodeAuthenticationOutcome(raw)
+}
+
+func decodeAuthenticationOutcome(raw []byte) (identity.AuthenticationOutcome, error) {
+	var outcome identity.AuthenticationOutcome
+	if err := json.Unmarshal(raw, &outcome); err != nil {
+		return identity.AuthenticationOutcome{}, &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.authentication_response_invalid", Cause: err}
+	}
+	if outcome.Status == identity.AuthenticationStatusAuthenticated && outcome.Session != nil && strings.TrimSpace(outcome.Session.AccessToken) != "" {
+		return outcome, nil
+	}
+	if outcome.Status == identity.AuthenticationStatusChallengeRequired && outcome.Challenge != nil && strings.TrimSpace(outcome.Challenge.State) != "" {
+		return outcome, nil
+	}
+	// Protocol-v2 servers returned a bare AuthSession. Accept it during rolling
+	// upgrades while always exposing the protocol-v3 outcome to new callers.
+	var session identity.AuthSession
+	if err := json.Unmarshal(raw, &session); err == nil && strings.TrimSpace(session.AccessToken) != "" {
+		return identity.AuthenticationOutcome{Status: identity.AuthenticationStatusAuthenticated, Session: &session}, nil
+	}
+	return identity.AuthenticationOutcome{}, &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.authentication_response_invalid"}
+}
+
+func authenticatedSession(outcome identity.AuthenticationOutcome, err error) (identity.AuthSession, error) {
+	if err != nil {
 		return identity.AuthSession{}, err
 	}
-	return session, nil
+	if outcome.Status == identity.AuthenticationStatusAuthenticated && outcome.Session != nil {
+		return *outcome.Session, nil
+	}
+	if outcome.Status == identity.AuthenticationStatusChallengeRequired && outcome.Challenge != nil {
+		return identity.AuthSession{}, &identity.Error{StatusCode: http.StatusConflict, Code: "auth.challenge_required", Params: map[string]string{"provider": outcome.Challenge.Provider, "state": outcome.Challenge.State}}
+	}
+	return identity.AuthSession{}, &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.authentication_response_invalid"}
 }
 
 func (adapter authentication) RefreshSession(ctx context.Context, request identity.RefreshRequest) (identity.AuthSession, error) {

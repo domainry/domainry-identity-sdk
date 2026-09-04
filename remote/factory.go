@@ -61,7 +61,7 @@ func (factory *Factory) Open(ctx context.Context, application identity.Applicati
 	delegate := &binding{client: client, tokens: verifier, descriptor: identity.Descriptor{
 		ProtocolVersion: identity.CurrentProtocolVersion, BundleVersion: identity.CurrentPolicyBundleVersion,
 		AuthorizationVersion: identity.CurrentAuthorizationContractVersion, Mode: identity.DeploymentModeSaaS, Issuer: issuer, Audience: audience,
-		Capabilities: []string{"authentication", "token_verification", "authorization", "principal_resolution", "identity_projection", "application_registration", "permission_reconciliation", "credentials", "oidc", "saml"},
+		Capabilities: []string{"authentication", "challenge_authentication", "action_assurance", "token_verification", "authorization", "principal_resolution", "identity_projection", "application_registration", "permission_reconciliation", "credentials", "oidc", "saml"},
 	}, capabilities: capabilities}
 	return identityapplication.Bind(delegate, application)
 }
@@ -97,7 +97,7 @@ func validateDiscovery(descriptor identity.Descriptor, expectedIssuer string) er
 	if strings.TrimSpace(descriptor.Issuer) != strings.TrimSpace(expectedIssuer) {
 		return &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.issuer_mismatch"}
 	}
-	required := map[string]bool{"authentication": false, "token_verification": false, "authorization": false, "principal_resolution": false, "identity_projection": false, "application_registration": false, "permission_reconciliation": false}
+	required := map[string]bool{"authentication": false, "challenge_authentication": false, "action_assurance": false, "token_verification": false, "authorization": false, "principal_resolution": false, "identity_projection": false, "application_registration": false, "permission_reconciliation": false}
 	for _, capability := range descriptor.Capabilities {
 		if _, exists := required[capability]; exists {
 			required[capability] = true
@@ -130,6 +130,12 @@ func (value *binding) ValidateCapabilityCandidate(ctx context.Context, request m
 }
 func (value *binding) Authentication() identity.Authentication {
 	return authentication{client: value.client}
+}
+func (value *binding) ChallengeAuthentication() identity.ChallengeAuthentication {
+	return authentication{client: value.client}
+}
+func (value *binding) ActionAssurance() identity.ActionAssurance {
+	return actionAssurance{client: value.client}
 }
 func (value *binding) Tokens() identity.TokenVerifier { return value.tokens }
 func (value *binding) Authorization() identity.Authorization {

@@ -53,6 +53,12 @@ func (value *binding) ValidateCapabilityCandidate(ctx context.Context, request m
 func (value *binding) Authentication() identity.Authentication {
 	return authentication{binding: value}
 }
+func (value *binding) ChallengeAuthentication() identity.ChallengeAuthentication {
+	return authentication{binding: value}
+}
+func (value *binding) ActionAssurance() identity.ActionAssurance {
+	return actionAssurance{binding: value}
+}
 func (value *binding) Tokens() identity.TokenVerifier { return tokens{binding: value} }
 func (value *binding) Authorization() identity.Authorization {
 	return authorization{binding: value}
@@ -130,6 +136,23 @@ func (value *binding) verifySession(ctx context.Context, session identity.AuthSe
 	return nil
 }
 
+func (value *binding) verifyAuthenticationOutcome(ctx context.Context, outcome identity.AuthenticationOutcome) error {
+	switch outcome.Status {
+	case identity.AuthenticationStatusAuthenticated:
+		if outcome.Session == nil {
+			return scopeError(http.StatusBadGateway, "identity.authentication_response_invalid")
+		}
+		return value.verifySession(ctx, *outcome.Session)
+	case identity.AuthenticationStatusChallengeRequired:
+		if outcome.Challenge == nil || strings.TrimSpace(outcome.Challenge.State) == "" {
+			return scopeError(http.StatusBadGateway, "identity.authentication_response_invalid")
+		}
+		return nil
+	default:
+		return scopeError(http.StatusBadGateway, "identity.authentication_response_invalid")
+	}
+}
+
 func scopeError(status int, code string) error {
 	return &identity.Error{StatusCode: status, Code: code}
 }
@@ -147,6 +170,12 @@ func (value *applicationServiceBinding) ApplicationServices() identity.Applicati
 func (value *applicationServiceBinding) ApplicationServiceVerifier() identity.ApplicationServiceTokenVerifier {
 	return applicationServiceVerifier{binding: value.binding}
 }
+func (value *applicationServiceBinding) ChallengeAuthentication() identity.ChallengeAuthentication {
+	return value.binding.ChallengeAuthentication()
+}
+func (value *applicationServiceBinding) ActionAssurance() identity.ActionAssurance {
+	return value.binding.ActionAssurance()
+}
 
 type applicationServiceVerificationBinding struct {
 	identity.Binding
@@ -156,9 +185,21 @@ type applicationServiceVerificationBinding struct {
 func (value *applicationServiceVerificationBinding) ApplicationServiceVerifier() identity.ApplicationServiceTokenVerifier {
 	return applicationServiceVerifier{binding: value.binding}
 }
+func (value *applicationServiceVerificationBinding) ChallengeAuthentication() identity.ChallengeAuthentication {
+	return value.binding.ChallengeAuthentication()
+}
+func (value *applicationServiceVerificationBinding) ActionAssurance() identity.ActionAssurance {
+	return value.binding.ActionAssurance()
+}
 
 var _ identity.Binding = (*applicationServiceBinding)(nil)
 var _ identity.ApplicationServiceBinding = (*applicationServiceBinding)(nil)
 var _ identity.ApplicationServiceVerificationBinding = (*applicationServiceBinding)(nil)
 var _ identity.Binding = (*applicationServiceVerificationBinding)(nil)
 var _ identity.ApplicationServiceVerificationBinding = (*applicationServiceVerificationBinding)(nil)
+var _ identity.ChallengeAuthenticationBinding = (*binding)(nil)
+var _ identity.ChallengeAuthenticationBinding = (*applicationServiceBinding)(nil)
+var _ identity.ChallengeAuthenticationBinding = (*applicationServiceVerificationBinding)(nil)
+var _ identity.ActionAssuranceBinding = (*binding)(nil)
+var _ identity.ActionAssuranceBinding = (*applicationServiceBinding)(nil)
+var _ identity.ActionAssuranceBinding = (*applicationServiceVerificationBinding)(nil)

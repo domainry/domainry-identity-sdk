@@ -65,8 +65,13 @@ type ProjectRolePermission struct {
 }
 
 type ProjectRoleCatalog struct {
-	Application ApplicationRef          `json:"application"`
-	Roles       []ProjectRoleDefinition `json:"roles"`
+	Application ApplicationRef `json:"application"`
+	// Objects is the application-owned object/field catalog used to project
+	// declared role field permissions into an effective AccessBundle. It stays
+	// as canonical JSON so Identity SDK does not take ownership of an
+	// application's metadata model.
+	Objects json.RawMessage         `json:"objects,omitempty"`
+	Roles   []ProjectRoleDefinition `json:"roles"`
 }
 
 type ProjectRoleCatalogReceipt struct {

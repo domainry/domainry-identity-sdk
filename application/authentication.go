@@ -35,6 +35,33 @@ func (value authentication) LoginWithPassword(ctx context.Context, request ident
 	return session, err
 }
 
+func (value authentication) LoginWithPasswordOutcome(ctx context.Context, request identity.PasswordLoginRequest) (identity.AuthenticationOutcome, error) {
+	workspaceID, err := value.binding.workspace(request.WorkspaceID)
+	if err != nil {
+		return identity.AuthenticationOutcome{}, err
+	}
+	applicationKey, err := value.binding.applicationKey(request.ApplicationKey)
+	if err != nil {
+		return identity.AuthenticationOutcome{}, err
+	}
+	request.WorkspaceID, request.ApplicationKey = workspaceID, applicationKey
+	if challengeBinding, ok := value.binding.delegate.(identity.ChallengeAuthenticationBinding); ok {
+		outcome, err := challengeBinding.ChallengeAuthentication().LoginWithPasswordOutcome(ctx, request)
+		if err == nil {
+			err = value.binding.verifyAuthenticationOutcome(ctx, outcome)
+		}
+		return outcome, err
+	}
+	session, err := value.binding.delegate.Authentication().LoginWithPassword(ctx, request)
+	if err != nil {
+		return identity.AuthenticationOutcome{}, err
+	}
+	if err := value.binding.verifySession(ctx, session); err != nil {
+		return identity.AuthenticationOutcome{}, err
+	}
+	return identity.AuthenticationOutcome{Status: identity.AuthenticationStatusAuthenticated, Session: &session}, nil
+}
+
 func (value authentication) BeginFederatedLogin(ctx context.Context, request identity.BeginFederatedLoginRequest) (identity.ProviderChallenge, error) {
 	workspaceID, err := value.binding.workspace(request.WorkspaceID)
 	if err != nil {
@@ -80,6 +107,29 @@ func (value authentication) VerifyOTP(ctx context.Context, request identity.Veri
 		err = value.binding.verifySession(ctx, session)
 	}
 	return session, err
+}
+
+func (value authentication) VerifyOTPOutcome(ctx context.Context, request identity.VerifyOTPRequest) (identity.AuthenticationOutcome, error) {
+	workspaceID, err := value.binding.workspace(request.WorkspaceID)
+	if err != nil {
+		return identity.AuthenticationOutcome{}, err
+	}
+	request.WorkspaceID = workspaceID
+	if challengeBinding, ok := value.binding.delegate.(identity.ChallengeAuthenticationBinding); ok {
+		outcome, err := challengeBinding.ChallengeAuthentication().VerifyOTPOutcome(ctx, request)
+		if err == nil {
+			err = value.binding.verifyAuthenticationOutcome(ctx, outcome)
+		}
+		return outcome, err
+	}
+	session, err := value.binding.delegate.Authentication().VerifyOTP(ctx, request)
+	if err != nil {
+		return identity.AuthenticationOutcome{}, err
+	}
+	if err := value.binding.verifySession(ctx, session); err != nil {
+		return identity.AuthenticationOutcome{}, err
+	}
+	return identity.AuthenticationOutcome{Status: identity.AuthenticationStatusAuthenticated, Session: &session}, nil
 }
 
 func (value authentication) RefreshSession(ctx context.Context, request identity.RefreshRequest) (identity.AuthSession, error) {

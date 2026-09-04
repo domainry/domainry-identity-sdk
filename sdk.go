@@ -120,42 +120,50 @@ type Clock interface {
 }
 
 const (
-	ProtocolVersionV1                   = "domainry-identity-protocol-v1"
-	ProtocolVersionV2                   = "domainry-identity-protocol-v2"
-	ProtocolVersionV3                   = "domainry-identity-protocol-v3"
-	CurrentProtocolVersion              = ProtocolVersionV3
-	PolicyBundleVersionV1               = authorization.PolicyBundleVersionV1
-	PolicyBundleVersionV2               = authorization.PolicyBundleVersionV2
-	PolicyBundleVersionV3               = authorization.PolicyBundleVersionV3
-	PolicyBundleVersionV4               = authorization.PolicyBundleVersionV4
-	PolicyBundleVersionV5               = authorization.PolicyBundleVersionV5
-	CurrentPolicyBundleVersion          = authorization.CurrentPolicyBundleVersion
-	AuthorizationContractVersionV1      = authorization.AuthorizationContractVersionV1
-	AuthorizationContractVersionV2      = authorization.AuthorizationContractVersionV2
-	CurrentAuthorizationContractVersion = authorization.CurrentAuthorizationContractVersion
-	PrincipalContextContractVersion     = authorization.PrincipalContextContractVersion
-	EffectAllow                         = authorization.EffectAllow
-	EffectDeny                          = authorization.EffectDeny
-	ExportModeDeny                      = authorization.ExportModeDeny
-	ExportModeAllowList                 = authorization.ExportModeAllowList
-	OperatorEqual                       = authorization.OperatorEqual
-	OperatorNotEqual                    = authorization.OperatorNotEqual
-	OperatorIn                          = authorization.OperatorIn
-	OperatorNotIn                       = authorization.OperatorNotIn
-	OperatorExists                      = authorization.OperatorExists
-	OperatorPrefix                      = authorization.OperatorPrefix
-	OperatorContains                    = authorization.OperatorContains
-	FieldEffectAllow                    = authorization.FieldEffectAllow
-	FieldEffectDeny                     = authorization.FieldEffectDeny
-	FieldEffectHide                     = authorization.FieldEffectHide
-	FieldEffectMask                     = authorization.FieldEffectMask
-	MaskTypePhone                       = authorization.MaskTypePhone
-	MaskTypeIDNumber                    = authorization.MaskTypeIDNumber
-	MaskTypeEmail                       = authorization.MaskTypeEmail
-	MaskTypeYearOnly                    = authorization.MaskTypeYearOnly
-	MaskTypeLastN                       = authorization.MaskTypeLastN
-	RelationForward                     = authorization.RelationForward
-	RelationReverse                     = authorization.RelationReverse
+	ProtocolVersionV1                     = "domainry-identity-protocol-v1"
+	ProtocolVersionV2                     = "domainry-identity-protocol-v2"
+	ProtocolVersionV3                     = "domainry-identity-protocol-v3"
+	CurrentProtocolVersion                = ProtocolVersionV3
+	PolicyBundleVersionV1                 = authorization.PolicyBundleVersionV1
+	PolicyBundleVersionV2                 = authorization.PolicyBundleVersionV2
+	PolicyBundleVersionV3                 = authorization.PolicyBundleVersionV3
+	PolicyBundleVersionV4                 = authorization.PolicyBundleVersionV4
+	PolicyBundleVersionV5                 = authorization.PolicyBundleVersionV5
+	CurrentPolicyBundleVersion            = authorization.CurrentPolicyBundleVersion
+	AuthorizationContractVersionV1        = authorization.AuthorizationContractVersionV1
+	AuthorizationContractVersionV2        = authorization.AuthorizationContractVersionV2
+	CurrentAuthorizationContractVersion   = authorization.CurrentAuthorizationContractVersion
+	PrincipalContextContractVersion       = authorization.PrincipalContextContractVersion
+	EffectAllow                           = authorization.EffectAllow
+	EffectDeny                            = authorization.EffectDeny
+	ExportModeDeny                        = authorization.ExportModeDeny
+	ExportModeAllowList                   = authorization.ExportModeAllowList
+	OperatorEqual                         = authorization.OperatorEqual
+	OperatorNotEqual                      = authorization.OperatorNotEqual
+	OperatorIn                            = authorization.OperatorIn
+	OperatorNotIn                         = authorization.OperatorNotIn
+	OperatorExists                        = authorization.OperatorExists
+	OperatorPrefix                        = authorization.OperatorPrefix
+	OperatorContains                      = authorization.OperatorContains
+	FieldEffectAllow                      = authorization.FieldEffectAllow
+	FieldEffectDeny                       = authorization.FieldEffectDeny
+	FieldEffectHide                       = authorization.FieldEffectHide
+	FieldEffectMask                       = authorization.FieldEffectMask
+	MaskTypePhone                         = authorization.MaskTypePhone
+	MaskTypeIDNumber                      = authorization.MaskTypeIDNumber
+	MaskTypeEmail                         = authorization.MaskTypeEmail
+	MaskTypeYearOnly                      = authorization.MaskTypeYearOnly
+	MaskTypeLastN                         = authorization.MaskTypeLastN
+	ChallengeStatusPendingDelivery        = authentication.ChallengeStatusPendingDelivery
+	ChallengeStatusActive                 = authentication.ChallengeStatusActive
+	ChallengeStatusFailed                 = authentication.ChallengeStatusFailed
+	ChallengeStatusConsumed               = authentication.ChallengeStatusConsumed
+	ChallengeStatusExpired                = authentication.ChallengeStatusExpired
+	ChallengeStatusSuperseded             = authentication.ChallengeStatusSuperseded
+	AuthenticationStatusAuthenticated     = authentication.AuthenticationStatusAuthenticated
+	AuthenticationStatusChallengeRequired = authentication.AuthenticationStatusChallengeRequired
+	RelationForward                       = authorization.RelationForward
+	RelationReverse                       = authorization.RelationReverse
 )
 
 type Error = identitymodel.Error
@@ -181,6 +189,9 @@ type Projection = identitymodel.Projection
 type AuthSession = authentication.AuthSession
 type Provider = authentication.Provider
 type ProviderChallenge = authentication.ProviderChallenge
+type ChallengeStatus = authentication.ChallengeStatus
+type AuthenticationStatus = authentication.AuthenticationStatus
+type AuthenticationOutcome = authentication.AuthenticationOutcome
 type ProviderQuery = authentication.ProviderQuery
 type PasswordLoginRequest = authentication.PasswordLoginRequest
 type BeginFederatedLoginRequest = authentication.BeginFederatedLoginRequest
@@ -193,10 +204,16 @@ type CurrentSessionRequest = authentication.CurrentSessionRequest
 type ExchangeAuthorizationCodeRequest = authentication.ExchangeAuthorizationCodeRequest
 type SessionView = authentication.SessionView
 type Authentication = authentication.Authentication
+type ChallengeAuthentication = authentication.ChallengeAuthentication
 type ChangePasswordRequest = authentication.ChangePasswordRequest
 type ResetPasswordRequest = authentication.ResetPasswordRequest
 type RevokeSessionsRequest = authentication.RevokeSessionsRequest
 type CredentialManager = authentication.CredentialManager
+type BeginActionAssuranceRequest = authentication.BeginActionAssuranceRequest
+type VerifyActionAssuranceRequest = authentication.VerifyActionAssuranceRequest
+type ActionAssuranceReceipt = authentication.ActionAssuranceReceipt
+type ValidateActionAssuranceReceiptRequest = authentication.ValidateActionAssuranceReceiptRequest
+type ActionAssurance = authentication.ActionAssurance
 type ApplicationServiceGrant = authentication.ApplicationServiceGrant
 type ExchangeApplicationServiceTokenRequest = authentication.ExchangeApplicationServiceTokenRequest
 type ApplicationServiceToken = authentication.ApplicationServiceToken
@@ -209,6 +226,25 @@ type ApplicationServiceAuthentication = authentication.ApplicationServiceAuthent
 // capability for verifying already-issued short-lived service tokens.
 type ApplicationServiceVerificationBinding interface {
 	ApplicationServiceVerifier() ApplicationServiceTokenVerifier
+}
+
+// ChallengeAuthenticationBinding exposes protocol-v3 challenge-aware login
+// without forcing legacy test/resource bindings to implement it.
+type ChallengeAuthenticationBinding interface {
+	ChallengeAuthentication() ChallengeAuthentication
+}
+
+// SecurityChallengeDeliveryBinder is implemented by an embedded Identity
+// module. Runtime binds the already-open Integration Operations capability;
+// Identity never receives provider credentials.
+type SecurityChallengeDeliveryBinder interface {
+	BindSecurityChallengeDelivery(modulehost.SecurityChallengeDelivery) error
+}
+
+// ActionAssuranceBinding exposes Identity-owned OTP verification to Runtime.
+// Runtime remains the owner of payload-bound, one-time Action grants.
+type ActionAssuranceBinding interface {
+	ActionAssurance() ActionAssurance
 }
 
 // ApplicationServiceBinding is the full Identity service-token capability.

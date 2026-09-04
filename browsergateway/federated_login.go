@@ -107,6 +107,15 @@ func (gateway *Gateway) VerifyProvider(w http.ResponseWriter, r *http.Request) {
 	}
 	request.WorkspaceID = workspaceID
 	request.Provider = r.PathValue("provider")
+	if challengeBinding, ok := gateway.binding.(identity.ChallengeAuthenticationBinding); ok {
+		outcome, err := challengeBinding.ChallengeAuthentication().VerifyOTPOutcome(r.Context(), request)
+		if err != nil {
+			gateway.writeError(w, err)
+			return
+		}
+		gateway.writeBrowserAuthenticationOutcome(w, outcome)
+		return
+	}
 	session, err := gateway.binding.Authentication().VerifyOTP(r.Context(), request)
 	if err != nil {
 		gateway.writeError(w, err)

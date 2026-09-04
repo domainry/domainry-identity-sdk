@@ -3,18 +3,21 @@ package authentication
 import "context"
 
 type AuthSession struct {
-	SessionID          SessionID `json:"session_id,omitempty"`
-	TenantID           TenantID  `json:"tenant_id,omitempty"`
-	WorkspaceID        string    `json:"workspace_id"`
-	AccessToken        string    `json:"access_token"`
-	RefreshToken       string    `json:"refresh_token,omitempty"`
-	TokenType          string    `json:"token_type"`
-	ExpiresAt          string    `json:"expires_at"`
-	User               User      `json:"user"`
-	Roles              []Role    `json:"roles"`
-	DefaultRole        string    `json:"default_role"`
-	Permissions        []string  `json:"permissions"`
-	MustChangePassword bool      `json:"must_change_password"`
+	SessionID             SessionID `json:"session_id,omitempty"`
+	TenantID              TenantID  `json:"tenant_id,omitempty"`
+	WorkspaceID           string    `json:"workspace_id"`
+	AccessToken           string    `json:"access_token"`
+	RefreshToken          string    `json:"refresh_token,omitempty"`
+	TokenType             string    `json:"token_type"`
+	ExpiresAt             string    `json:"expires_at"`
+	User                  User      `json:"user"`
+	Roles                 []Role    `json:"roles"`
+	DefaultRole           string    `json:"default_role"`
+	Permissions           []string  `json:"permissions"`
+	MustChangePassword    bool      `json:"must_change_password"`
+	AuthenticationTime    int64     `json:"auth_time,omitempty"`
+	AuthenticationMethods []string  `json:"amr,omitempty"`
+	AssuranceLevel        string    `json:"acr,omitempty"`
 }
 
 type Provider struct {
@@ -35,12 +38,44 @@ type Provider struct {
 }
 
 type ProviderChallenge struct {
-	Provider  string `json:"provider"`
-	State     string `json:"state"`
-	Nonce     string `json:"nonce,omitempty"`
-	Code      string `json:"code,omitempty"`
-	AuthURL   string `json:"auth_url,omitempty"`
-	ExpiresAt string `json:"expires_at"`
+	Provider          string          `json:"provider"`
+	State             string          `json:"state"`
+	Type              string          `json:"type,omitempty"`
+	Purpose           string          `json:"purpose,omitempty"`
+	Status            ChallengeStatus `json:"status,omitempty"`
+	Nonce             string          `json:"nonce,omitempty"`
+	Code              string          `json:"code,omitempty"`
+	AuthURL           string          `json:"auth_url,omitempty"`
+	MaskedDestination string          `json:"masked_destination,omitempty"`
+	RetryAt           string          `json:"retry_at,omitempty"`
+	ExpiresAt         string          `json:"expires_at"`
+}
+
+type ChallengeStatus string
+
+const (
+	ChallengeStatusPendingDelivery ChallengeStatus = "pending_delivery"
+	ChallengeStatusActive          ChallengeStatus = "active"
+	ChallengeStatusFailed          ChallengeStatus = "failed"
+	ChallengeStatusConsumed        ChallengeStatus = "consumed"
+	ChallengeStatusExpired         ChallengeStatus = "expired"
+	ChallengeStatusSuperseded      ChallengeStatus = "superseded"
+)
+
+type AuthenticationStatus string
+
+const (
+	AuthenticationStatusAuthenticated     AuthenticationStatus = "authenticated"
+	AuthenticationStatusChallengeRequired AuthenticationStatus = "challenge_required"
+)
+
+// AuthenticationOutcome prevents callers from treating a verified first
+// factor as a completed login. Session is populated only after every required
+// factor has completed.
+type AuthenticationOutcome struct {
+	Status    AuthenticationStatus `json:"status"`
+	Session   *AuthSession         `json:"session,omitempty"`
+	Challenge *ProviderChallenge   `json:"challenge,omitempty"`
 }
 
 type ProviderQuery struct {
@@ -137,6 +172,15 @@ type Authentication interface {
 	RefreshSession(context.Context, RefreshRequest) (AuthSession, error)
 	LogoutSession(context.Context, LogoutRequest) error
 	CurrentSession(context.Context, CurrentSessionRequest) (SessionView, error)
+}
+
+// ChallengeAuthentication is an optional protocol-v3 capability. Legacy
+// Authentication methods remain available for clients that do not enable MFA;
+// challenge-aware clients should use this capability exclusively for login
+// and OTP completion.
+type ChallengeAuthentication interface {
+	LoginWithPasswordOutcome(context.Context, PasswordLoginRequest) (AuthenticationOutcome, error)
+	VerifyOTPOutcome(context.Context, VerifyOTPRequest) (AuthenticationOutcome, error)
 }
 
 type ChangePasswordRequest struct {

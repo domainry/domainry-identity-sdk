@@ -58,7 +58,7 @@ func (value *binding) Authorization() identity.Authorization {
 	return authorization{binding: value}
 }
 func (value *binding) Principals() identity.PrincipalResolver { return principals{binding: value} }
-func (value *binding) Directory() identity.Directory          { return directory{binding: value} }
+func (value *binding) Projection() identity.Projection        { return projection{binding: value} }
 func (value *binding) Applications() identity.ApplicationRegistry {
 	return applications{binding: value}
 }

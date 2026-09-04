@@ -17,7 +17,7 @@ management CRUD, Plane types, or service-side domain implementation.
   a pluggable cache contract with a five-minute absolute local default.
 - `authorization/evaluator`: local function, record, field, reference, and
   export evaluation.
-- `httpapi`: optional exact HTTP administration Surface for embedded modules;
+- `httpapi`: optional exact HTTP administration Adapter for embedded modules;
   it is intentionally not part of the consuming application's CRUD contract.
 - `httpmiddleware`: fail-closed `net/http` authentication and high-risk gates.
 - `browsergateway`: same-origin HttpOnly refresh-cookie HTTP adapter.
@@ -25,7 +25,7 @@ management CRUD, Plane types, or service-side domain implementation.
 - `contracttest`: one parity suite used by Module and SaaS implementations.
 - `browser`: the separately versioned `@domainry/identity-client` package.
 
-The SDK intentionally has no public `persistence` package. Identity owns its database and exposes business capabilities such as Authentication, Authorization, and Directory instead of storage contracts. `modulehost` is limited to embedded composition and host-coordinated provisioning capabilities.
+The SDK intentionally has no public `persistence` package. Identity owns its database and exposes business capabilities such as Authentication, Authorization, and Projection instead of storage contracts. `modulehost` is limited to embedded composition and host-coordinated provisioning capabilities.
 
 ## HTTP middleware
 

@@ -11,7 +11,7 @@ import (
 type principalResolver struct{ client *client }
 
 func (adapter principalResolver) Resolve(ctx context.Context, request identity.PrincipalResolutionRequest) (identity.PrincipalResolution, error) {
-	if err := (directoryClient{client: adapter.client}).normalizeScope(&request.Application); err != nil {
+	if err := (projectionClient{client: adapter.client}).normalizeScope(&request.Application); err != nil {
 		return identity.PrincipalResolution{}, err
 	}
 	request.RoleKey = strings.TrimSpace(request.RoleKey)
@@ -19,7 +19,7 @@ func (adapter principalResolver) Resolve(ctx context.Context, request identity.P
 		return identity.PrincipalResolution{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.subject_id_invalid"}
 	}
 	var resolution identity.PrincipalResolution
-	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/runtime/principal/resolve", adapter.client.serviceAccessToken, request, &resolution); err != nil {
+	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/principal/resolve", adapter.client.serviceAccessToken, request, &resolution); err != nil {
 		return identity.PrincipalResolution{}, err
 	}
 	if resolution.Principal.WorkspaceID != string(request.Application.WorkspaceID) || resolution.Principal.UserID != string(request.SubjectID) ||

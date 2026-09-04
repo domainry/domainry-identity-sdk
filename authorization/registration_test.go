@@ -98,7 +98,7 @@ func TestPermissionSourceSnapshotValidation(t *testing.T) {
 	}
 	definitions := []PermissionDefinition{{
 		PermissionKey: "notification.templates.list", ResourceKey: "notification.templates", OperationKey: "list",
-		Label: "List templates", Category: "Notification", SourceKind: "module_surface",
+		Label: "List templates", Category: "Notification", SourceKind: "module_http",
 	}}
 	hash, err := PermissionSnapshotHash(request.SourceOwner, definitions)
 	if err != nil {

@@ -27,7 +27,7 @@ func Run(t *testing.T, fixture Fixture) {
 	if fixture.Binding == nil {
 		t.Fatal("Identity binding is required")
 	}
-	if fixture.Binding.Authentication() == nil || fixture.Binding.Tokens() == nil || fixture.Binding.Authorization() == nil || fixture.Binding.Principals() == nil || fixture.Binding.Directory() == nil || fixture.Binding.Applications() == nil || fixture.Binding.Permissions() == nil || fixture.Binding.Credentials() == nil {
+	if fixture.Binding.Authentication() == nil || fixture.Binding.Tokens() == nil || fixture.Binding.Authorization() == nil || fixture.Binding.Principals() == nil || fixture.Binding.Projection() == nil || fixture.Binding.Applications() == nil || fixture.Binding.Permissions() == nil || fixture.Binding.Credentials() == nil {
 		t.Fatal("Identity binding does not expose the complete Runtime contract")
 	}
 	if !fixture.ApplicationKey.Valid() {
@@ -94,21 +94,21 @@ func Run(t *testing.T, fixture Fixture) {
 		t.Fatalf("reauthorization without resource facts must fail closed: decision=%+v err=%v", denied, err)
 	}
 	application := identity.ApplicationScope{TenantID: fixture.TenantID, WorkspaceID: fixture.WorkspaceID, ApplicationKey: fixture.ApplicationKey}
-	user, found, err := fixture.Binding.Directory().FindUser(ctx, identity.UserLookup{Application: application, UserID: verified.SubjectID})
+	user, found, err := fixture.Binding.Projection().FindUser(ctx, identity.UserLookup{Application: application, UserID: verified.SubjectID})
 	if err != nil || !found || user.ID != string(verified.SubjectID) {
-		t.Fatalf("directory user=%+v found=%v err=%v", user, found, err)
+		t.Fatalf("projection user=%+v found=%v err=%v", user, found, err)
 	}
-	users, err := fixture.Binding.Directory().ListUsers(ctx, identity.DirectoryQuery{Application: application})
+	users, err := fixture.Binding.Projection().ListUsers(ctx, identity.ProjectionQuery{Application: application})
 	if err != nil || !containsUser(users, user.ID) {
-		t.Fatalf("directory users=%+v err=%v", users, err)
+		t.Fatalf("projection users=%+v err=%v", users, err)
 	}
-	roles, err := fixture.Binding.Directory().ListRoles(ctx, identity.DirectoryQuery{Application: application})
+	roles, err := fixture.Binding.Projection().ListRoles(ctx, identity.ProjectionQuery{Application: application})
 	if err != nil || len(roles) == 0 {
-		t.Fatalf("directory roles=%+v err=%v", roles, err)
+		t.Fatalf("projection roles=%+v err=%v", roles, err)
 	}
-	assignments, err := fixture.Binding.Directory().ListUserRoleAssignments(ctx, identity.UserRoleAssignmentQuery{Application: application, UserID: verified.SubjectID})
+	assignments, err := fixture.Binding.Projection().ListUserRoleAssignments(ctx, identity.UserRoleAssignmentQuery{Application: application, UserID: verified.SubjectID})
 	if err != nil || len(assignments) == 0 {
-		t.Fatalf("directory role assignments=%+v err=%v", assignments, err)
+		t.Fatalf("projection role assignments=%+v err=%v", assignments, err)
 	}
 	resolution, err := fixture.Binding.Principals().Resolve(ctx, identity.PrincipalResolutionRequest{Application: application, SubjectID: verified.SubjectID})
 	if err != nil || !resolution.Principal.Known || resolution.Principal.UserID != string(verified.SubjectID) || resolution.AccessBundle.Subject.SubjectID != verified.SubjectID || resolution.AccessBundle.AuthorizationRevision != bundle.AuthorizationRevision {
@@ -116,8 +116,8 @@ func Run(t *testing.T, fixture Fixture) {
 	}
 	otherApplication := application
 	otherApplication.WorkspaceID += "-other"
-	if _, err := fixture.Binding.Directory().ListUsers(ctx, identity.DirectoryQuery{Application: otherApplication}); err == nil {
-		t.Fatal("directory accepted a different application workspace")
+	if _, err := fixture.Binding.Projection().ListUsers(ctx, identity.ProjectionQuery{Application: otherApplication}); err == nil {
+		t.Fatal("projection accepted a different application workspace")
 	}
 	if err := fixture.Binding.Authentication().LogoutSession(ctx, identity.LogoutRequest{TenantID: fixture.TenantID, WorkspaceID: fixture.WorkspaceID, ApplicationKey: fixture.ApplicationKey, SessionID: session.SessionID, RefreshToken: session.RefreshToken}); err != nil {
 		t.Fatalf("logout: %v", err)

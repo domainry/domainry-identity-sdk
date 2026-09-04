@@ -49,8 +49,8 @@ func TestBusinessContractsDoNotDependOnOuterAdapters(t *testing.T) {
 		"github.com/domainry/domainry-identity-sdk/httpmiddleware",
 		"github.com/domainry/domainry-identity-sdk/remote",
 	}
-	for _, directory := range coreDirectories {
-		err := filepath.WalkDir(filepath.Join(repositoryRoot, directory), func(path string, entry fs.DirEntry, walkErr error) error {
+	for _, projection := range coreDirectories {
+		err := filepath.WalkDir(filepath.Join(repositoryRoot, projection), func(path string, entry fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr
 			}
@@ -83,8 +83,8 @@ func TestBusinessContractsDoNotDependOnOuterAdapters(t *testing.T) {
 func TestBusinessImplementationsDoNotDependBackOnRootFacade(t *testing.T) {
 	repositoryRoot := sdkRepositoryRoot(t)
 	rootImport := "github.com/domainry/domainry-identity-sdk"
-	for _, directory := range []string{"authentication", "authorization", "identity"} {
-		err := filepath.WalkDir(filepath.Join(repositoryRoot, directory), func(path string, entry fs.DirEntry, walkErr error) error {
+	for _, projection := range []string{"authentication", "authorization", "identity"} {
+		err := filepath.WalkDir(filepath.Join(repositoryRoot, projection), func(path string, entry fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr
 			}

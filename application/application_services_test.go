@@ -24,7 +24,7 @@ func (*applicationBindingTestBase) Authentication() identity.Authentication    {
 func (*applicationBindingTestBase) Tokens() identity.TokenVerifier             { return nil }
 func (*applicationBindingTestBase) Authorization() identity.Authorization      { return nil }
 func (*applicationBindingTestBase) Principals() identity.PrincipalResolver     { return nil }
-func (*applicationBindingTestBase) Directory() identity.Directory              { return nil }
+func (*applicationBindingTestBase) Projection() identity.Projection            { return nil }
 func (*applicationBindingTestBase) Applications() identity.ApplicationRegistry { return nil }
 func (*applicationBindingTestBase) Permissions() identity.PermissionRegistry   { return nil }
 func (*applicationBindingTestBase) Credentials() identity.CredentialManager    { return nil }

@@ -41,7 +41,7 @@ type Binding interface {
 	Tokens() TokenVerifier
 	Authorization() Authorization
 	Principals() PrincipalResolver
-	Directory() Directory
+	Projection() Projection
 	Applications() ApplicationRegistry
 	Permissions() PermissionRegistry
 	Credentials() CredentialManager
@@ -100,7 +100,7 @@ type DatabaseFactory interface {
 	OpenWithDatabase(context.Context, ApplicationRef, DatabaseHandle) (Binding, error)
 }
 
-// BootstrapBinding is the deliberately narrow in-process surface available
+// BootstrapBinding is the deliberately narrow in-process contract available
 // before the first tenant exists. It can participate in the host-owned atomic
 // tenant transaction, but exposes no authentication or business APIs.
 type BootstrapBinding interface {
@@ -172,11 +172,11 @@ type OrganizationUnit = identitymodel.OrganizationUnit
 type Role = identitymodel.Role
 type UserRoleAssignment = identitymodel.UserRoleAssignment
 type ApplicationScope = identitymodel.ApplicationScope
-type DirectoryQuery = identitymodel.DirectoryQuery
+type ProjectionQuery = identitymodel.ProjectionQuery
 type UserLookup = identitymodel.UserLookup
 type OrganizationUnitLookup = identitymodel.OrganizationUnitLookup
 type UserRoleAssignmentQuery = identitymodel.UserRoleAssignmentQuery
-type Directory = identitymodel.Directory
+type Projection = identitymodel.Projection
 
 type AuthSession = authentication.AuthSession
 type Provider = authentication.Provider

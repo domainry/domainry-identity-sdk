@@ -8,9 +8,9 @@ import (
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
-type directoryClient struct{ client *client }
+type projectionClient struct{ client *client }
 
-func (adapter directoryClient) FindUser(ctx context.Context, request identity.UserLookup) (identity.User, bool, error) {
+func (adapter projectionClient) FindUser(ctx context.Context, request identity.UserLookup) (identity.User, bool, error) {
 	if err := adapter.normalizeScope(&request.Application); err != nil {
 		return identity.User{}, false, err
 	}
@@ -21,13 +21,13 @@ func (adapter directoryClient) FindUser(ctx context.Context, request identity.Us
 		User  identity.User `json:"user"`
 		Found bool          `json:"found"`
 	}
-	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/runtime/directory/user", adapter.client.serviceAccessToken, request, &response); err != nil {
+	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/users/lookup", adapter.client.serviceAccessToken, request, &response); err != nil {
 		return identity.User{}, false, err
 	}
 	return response.User, response.Found, nil
 }
 
-func (adapter directoryClient) FindOrganizationUnit(ctx context.Context, request identity.OrganizationUnitLookup) (identity.OrganizationUnit, bool, error) {
+func (adapter projectionClient) FindOrganizationUnit(ctx context.Context, request identity.OrganizationUnitLookup) (identity.OrganizationUnit, bool, error) {
 	if err := adapter.normalizeScope(&request.Application); err != nil {
 		return identity.OrganizationUnit{}, false, err
 	}
@@ -39,40 +39,40 @@ func (adapter directoryClient) FindOrganizationUnit(ctx context.Context, request
 		OrganizationUnit identity.OrganizationUnit `json:"organization_unit"`
 		Found            bool                      `json:"found"`
 	}
-	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/runtime/directory/organization-unit", adapter.client.serviceAccessToken, request, &response); err != nil {
+	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/organization-units/lookup", adapter.client.serviceAccessToken, request, &response); err != nil {
 		return identity.OrganizationUnit{}, false, err
 	}
 	return response.OrganizationUnit, response.Found, nil
 }
 
-func (adapter directoryClient) ListUsers(ctx context.Context, request identity.DirectoryQuery) ([]identity.User, error) {
+func (adapter projectionClient) ListUsers(ctx context.Context, request identity.ProjectionQuery) ([]identity.User, error) {
 	if err := adapter.normalizeScope(&request.Application); err != nil {
 		return nil, err
 	}
 	var values []identity.User
-	err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/runtime/directory/users", adapter.client.serviceAccessToken, request, &values)
+	err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/users/query", adapter.client.serviceAccessToken, request, &values)
 	return values, err
 }
 
-func (adapter directoryClient) ListRoles(ctx context.Context, request identity.DirectoryQuery) ([]identity.Role, error) {
+func (adapter projectionClient) ListRoles(ctx context.Context, request identity.ProjectionQuery) ([]identity.Role, error) {
 	if err := adapter.normalizeScope(&request.Application); err != nil {
 		return nil, err
 	}
 	var values []identity.Role
-	err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/runtime/directory/roles", adapter.client.serviceAccessToken, request, &values)
+	err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/roles/query", adapter.client.serviceAccessToken, request, &values)
 	return values, err
 }
 
-func (adapter directoryClient) ListUserRoleAssignments(ctx context.Context, request identity.UserRoleAssignmentQuery) ([]identity.UserRoleAssignment, error) {
+func (adapter projectionClient) ListUserRoleAssignments(ctx context.Context, request identity.UserRoleAssignmentQuery) ([]identity.UserRoleAssignment, error) {
 	if err := adapter.normalizeScope(&request.Application); err != nil {
 		return nil, err
 	}
 	var values []identity.UserRoleAssignment
-	err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/runtime/directory/role-assignments", adapter.client.serviceAccessToken, request, &values)
+	err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/user-role-assignments/query", adapter.client.serviceAccessToken, request, &values)
 	return values, err
 }
 
-func (adapter directoryClient) normalizeScope(scope *identity.ApplicationScope) error {
+func (adapter projectionClient) normalizeScope(scope *identity.ApplicationScope) error {
 	if adapter.client == nil || strings.TrimSpace(adapter.client.serviceAccessToken) == "" {
 		return &identity.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.service_credential_required"}
 	}
@@ -92,4 +92,4 @@ func (adapter directoryClient) normalizeScope(scope *identity.ApplicationScope) 
 	return nil
 }
 
-var _ identity.Directory = directoryClient{}
+var _ identity.Projection = projectionClient{}

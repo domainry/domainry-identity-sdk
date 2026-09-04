@@ -9,7 +9,7 @@ import (
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
-func TestApplicationServiceCredentialProtectsRegistrationAndDirectoryRequests(t *testing.T) {
+func TestApplicationServiceCredentialProtectsRegistrationAndProjectionRequests(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer application-service-secret" {
 			t.Fatalf("%s authorization=%q", r.URL.Path, got)
@@ -25,13 +25,13 @@ func TestApplicationServiceCredentialProtectsRegistrationAndDirectoryRequests(t 
 				t.Fatalf("application registration=%+v", request)
 			}
 			_, _ = w.Write([]byte(`{"application":{"workspace_id":"workspace-a","application_key":"runtime-app"},"status":"active"}`))
-		case "/identity/runtime/directory/users":
-			var request identity.DirectoryQuery
+		case "/identity/users/query":
+			var request identity.ProjectionQuery
 			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 				t.Fatal(err)
 			}
 			if request.Application.TenantID != "workspace-a" || request.Application.WorkspaceID != "workspace-a" || request.Application.ApplicationKey != "runtime-app" {
-				t.Fatalf("directory application=%+v", request.Application)
+				t.Fatalf("projection application=%+v", request.Application)
 			}
 			_, _ = w.Write([]byte(`[]`))
 		default:
@@ -49,7 +49,7 @@ func TestApplicationServiceCredentialProtectsRegistrationAndDirectoryRequests(t 
 	if _, err := (applicationRegistry{client: client}).Register(t.Context(), identity.ApplicationRegistration{Application: identity.ApplicationRef{WorkspaceID: "workspace-a", ApplicationKey: "runtime-app"}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (directoryClient{client: client}).ListUsers(t.Context(), identity.DirectoryQuery{}); err != nil {
+	if _, err := (projectionClient{client: client}).ListUsers(t.Context(), identity.ProjectionQuery{}); err != nil {
 		t.Fatal(err)
 	}
 }

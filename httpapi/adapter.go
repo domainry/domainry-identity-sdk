@@ -1,6 +1,6 @@
-// Package httpapi defines optional HTTP surfaces owned by an in-process
+// Package httpapi defines optional HTTP adapters owned by an in-process
 // Identity implementation. Deployment-neutral Runtime code may mount these
-// surfaces without importing the Identity implementation or duplicating its
+// adapters without importing the Identity implementation or duplicating its
 // authentication and administration handlers.
 package httpapi
 
@@ -10,11 +10,11 @@ const ContractVersion = modulehttp.ContractVersion
 
 type Exposure = modulehttp.Exposure
 type Route = modulehttp.Route
-type Surface = modulehttp.Surface
+type Adapter = modulehttp.Adapter
 type Provider = modulehttp.Provider
 
 const (
-	ExposurePublic      = modulehttp.ExposurePublic
-	ExposureTenantAdmin = modulehttp.ExposureTenantAdmin
-	ExposureOps         = modulehttp.ExposureOps
+	ExposurePublic     = modulehttp.ExposurePublic
+	ExposureManagement = modulehttp.ExposureManagement
+	ExposureOps        = modulehttp.ExposureOps
 )

@@ -12,7 +12,7 @@ import (
 	identity "github.com/domainry/domainry-identity-sdk/authorization"
 )
 
-// Binding is the minimum cohesive SDK surface required to build a Runtime
+// Binding is the minimum cohesive SDK contract required to build a Runtime
 // request principal. The root identity.Binding satisfies it structurally,
 // while this package remains dependent only on business contracts.
 type Binding interface {

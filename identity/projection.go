@@ -1,5 +1,5 @@
 // Package identity owns the stable, non-secret identity vocabulary shared by
-// authentication, authorization, and application directory projections.
+// authentication, authorization, and application projections.
 package identity
 
 import "context"
@@ -14,17 +14,17 @@ type ApplicationScope struct {
 	ApplicationKey ApplicationKey `json:"application_key"`
 }
 
-// Directory is a read-only application projection. Identity management commands
+// Projection is a read-only application projection. Identity management commands
 // and CRUD models do not belong to this contract.
-type Directory interface {
+type Projection interface {
 	FindUser(context.Context, UserLookup) (User, bool, error)
 	FindOrganizationUnit(context.Context, OrganizationUnitLookup) (OrganizationUnit, bool, error)
-	ListUsers(context.Context, DirectoryQuery) ([]User, error)
-	ListRoles(context.Context, DirectoryQuery) ([]Role, error)
+	ListUsers(context.Context, ProjectionQuery) ([]User, error)
+	ListRoles(context.Context, ProjectionQuery) ([]Role, error)
 	ListUserRoleAssignments(context.Context, UserRoleAssignmentQuery) ([]UserRoleAssignment, error)
 }
 
-type DirectoryQuery struct {
+type ProjectionQuery struct {
 	Application ApplicationScope `json:"application"`
 }
 
@@ -34,8 +34,8 @@ type UserLookup struct {
 }
 
 type OrganizationUnitLookup struct {
-	Application        ApplicationScope `json:"application"`
-	OrgID string           `json:"org_id"`
+	Application ApplicationScope `json:"application"`
+	OrgID       string           `json:"org_id"`
 }
 
 type UserRoleAssignmentQuery struct {
@@ -43,35 +43,35 @@ type UserRoleAssignmentQuery struct {
 	UserID      SubjectID        `json:"user_id,omitempty"`
 }
 
-// User contains only directory attributes safe for application projections. It
+// User contains only projection attributes safe for application projections. It
 // never carries credentials, external-provider tokens, MFA, or session data.
 type User struct {
-	ID                 string `json:"id"`
-	Name               string `json:"name"`
-	GivenName          string `json:"given_name,omitempty"`
-	MiddleName         string `json:"middle_name,omitempty"`
-	FamilyName         string `json:"family_name,omitempty"`
-	NamePrefix         string `json:"name_prefix,omitempty"`
-	NameSuffix         string `json:"name_suffix,omitempty"`
-	NativeName         string `json:"native_name,omitempty"`
-	NameLocale         string `json:"name_locale,omitempty"`
-	Email              string `json:"email,omitempty"`
-	Phone              string `json:"phone,omitempty"`
-	AccountType        string `json:"account_type,omitempty"`
-	Locale             string `json:"locale,omitempty"`
-	Timezone           string `json:"timezone,omitempty"`
-	OrgID string `json:"org_id,omitempty"`
-	ManagerUserID      string `json:"manager_user_id,omitempty"`
-	ReportingPath      string `json:"reporting_path,omitempty"`
-	WorkerNo           string `json:"worker_no,omitempty"`
-	WorkerType         string `json:"worker_type,omitempty"`
-	WorkStatus         string `json:"work_status,omitempty"`
-	StartDate          string `json:"start_date,omitempty"`
-	EndDate            string `json:"end_date,omitempty"`
-	Status             string `json:"status"`
-	Version            int64  `json:"version"`
-	CreatedAt          string `json:"created_at,omitempty"`
-	UpdatedAt          string `json:"updated_at,omitempty"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	GivenName     string `json:"given_name,omitempty"`
+	MiddleName    string `json:"middle_name,omitempty"`
+	FamilyName    string `json:"family_name,omitempty"`
+	NamePrefix    string `json:"name_prefix,omitempty"`
+	NameSuffix    string `json:"name_suffix,omitempty"`
+	NativeName    string `json:"native_name,omitempty"`
+	NameLocale    string `json:"name_locale,omitempty"`
+	Email         string `json:"email,omitempty"`
+	Phone         string `json:"phone,omitempty"`
+	AccountType   string `json:"account_type,omitempty"`
+	Locale        string `json:"locale,omitempty"`
+	Timezone      string `json:"timezone,omitempty"`
+	OrgID         string `json:"org_id,omitempty"`
+	ManagerUserID string `json:"manager_user_id,omitempty"`
+	ReportingPath string `json:"reporting_path,omitempty"`
+	WorkerNo      string `json:"worker_no,omitempty"`
+	WorkerType    string `json:"worker_type,omitempty"`
+	WorkStatus    string `json:"work_status,omitempty"`
+	StartDate     string `json:"start_date,omitempty"`
+	EndDate       string `json:"end_date,omitempty"`
+	Status        string `json:"status"`
+	Version       int64  `json:"version"`
+	CreatedAt     string `json:"created_at,omitempty"`
+	UpdatedAt     string `json:"updated_at,omitempty"`
 }
 
 type OrganizationUnit struct {

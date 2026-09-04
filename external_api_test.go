@@ -46,8 +46,8 @@ var (
 	_ identity.EmbeddedWorkspaceProvisioner
 	_ authentication.Authentication
 	_ authorization.Authorization
-	_ identitymodel.Directory
-		_ httpapi.Surface
+	_ identitymodel.Projection
+		_ httpapi.Adapter
 	_ = application.Bind
 	_ = evaluator.Evaluate
 	_ = principal.NewResolver

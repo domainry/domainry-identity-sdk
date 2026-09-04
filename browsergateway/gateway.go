@@ -65,7 +65,7 @@ func New(binding identity.Binding, config Config) (*Gateway, error) {
 	return &Gateway{binding: binding, config: config}, nil
 }
 
-// RegisterRoutes mounts the complete browser session surface below prefix.
+// RegisterRoutes mounts the complete browser session adapter below prefix.
 // For example, prefix "/browser" produces "/browser/auth/login".
 func (gateway *Gateway) RegisterRoutes(mux *http.ServeMux, prefix string) error {
 	if gateway == nil || mux == nil {
@@ -90,7 +90,7 @@ func (gateway *Gateway) RegisterRoutes(mux *http.ServeMux, prefix string) error 
 }
 
 // RoutePatterns returns the exact browser-session route contract owned by the
-// SDK. Hosts can use it for listener inventories and OpenAPI/surface checks
+// SDK. Hosts can use it for listener inventories and OpenAPI/adapter checks
 // without duplicating authentication routes.
 func RoutePatterns(prefix string) ([]string, error) {
 	definitions, err := ActionDefinitions(prefix)

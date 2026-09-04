@@ -54,7 +54,7 @@ func (binding testBinding) Authentication() identity.Authentication { return bin
 func (testBinding) Tokens() identity.TokenVerifier                  { return nil }
 func (testBinding) Authorization() identity.Authorization           { return nil }
 func (testBinding) Principals() identity.PrincipalResolver          { return nil }
-func (testBinding) Directory() identity.Directory                   { return nil }
+func (testBinding) Projection() identity.Projection                 { return nil }
 func (testBinding) Applications() identity.ApplicationRegistry      { return nil }
 func (testBinding) Permissions() identity.PermissionRegistry        { return nil }
 func (binding testBinding) Credentials() identity.CredentialManager { return binding.credentials }

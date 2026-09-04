@@ -35,7 +35,7 @@ func (binding *resolverBinding) Authentication() identity.Authentication { retur
 func (binding *resolverBinding) Tokens() identity.TokenVerifier          { return binding.tokens }
 func (binding *resolverBinding) Authorization() identity.Authorization   { return binding.author }
 func (*resolverBinding) Principals() identity.PrincipalResolver          { return nil }
-func (*resolverBinding) Directory() identity.Directory                   { return nil }
+func (*resolverBinding) Projection() identity.Projection                 { return nil }
 func (*resolverBinding) Applications() identity.ApplicationRegistry      { return nil }
 func (*resolverBinding) Permissions() identity.PermissionRegistry        { return nil }
 func (*resolverBinding) Credentials() identity.CredentialManager         { return nil }

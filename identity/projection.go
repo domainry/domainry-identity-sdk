@@ -24,6 +24,14 @@ type Projection interface {
 	ListUserRoleAssignments(context.Context, UserRoleAssignmentQuery) ([]UserRoleAssignment, error)
 }
 
+// DisplayNameProjection is the optional, narrow projection used by application
+// read models to turn stable Identity IDs into current display names. Keeping it
+// separate from Projection lets older Identity providers remain compatible while
+// avoiding full-directory payloads and per-ID network lookup loops in consumers.
+type DisplayNameProjection interface {
+	ResolveDisplayNames(context.Context, DisplayNameQuery) (DisplayNameResult, error)
+}
+
 type ProjectionQuery struct {
 	Application ApplicationScope `json:"application"`
 }
@@ -36,6 +44,22 @@ type UserLookup struct {
 type OrganizationUnitLookup struct {
 	Application ApplicationScope `json:"application"`
 	OrgID       string           `json:"org_id"`
+}
+
+type DisplayNameQuery struct {
+	Application         ApplicationScope `json:"application"`
+	UserIDs             []string         `json:"user_ids,omitempty"`
+	OrganizationUnitIDs []string         `json:"organization_unit_ids,omitempty"`
+}
+
+type DisplayName struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type DisplayNameResult struct {
+	Users             []DisplayName `json:"users"`
+	OrganizationUnits []DisplayName `json:"organization_units"`
 }
 
 type UserRoleAssignmentQuery struct {

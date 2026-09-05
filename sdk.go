@@ -105,7 +105,16 @@ type DatabaseFactory interface {
 // tenant transaction, but exposes no authentication or business APIs.
 type BootstrapBinding interface {
 	modulehost.WorkspaceProvisioner
+	BootstrapProjectRoleCatalogBinder
 	Close(context.Context) error
+}
+
+// BootstrapProjectRoleCatalogBinder supplies the application-owned role
+// directory before the first workspace exists. Implementations must keep the
+// catalog in memory; workspace role rows are written only by the host-owned
+// provisioning transaction.
+type BootstrapProjectRoleCatalogBinder interface {
+	BindBootstrapProjectRoleCatalog(context.Context, ProjectRoleCatalog) error
 }
 
 // BootstrapDatabaseFactory is implemented only by an embedded Identity
@@ -183,8 +192,12 @@ type ApplicationScope = identitymodel.ApplicationScope
 type ProjectionQuery = identitymodel.ProjectionQuery
 type UserLookup = identitymodel.UserLookup
 type OrganizationUnitLookup = identitymodel.OrganizationUnitLookup
+type DisplayNameQuery = identitymodel.DisplayNameQuery
+type DisplayName = identitymodel.DisplayName
+type DisplayNameResult = identitymodel.DisplayNameResult
 type UserRoleAssignmentQuery = identitymodel.UserRoleAssignmentQuery
 type Projection = identitymodel.Projection
+type DisplayNameProjection = identitymodel.DisplayNameProjection
 
 type AuthSession = authentication.AuthSession
 type Provider = authentication.Provider
@@ -324,6 +337,8 @@ var DataScopeValues = authorization.DataScopeValues
 type EmbeddedTransaction = modulehost.Transaction
 type WorkspaceProvisionFailureInjector = modulehost.WorkspaceProvisionFailureInjector
 type WorkspaceIdentityProvisionRequest = modulehost.WorkspaceIdentityProvisionRequest
+type WorkspaceAcceptanceOrganization = modulehost.WorkspaceAcceptanceOrganization
+type WorkspaceAcceptanceActor = modulehost.WorkspaceAcceptanceActor
 type WorkspaceIdentityProvisionResult = modulehost.WorkspaceIdentityProvisionResult
 
 const (

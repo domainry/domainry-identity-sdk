@@ -34,6 +34,18 @@ func TestApplicationServiceCredentialProtectsRegistrationAndProjectionRequests(t
 				t.Fatalf("projection application=%+v", request.Application)
 			}
 			_, _ = w.Write([]byte(`[]`))
+		case "/identity/display-names/resolve":
+			var request identity.DisplayNameQuery
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Fatal(err)
+			}
+			if request.Application.TenantID != "workspace-a" || request.Application.WorkspaceID != "workspace-a" || request.Application.ApplicationKey != "runtime-app" {
+				t.Fatalf("display-name application=%+v", request.Application)
+			}
+			if len(request.UserIDs) != 1 || request.UserIDs[0] != "user-1" || len(request.OrganizationUnitIDs) != 1 || request.OrganizationUnitIDs[0] != "org-1" {
+				t.Fatalf("display-name query=%+v", request)
+			}
+			_, _ = w.Write([]byte(`{"users":[{"id":"user-1","name":"Ada"}],"organization_units":[{"id":"org-1","name":"Engineering"}]}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -51,5 +63,12 @@ func TestApplicationServiceCredentialProtectsRegistrationAndProjectionRequests(t
 	}
 	if _, err := (projectionClient{client: client}).ListUsers(t.Context(), identity.ProjectionQuery{}); err != nil {
 		t.Fatal(err)
+	}
+	result, err := (projectionClient{client: client}).ResolveDisplayNames(t.Context(), identity.DisplayNameQuery{UserIDs: []string{"user-1"}, OrganizationUnitIDs: []string{"org-1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Users) != 1 || result.Users[0].Name != "Ada" || len(result.OrganizationUnits) != 1 || result.OrganizationUnits[0].Name != "Engineering" {
+		t.Fatalf("display-name result=%+v", result)
 	}
 }

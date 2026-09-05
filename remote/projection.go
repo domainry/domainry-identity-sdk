@@ -45,6 +45,15 @@ func (adapter projectionClient) FindOrganizationUnit(ctx context.Context, reques
 	return response.OrganizationUnit, response.Found, nil
 }
 
+func (adapter projectionClient) ResolveDisplayNames(ctx context.Context, request identity.DisplayNameQuery) (identity.DisplayNameResult, error) {
+	if err := adapter.normalizeScope(&request.Application); err != nil {
+		return identity.DisplayNameResult{}, err
+	}
+	var result identity.DisplayNameResult
+	err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/display-names/resolve", adapter.client.serviceAccessToken, request, &result)
+	return result, err
+}
+
 func (adapter projectionClient) ListUsers(ctx context.Context, request identity.ProjectionQuery) ([]identity.User, error) {
 	if err := adapter.normalizeScope(&request.Application); err != nil {
 		return nil, err
@@ -93,3 +102,4 @@ func (adapter projectionClient) normalizeScope(scope *identity.ApplicationScope)
 }
 
 var _ identity.Projection = projectionClient{}
+var _ identity.DisplayNameProjection = projectionClient{}

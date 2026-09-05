@@ -35,6 +35,27 @@ type WorkspaceIdentityProvisionRequest struct {
 	// InitialPassword is accepted only across the in-process bootstrap
 	// boundary. It is deliberately excluded from serialized contracts so a
 	// remote or public workspace-provisioning request cannot select a password.
+	InitialPassword         string                            `json:"-"`
+	AcceptanceOrganizations []WorkspaceAcceptanceOrganization `json:"-"`
+	AcceptanceActors        []WorkspaceAcceptanceActor        `json:"-"`
+}
+
+// WorkspaceAcceptanceOrganization and WorkspaceAcceptanceActor are available
+// only on the embedded bootstrap boundary used by a host-owned verification
+// child process. Credentials can never enter a public or serialized request.
+type WorkspaceAcceptanceOrganization struct {
+	ID   string `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+type WorkspaceAcceptanceActor struct {
+	ID              string `json:"id"`
+	LoginID         string `json:"login_id"`
+	Name            string `json:"name"`
+	RoleKey         string `json:"role_key"`
+	OrganizationID  string `json:"organization_id,omitempty"`
+	ManagerUserID   string `json:"manager_user_id,omitempty"`
 	InitialPassword string `json:"-"`
 }
 

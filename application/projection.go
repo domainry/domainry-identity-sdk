@@ -32,6 +32,19 @@ func (value projection) FindOrganizationUnit(ctx context.Context, input identity
 	return value.binding.delegate.Projection().FindOrganizationUnit(ctx, input)
 }
 
+func (value projection) ResolveDisplayNames(ctx context.Context, input identity.DisplayNameQuery) (identity.DisplayNameResult, error) {
+	scope, err := value.binding.applicationScope(input.Application)
+	if err != nil {
+		return identity.DisplayNameResult{}, err
+	}
+	input.Application = scope
+	resolver, ok := value.binding.delegate.Projection().(identity.DisplayNameProjection)
+	if !ok {
+		return identity.DisplayNameResult{}, &identity.Error{Code: "identity.display_name_projection_unavailable"}
+	}
+	return resolver.ResolveDisplayNames(ctx, input)
+}
+
 func (value projection) ListUsers(ctx context.Context, input identity.ProjectionQuery) ([]identity.User, error) {
 	input, err := value.query(input)
 	if err != nil {
@@ -56,3 +69,5 @@ func (value projection) ListUserRoleAssignments(ctx context.Context, input ident
 	input.Application = scope
 	return value.binding.delegate.Projection().ListUserRoleAssignments(ctx, input)
 }
+
+var _ identity.DisplayNameProjection = projection{}

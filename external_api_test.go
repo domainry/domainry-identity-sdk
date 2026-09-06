@@ -43,6 +43,7 @@ import (
 var (
 	_ identity.Factory
 	_ identity.ProjectRoleCatalogPublisher
+	_ identity.BootstrapProjectNavigationCatalogBinder
 	_ identity.EmbeddedWorkspaceProvisioner
 	_ identity.BootstrapBinding
 	_ identity.WorkspaceIdentityBootstrap
@@ -53,6 +54,7 @@ var (
 		_ httpapi.Adapter
 	_ = application.Bind
 	_ = identity.WorkspaceBootstrapProjectRoleCatalogSHA256
+	_ = identity.ProjectNavigationCatalogSHA256
 	_ = evaluator.Evaluate
 	_ = principal.NewResolver
 	_ = browsergateway.New

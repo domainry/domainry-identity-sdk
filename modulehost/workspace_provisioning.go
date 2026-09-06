@@ -27,6 +27,8 @@ type Transaction struct {
 const (
 	WorkspaceProvisionFailureAfterIdentityUser     = "after_identity_user"
 	WorkspaceProvisionFailureAfterIdentityRole     = "after_identity_role"
+	WorkspaceProvisionFailureAfterIdentityMenu     = "after_identity_menu"
+	WorkspaceProvisionFailureAfterRoleMenu         = "after_role_menu"
 	WorkspaceProvisionFailureAfterRoleAssignment   = "after_role_assignment"
 	WorkspaceProvisionFailureAfterCredential       = "after_credential"
 	WorkspaceProvisionFailureAfterCompany          = "after_company"
@@ -114,9 +116,9 @@ type WorkspaceAcceptanceFixtureProvisionerBinding interface {
 }
 
 const (
-	WorkspaceIdentityBootstrapContractVersion   = "domainry-workspace-identity-bootstrap-v1"
-	WorkspaceIdentityBootstrapContractCanonical = "domainry-workspace-identity-bootstrap-v1|request:invocation_id,workspace_id,company_id,company_code,company_name,first_store_id,first_store_code,first_store_name,initial_admin_user_id,initial_admin_login_id,initial_admin_name|roles:trusted_bound_catalog(provision_to_workspaces=true,audience=any_or_user_or_business_profile,assignment_mode!=system_managed),role_catalog_sha256|assignment:initial_admin=trusted_explicit_manual_any_or_user_role@company|result:receipt_with_role_policy_evidence|completion:committed,rolled_back|credential:post_commit_one_time_nonpersistent"
-	WorkspaceIdentityBootstrapContractHash      = "2437c3597855a0985c63d82bc4f524e4e28053ba54d956c790262a1500d7c53c"
+	WorkspaceIdentityBootstrapContractVersion   = "domainry-workspace-identity-bootstrap-v2"
+	WorkspaceIdentityBootstrapContractCanonical = "domainry-workspace-identity-bootstrap-v2|request:invocation_id,workspace_id,company_id,company_code,company_name,first_store_id,first_store_code,first_store_name,initial_admin_user_id,initial_admin_login_id,initial_admin_name|roles:trusted_bound_catalog(provision_to_workspaces=true,audience=any_or_user_or_business_profile,assignment_mode!=system_managed),role_catalog_sha256|navigation:trusted_bound_file_catalog,source_owned_menu_definitions,authored_role_menu_sets,navigation_catalog_sha256|assignment:initial_admin=trusted_explicit_manual_any_or_user_role@company|result:receipt_with_role_and_navigation_policy_evidence|completion:committed,rolled_back|credential:post_commit_one_time_nonpersistent"
+	WorkspaceIdentityBootstrapContractHash      = "76af97110f188cd2e18b71fbbde56e931fb3faad867612d392179073f3d3d3b8"
 )
 
 // WorkspaceIdentityBootstrapRequest is a trusted, in-process-only graph
@@ -152,6 +154,7 @@ type WorkspaceIdentityBootstrapReceipt struct {
 	InitialAdminUserID                   string `json:"initial_admin_user_id"`
 	InitialAdminLoginID                  string `json:"initial_admin_login_id"`
 	RoleCatalogSHA256                    string `json:"role_catalog_sha256"`
+	NavigationCatalogSHA256              string `json:"navigation_catalog_sha256"`
 	InitialWorkspaceAdministratorRoleKey string `json:"initial_workspace_administrator_role_key"`
 	Replayed                             bool   `json:"replayed"`
 }

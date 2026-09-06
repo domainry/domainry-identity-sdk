@@ -129,6 +129,7 @@ type DatabaseFactory interface {
 type BootstrapBinding interface {
 	modulehost.WorkspaceIdentityBootstrap
 	BootstrapProjectRoleCatalogBinder
+	BootstrapProjectNavigationCatalogBinder
 	Close(context.Context) error
 }
 
@@ -138,6 +139,13 @@ type BootstrapBinding interface {
 // provisioning transaction.
 type BootstrapProjectRoleCatalogBinder interface {
 	BindBootstrapProjectRoleCatalog(context.Context, ProjectRoleCatalog) error
+}
+
+// BootstrapProjectNavigationCatalogBinder supplies the compiled, source-owned
+// navigation file before Workspace provisioning. Implementations keep the
+// template in memory and materialize tenant rows only inside bootstrap.
+type BootstrapProjectNavigationCatalogBinder interface {
+	BindBootstrapProjectNavigationCatalog(context.Context, ProjectNavigationCatalog) error
 }
 
 // BootstrapDatabaseFactory is implemented only by an embedded Identity
@@ -461,6 +469,19 @@ type DataScope = authorization.DataScope
 type ProjectRoleCatalog = authorization.ProjectRoleCatalog
 type ProjectRoleCatalogReceipt = authorization.ProjectRoleCatalogReceipt
 type ProjectRoleCatalogPublisher = authorization.ProjectRoleCatalogPublisher
+type ProjectMenuDefinition = authorization.ProjectMenuDefinition
+type ProjectRoleMenuSet = authorization.ProjectRoleMenuSet
+type ProjectNavigationCatalog = authorization.ProjectNavigationCatalog
+
+const ProjectNavigationContractVersion = authorization.ProjectNavigationContractVersion
+
+func NormalizeProjectNavigationCatalog(catalog ProjectNavigationCatalog) (ProjectNavigationCatalog, error) {
+	return authorization.NormalizeProjectNavigationCatalog(catalog)
+}
+
+func ProjectNavigationCatalogSHA256(catalog ProjectNavigationCatalog) (string, error) {
+	return authorization.ProjectNavigationCatalogSHA256(catalog)
+}
 
 // WorkspaceBootstrapProjectRoleCatalogSHA256 is the shared canonical digest
 // used by Runtime and Identity for the trusted Workspace bootstrap role policy.
@@ -496,6 +517,8 @@ type WorkspaceIdentityBootstrapCompletion = modulehost.WorkspaceIdentityBootstra
 const (
 	WorkspaceProvisionFailureAfterIdentityUser      = modulehost.WorkspaceProvisionFailureAfterIdentityUser
 	WorkspaceProvisionFailureAfterIdentityRole      = modulehost.WorkspaceProvisionFailureAfterIdentityRole
+	WorkspaceProvisionFailureAfterIdentityMenu      = modulehost.WorkspaceProvisionFailureAfterIdentityMenu
+	WorkspaceProvisionFailureAfterRoleMenu          = modulehost.WorkspaceProvisionFailureAfterRoleMenu
 	WorkspaceProvisionFailureAfterRoleAssignment    = modulehost.WorkspaceProvisionFailureAfterRoleAssignment
 	WorkspaceProvisionFailureAfterCredential        = modulehost.WorkspaceProvisionFailureAfterCredential
 	WorkspaceProvisionFailureAfterCompany           = modulehost.WorkspaceProvisionFailureAfterCompany

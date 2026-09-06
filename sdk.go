@@ -71,6 +71,15 @@ type DatabaseHandle struct {
 	BusinessProfileResolver BusinessProfileResolver
 	Migrations              EmbeddedMigrationRegistrar
 	ModuleMigrations        modulehost.MigrationRegistrar
+	// WorkspaceIdentityUsageAuthority is a trusted infrastructure-only
+	// installation authorization and active Workspace catalog provider. It is
+	// never exposed through Binding or accepted from a handler request.
+	WorkspaceIdentityUsageAuthority modulehost.WorkspaceIdentityUsageInstallationAuthority
+	// WorkspaceIdentityUsageCursorKey is a host-owned stable 32-byte AES key.
+	// Identity uses it only for authenticated encryption of usage page cursors.
+	// The host must persist it across restarts; deliberate rotation invalidates
+	// outstanding cursors fail closed.
+	WorkspaceIdentityUsageCursorKey []byte
 }
 
 // EmbeddedMigrationRegistrar lets an in-process Identity module execute its
@@ -93,6 +102,20 @@ type BusinessProfileBinding struct {
 // status, cardinality, and the identity relation.
 type BusinessProfileResolver func(context.Context, string, string) ([]BusinessProfileBinding, error)
 
+type ProjectProfileExtension = identitymodel.ProjectProfileExtension
+type ProjectBusinessIdentityBinding = identitymodel.ProjectBusinessIdentityBinding
+type ProjectProfileClaimBinding = identitymodel.ProjectProfileClaimBinding
+type ProjectProfileBindingLifecycle = identitymodel.ProjectProfileBindingLifecycle
+type ProjectProfileClaimProof = identitymodel.ProjectProfileClaimProof
+type ProjectProfileExtensionPublisher = identitymodel.ProjectProfileExtensionPublisher
+
+// EmbeddedProjectProfileExtensionBinding is optional and implemented by an
+// in-process Identity module. Runtime uses it to publish its authoritative
+// profile-extension metadata without exposing Identity's metadata store.
+type EmbeddedProjectProfileExtensionBinding interface {
+	ProjectProfileExtensionPublisher() ProjectProfileExtensionPublisher
+}
+
 // DatabaseFactory is implemented by in-process factories that can join the
 // embedding Runtime's project database pool. Remote factories intentionally
 // implement only Factory.
@@ -100,11 +123,11 @@ type DatabaseFactory interface {
 	OpenWithDatabase(context.Context, ApplicationRef, DatabaseHandle) (Binding, error)
 }
 
-// BootstrapBinding is the deliberately narrow in-process contract available
-// before the first tenant exists. It can participate in the host-owned atomic
-// tenant transaction, but exposes no authentication or business APIs.
+// BootstrapBinding is the deliberately narrow Protocol V3 in-process contract
+// available before the first Workspace exists. It exposes V2 initialization,
+// not the role-selectable V1 legacy WorkspaceProvisioner.
 type BootstrapBinding interface {
-	modulehost.WorkspaceProvisioner
+	modulehost.WorkspaceIdentityBootstrapV2
 	BootstrapProjectRoleCatalogBinder
 	Close(context.Context) error
 }
@@ -118,10 +141,18 @@ type BootstrapProjectRoleCatalogBinder interface {
 }
 
 // BootstrapDatabaseFactory is implemented only by an embedded Identity
-// module. A host uses it to create the first tenant in its project database,
+// module. A host uses it to create the first Workspace in its project database,
 // then closes it and reopens the ordinary workspace-bound Binding.
 type BootstrapDatabaseFactory interface {
 	OpenBootstrapWithDatabase(context.Context, ApplicationKey, DatabaseHandle) (BootstrapBinding, error)
+}
+
+// EmbeddedInstallationAdministratorBootstrapBinding is implemented only by
+// an in-process, initialized Identity module. Runtime may use it from explicit
+// installation startup configuration; remote and browser bindings never gain
+// this authority.
+type EmbeddedInstallationAdministratorBootstrapBinding interface {
+	InstallationAdministratorBootstrap() modulehost.InstallationAdministratorBootstrapV1
 }
 
 type Clock interface {
@@ -198,6 +229,113 @@ type DisplayNameResult = identitymodel.DisplayNameResult
 type UserRoleAssignmentQuery = identitymodel.UserRoleAssignmentQuery
 type Projection = identitymodel.Projection
 type DisplayNameProjection = identitymodel.DisplayNameProjection
+type HandlerUserOperation = identitymodel.HandlerUserOperation
+type HandlerLoginMode = identitymodel.HandlerLoginMode
+type HandlerUserMutation = identitymodel.HandlerUserMutation
+type HandlerProfileBindingMutation = identitymodel.HandlerProfileBindingMutation
+type HandlerDeliveryRequest = identitymodel.HandlerDeliveryRequest
+type HandlerProfileBinding = identitymodel.HandlerProfileBinding
+type HandlerProfileBindingSelector = identitymodel.HandlerProfileBindingSelector
+type HandlerDeliveryResult = identitymodel.HandlerDeliveryResult
+type HandlerInitialCredential = identitymodel.HandlerInitialCredential
+type HandlerBoundIdentityRequest = identitymodel.HandlerBoundIdentityRequest
+type HandlerBoundIdentity = identitymodel.HandlerBoundIdentity
+type HandlerDelivery = identitymodel.HandlerDelivery
+type StoreOrganizationOperation = identitymodel.StoreOrganizationOperation
+type StoreOrganizationMutation = identitymodel.StoreOrganizationMutation
+type StoreOrganizationDeliveryRequest = identitymodel.StoreOrganizationDeliveryRequest
+type StoreOrganization = identitymodel.StoreOrganization
+type StoreOrganizationDeliveryResult = identitymodel.StoreOrganizationDeliveryResult
+type StoreOrganizationResolveRequest = identitymodel.StoreOrganizationResolveRequest
+type StoreOrganizationListRequest = identitymodel.StoreOrganizationListRequest
+type StoreOrganizationPage = identitymodel.StoreOrganizationPage
+type StoreOrganizationDelivery = identitymodel.StoreOrganizationDelivery
+type WorkspaceIdentityUsageRequest = identitymodel.WorkspaceIdentityUsageRequest
+type WorkspaceIdentityUsageResolveRequest = identitymodel.WorkspaceIdentityUsageResolveRequest
+type WorkspaceIdentityUsageAuthorizationRequest = identitymodel.WorkspaceIdentityUsageAuthorizationRequest
+type WorkspaceIdentityUsageAuthorization = identitymodel.WorkspaceIdentityUsageAuthorization
+type WorkspaceIdentityAccountCounts = identitymodel.WorkspaceIdentityAccountCounts
+type WorkspaceIdentityUsage = identitymodel.WorkspaceIdentityUsage
+type WorkspaceIdentityUsagePage = identitymodel.WorkspaceIdentityUsagePage
+type WorkspaceIdentityUsageAggregate = identitymodel.WorkspaceIdentityUsageAggregate
+
+const (
+	HandlerDeliveryContractVersionV1             = identitymodel.HandlerDeliveryContractVersionV1
+	HandlerDeliveryCreatePermission              = identitymodel.HandlerDeliveryCreatePermission
+	HandlerDeliveryUpdatePermission              = identitymodel.HandlerDeliveryUpdatePermission
+	HandlerDeliveryDisablePermission             = identitymodel.HandlerDeliveryDisablePermission
+	HandlerDeliveryResolvePermission             = identitymodel.HandlerDeliveryResolvePermission
+	HandlerUserCreate                            = identitymodel.HandlerUserCreate
+	HandlerUserUpdate                            = identitymodel.HandlerUserUpdate
+	HandlerUserDisable                           = identitymodel.HandlerUserDisable
+	HandlerLoginNone                             = identitymodel.HandlerLoginNone
+	HandlerLoginPassword                         = identitymodel.HandlerLoginPassword
+	StoreOrganizationDeliveryContractVersionV1   = identitymodel.StoreOrganizationDeliveryContractVersionV1
+	StoreOrganizationDefaultPageSize             = identitymodel.StoreOrganizationDefaultPageSize
+	StoreOrganizationMaxPageSize                 = identitymodel.StoreOrganizationMaxPageSize
+	StoreOrganizationDeliveryCreatePermission    = identitymodel.StoreOrganizationDeliveryCreatePermission
+	StoreOrganizationDeliveryRenamePermission    = identitymodel.StoreOrganizationDeliveryRenamePermission
+	StoreOrganizationDeliveryDisablePermission   = identitymodel.StoreOrganizationDeliveryDisablePermission
+	StoreOrganizationDeliveryResolvePermission   = identitymodel.StoreOrganizationDeliveryResolvePermission
+	StoreOrganizationDeliveryListPermission      = identitymodel.StoreOrganizationDeliveryListPermission
+	StoreOrganizationCreate                      = identitymodel.StoreOrganizationCreate
+	StoreOrganizationRename                      = identitymodel.StoreOrganizationRename
+	StoreOrganizationDisable                     = identitymodel.StoreOrganizationDisable
+	WorkspaceIdentityUsageContractVersionV1      = identitymodel.WorkspaceIdentityUsageContractVersionV1
+	WorkspaceIdentityUsageContractVersionV2      = identitymodel.WorkspaceIdentityUsageContractVersionV2
+	WorkspaceIdentityUsageContractVersionV3      = identitymodel.WorkspaceIdentityUsageContractVersionV3
+	CurrentWorkspaceIdentityUsageContractVersion = identitymodel.CurrentWorkspaceIdentityUsageContractVersion
+	WorkspaceIdentityUsageContractHashV2         = identitymodel.WorkspaceIdentityUsageContractHashV2
+	WorkspaceIdentityUsageContractHashV3         = identitymodel.WorkspaceIdentityUsageContractHashV3
+	CurrentWorkspaceIdentityUsageContractHash    = identitymodel.CurrentWorkspaceIdentityUsageContractHash
+	WorkspaceIdentityUsageAggregatePermission    = identitymodel.WorkspaceIdentityUsageAggregatePermission
+	WorkspaceIdentityUsageDefaultPageSize        = identitymodel.WorkspaceIdentityUsageDefaultPageSize
+	WorkspaceIdentityUsageMaxPageSize            = identitymodel.WorkspaceIdentityUsageMaxPageSize
+)
+
+// HandlerDeliveryBinding is optional so protocol-v3 providers that predate
+// handler delivery remain source compatible and fail capability discovery
+// explicitly instead of silently emulating a non-atomic workflow.
+type HandlerDeliveryBinding interface {
+	HandlerDelivery() HandlerDelivery
+}
+
+// HandlerDeliveryUnitOfWorkBinder is an infrastructure-only bridge. Runtime
+// binds Identity to the Action transaction, then injects only the returned
+// narrow HandlerDelivery into generated project code. A project handler never
+// receives EmbeddedTransaction, its executor, or a database handle.
+type HandlerDeliveryUnitOfWorkBinder interface {
+	BindHandlerDeliveryUnitOfWork(EmbeddedTransaction) (HandlerDelivery, error)
+}
+
+type EmbeddedHandlerDeliveryBinding interface {
+	HandlerDeliveryUnitOfWorkBinder() HandlerDeliveryUnitOfWorkBinder
+}
+
+// StoreOrganizationDeliveryBinding is available on the deployment-neutral
+// core. Embedded Runtime integrations must use the UoW binder below.
+type StoreOrganizationDeliveryBinding interface {
+	StoreOrganizationDelivery() StoreOrganizationDelivery
+}
+
+type StoreOrganizationDeliveryUnitOfWorkBinder interface {
+	BindStoreOrganizationDeliveryUnitOfWork(EmbeddedTransaction) (StoreOrganizationDelivery, error)
+}
+
+type EmbeddedStoreOrganizationDeliveryBinding interface {
+	StoreOrganizationDeliveryUnitOfWorkBinder() StoreOrganizationDeliveryUnitOfWorkBinder
+}
+
+// WorkspaceIdentityUsageUnitOfWorkBinder is the only public discovery surface
+// for this embedded capability. The unbound aggregate is never exposed.
+type WorkspaceIdentityUsageUnitOfWorkBinder interface {
+	AuthorizeWorkspaceIdentityUsage(context.Context, WorkspaceIdentityUsageAuthorizationRequest) (WorkspaceIdentityUsageAuthorization, error)
+	BindWorkspaceIdentityUsageUnitOfWork(EmbeddedTransaction) (WorkspaceIdentityUsageAggregate, error)
+}
+
+type EmbeddedWorkspaceIdentityUsageBinding interface {
+	WorkspaceIdentityUsageUnitOfWorkBinder() WorkspaceIdentityUsageUnitOfWorkBinder
+}
 
 type AuthSession = authentication.AuthSession
 type Provider = authentication.Provider
@@ -335,22 +473,47 @@ const (
 var DataScopeValues = authorization.DataScopeValues
 
 type EmbeddedTransaction = modulehost.Transaction
+type EmbeddedTransactionExecutor = modulehost.TransactionExecutor
 type WorkspaceProvisionFailureInjector = modulehost.WorkspaceProvisionFailureInjector
 type WorkspaceIdentityProvisionRequest = modulehost.WorkspaceIdentityProvisionRequest
 type WorkspaceAcceptanceOrganization = modulehost.WorkspaceAcceptanceOrganization
 type WorkspaceAcceptanceActor = modulehost.WorkspaceAcceptanceActor
 type WorkspaceIdentityProvisionResult = modulehost.WorkspaceIdentityProvisionResult
+type WorkspaceIdentityBootstrapV2Request = modulehost.WorkspaceIdentityBootstrapV2Request
+type WorkspaceIdentityBootstrapV2Receipt = modulehost.WorkspaceIdentityBootstrapV2Receipt
+type WorkspaceIdentityBootstrapCredentialClaim = modulehost.WorkspaceIdentityBootstrapCredentialClaim
+type WorkspaceIdentityBootstrapOneTimeCredential = modulehost.WorkspaceIdentityBootstrapOneTimeCredential
+type WorkspaceIdentityBootstrapTransactionOutcome = modulehost.WorkspaceIdentityBootstrapTransactionOutcome
+type WorkspaceIdentityBootstrapCompletion = modulehost.WorkspaceIdentityBootstrapCompletion
 
 const (
-	WorkspaceProvisionFailureAfterIdentityUser   = modulehost.WorkspaceProvisionFailureAfterIdentityUser
-	WorkspaceProvisionFailureAfterIdentityRole   = modulehost.WorkspaceProvisionFailureAfterIdentityRole
-	WorkspaceProvisionFailureAfterRoleAssignment = modulehost.WorkspaceProvisionFailureAfterRoleAssignment
-	WorkspaceProvisionFailureAfterCredential     = modulehost.WorkspaceProvisionFailureAfterCredential
+	WorkspaceProvisionFailureAfterIdentityUser       = modulehost.WorkspaceProvisionFailureAfterIdentityUser
+	WorkspaceProvisionFailureAfterIdentityRole       = modulehost.WorkspaceProvisionFailureAfterIdentityRole
+	WorkspaceProvisionFailureAfterRoleAssignment     = modulehost.WorkspaceProvisionFailureAfterRoleAssignment
+	WorkspaceProvisionFailureAfterCredential         = modulehost.WorkspaceProvisionFailureAfterCredential
+	WorkspaceProvisionFailureAfterCompany            = modulehost.WorkspaceProvisionFailureAfterCompany
+	WorkspaceProvisionFailureAfterFirstStore         = modulehost.WorkspaceProvisionFailureAfterFirstStore
+	WorkspaceProvisionFailureAfterBootstrapReceipt   = modulehost.WorkspaceProvisionFailureAfterBootstrapReceipt
+	WorkspaceIdentityBootstrapContractVersionV2      = modulehost.WorkspaceIdentityBootstrapContractVersionV2
+	WorkspaceIdentityBootstrapContractCanonicalV2    = modulehost.WorkspaceIdentityBootstrapContractCanonicalV2
+	WorkspaceIdentityBootstrapContractHashV2         = modulehost.WorkspaceIdentityBootstrapContractHashV2
+	CurrentWorkspaceIdentityBootstrapContractVersion = modulehost.CurrentWorkspaceIdentityBootstrapContractVersion
+	CurrentWorkspaceIdentityBootstrapContractHash    = modulehost.CurrentWorkspaceIdentityBootstrapContractHash
+	WorkspaceBootstrapRoleTenantAdmin                = modulehost.WorkspaceBootstrapRoleTenantAdmin
+	WorkspaceBootstrapRoleHeadquartersAdmin          = modulehost.WorkspaceBootstrapRoleHeadquartersAdmin
+	WorkspaceBootstrapRoleStoreManager               = modulehost.WorkspaceBootstrapRoleStoreManager
+	WorkspaceBootstrapRoleStaff                      = modulehost.WorkspaceBootstrapRoleStaff
+	WorkspaceIdentityBootstrapTransactionCommitted   = modulehost.WorkspaceIdentityBootstrapTransactionCommitted
+	WorkspaceIdentityBootstrapTransactionRolledBack  = modulehost.WorkspaceIdentityBootstrapTransactionRolledBack
 )
 
 type WorkspaceRoleReconcileRequest = modulehost.WorkspaceRoleReconcileRequest
 type WorkspaceRoleReconcileResult = modulehost.WorkspaceRoleReconcileResult
 type EmbeddedWorkspaceProvisioner = modulehost.WorkspaceProvisioner
+type WorkspaceAcceptanceFixtureRequest = modulehost.WorkspaceAcceptanceFixtureRequest
+type EmbeddedWorkspaceAcceptanceFixtureProvisioner = modulehost.WorkspaceAcceptanceFixtureProvisioner
+type EmbeddedWorkspaceAcceptanceFixtureProvisionerBinding = modulehost.WorkspaceAcceptanceFixtureProvisionerBinding
+type EmbeddedWorkspaceIdentityBootstrapV2 = modulehost.WorkspaceIdentityBootstrapV2
 type Principal = authorization.Principal
 type RequestIdentity = authorization.RequestIdentity
 type PrincipalAuthenticator = authorization.PrincipalAuthenticator

@@ -4,7 +4,7 @@ import test from 'node:test'
 import { IdentityClient, IdentityClientError } from './dist/index.js'
 
 const session = {
-  session_id: 'session-1', tenant_id: '', workspace_id: 'workspace-primary', access_token: 'access-1',
+  session_id: 'session-1', workspace_id: 'workspace-primary', access_token: 'access-1',
   token_type: 'Bearer', expires_at: '2026-08-27T00:00:00Z',
   user: { id: 'user-1', name: 'User', email: 'user@example.test', version: 1, status: 'active' },
   roles: [], default_role: '', permissions: [], must_change_password: false,
@@ -23,7 +23,9 @@ test('keeps access credentials in memory and sends cookie-bound requests', async
   await client.loginWithPassword('user@example.test', 'secret')
   assert.equal(client.accessToken(), 'access-1')
   assert.equal(requests[0][1].credentials, 'include')
-  assert.equal(JSON.parse(requests[0][1].body).workspace_id, 'workspace-a')
+  const loginBody = JSON.parse(requests[0][1].body)
+  assert.equal(loginBody.workspace_id, 'workspace-a')
+  assert.equal('tenant_id' in loginBody, false)
   assert.equal(new Headers(requests[0][1].headers).get('X-Workspace-ID'), 'workspace-a')
   await client.currentSession()
   assert.equal(new Headers(requests[1][1].headers).get('Authorization'), 'Bearer access-1')
@@ -96,9 +98,11 @@ test('uses the same provider contract for OTP without exposing refresh credentia
   const challenge = await client.beginProvider('sms', { phone: '+8613800000000' })
   assert.equal(challenge.state, 'state-1')
   assert.equal(JSON.parse(requests[0][1].body).phone, '+8613800000000')
+  assert.equal('tenant_id' in JSON.parse(requests[0][1].body), false)
   await client.verifyOTP('sms', challenge.state, '123456')
   assert.equal(client.accessToken(), 'access-1')
   assert.equal(JSON.parse(requests[1][1].body).code, '123456')
+  assert.equal('tenant_id' in JSON.parse(requests[1][1].body), false)
   assert.equal(requests[1][1].credentials, 'include')
 })
 

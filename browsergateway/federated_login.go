@@ -22,12 +22,7 @@ func (gateway *Gateway) Providers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gateway *Gateway) StartProvider(w http.ResponseWriter, r *http.Request) {
-	var request struct {
-		TenantID    identity.TenantID    `json:"tenant_id,omitempty"`
-		WorkspaceID identity.WorkspaceID `json:"workspace_id,omitempty"`
-		ReturnURL   string               `json:"return_url,omitempty"`
-		Phone       string               `json:"phone,omitempty"`
-	}
+	var request browserProviderStartRequest
 	if r.Method == http.MethodPost && !gateway.decodeJSON(w, r, &request) {
 		return
 	}
@@ -43,7 +38,7 @@ func (gateway *Gateway) StartProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	challenge, err := gateway.binding.Authentication().BeginFederatedLogin(r.Context(), identity.BeginFederatedLoginRequest{
-		TenantID: request.TenantID, WorkspaceID: workspaceID, ApplicationKey: gateway.config.ApplicationKey,
+		WorkspaceID: workspaceID, ApplicationKey: gateway.config.ApplicationKey,
 		Provider: r.PathValue("provider"), ReturnURL: request.ReturnURL, Phone: request.Phone,
 	})
 	if err != nil {
@@ -54,6 +49,9 @@ func (gateway *Gateway) StartProvider(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gateway *Gateway) ProviderCallback(w http.ResponseWriter, r *http.Request) {
+	if gateway.rejectNonWorkspaceBoundary(w, r) {
+		return
+	}
 	values := map[string]string{}
 	for key, entries := range r.URL.Query() {
 		if len(entries) > 0 {
@@ -63,6 +61,10 @@ func (gateway *Gateway) ProviderCallback(w http.ResponseWriter, r *http.Request)
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
 			gateway.writeCode(w, http.StatusBadRequest, "auth.provider_callback_invalid")
+			return
+		}
+		if _, present := r.PostForm["tenant_id"]; present {
+			gateway.writeCode(w, http.StatusBadRequest, "identity.workspace_scope_only")
 			return
 		}
 		for key, entries := range r.PostForm {
@@ -97,16 +99,15 @@ func (gateway *Gateway) ProviderCallback(w http.ResponseWriter, r *http.Request)
 }
 
 func (gateway *Gateway) VerifyProvider(w http.ResponseWriter, r *http.Request) {
-	var request identity.VerifyOTPRequest
-	if !gateway.decodeJSON(w, r, &request) {
+	var browserRequest browserVerifyOTPRequest
+	if !gateway.decodeJSON(w, r, &browserRequest) {
 		return
 	}
-	workspaceID, ok := gateway.workspaceID(w, r, request.WorkspaceID)
+	workspaceID, ok := gateway.workspaceID(w, r, browserRequest.WorkspaceID)
 	if !ok {
 		return
 	}
-	request.WorkspaceID = workspaceID
-	request.Provider = r.PathValue("provider")
+	request := identity.VerifyOTPRequest{WorkspaceID: workspaceID, Provider: r.PathValue("provider"), State: browserRequest.State, Code: browserRequest.Code}
 	if challengeBinding, ok := gateway.binding.(identity.ChallengeAuthenticationBinding); ok {
 		outcome, err := challengeBinding.ChallengeAuthentication().VerifyOTPOutcome(r.Context(), request)
 		if err != nil {
@@ -125,19 +126,21 @@ func (gateway *Gateway) VerifyProvider(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gateway *Gateway) ExchangeAuthorizationCode(w http.ResponseWriter, r *http.Request) {
-	var request identity.ExchangeAuthorizationCodeRequest
-	if !gateway.decodeJSON(w, r, &request) {
+	var browserRequest browserAuthorizationCodeExchangeRequest
+	if !gateway.decodeJSON(w, r, &browserRequest) {
 		return
 	}
-	workspaceID, ok := gateway.workspaceID(w, r, request.WorkspaceID)
+	workspaceID, ok := gateway.workspaceID(w, r, browserRequest.WorkspaceID)
 	if !ok {
 		return
 	}
-	request.WorkspaceID = workspaceID
-	request.ApplicationKey = gateway.config.ApplicationKey
-	if !validReturnURL(request.ReturnURL) {
+	if !validReturnURL(browserRequest.ReturnURL) {
 		gateway.writeCode(w, http.StatusBadRequest, "identity.redirect_url_invalid")
 		return
+	}
+	request := identity.ExchangeAuthorizationCodeRequest{
+		WorkspaceID: workspaceID, Code: browserRequest.Code,
+		ApplicationKey: gateway.config.ApplicationKey, ReturnURL: browserRequest.ReturnURL,
 	}
 	session, err := gateway.binding.Authentication().ExchangeAuthorizationCode(r.Context(), request)
 	if err != nil {

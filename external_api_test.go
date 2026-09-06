@@ -44,6 +44,9 @@ var (
 	_ identity.Factory
 	_ identity.ProjectRoleCatalogPublisher
 	_ identity.EmbeddedWorkspaceProvisioner
+	_ identity.BootstrapBinding
+	_ identity.EmbeddedWorkspaceIdentityBootstrapV2
+	_ identity.EmbeddedWorkspaceAcceptanceFixtureProvisioner
 	_ authentication.Authentication
 	_ authorization.Authorization
 	_ identitymodel.Projection

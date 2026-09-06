@@ -85,6 +85,7 @@ type User struct {
 	Locale        string `json:"locale,omitempty"`
 	Timezone      string `json:"timezone,omitempty"`
 	OrgID         string `json:"org_id,omitempty"`
+	SupportOrgID  string `json:"support_org_id,omitempty"`
 	ManagerUserID string `json:"manager_user_id,omitempty"`
 	ReportingPath string `json:"reporting_path,omitempty"`
 	WorkerNo      string `json:"worker_no,omitempty"`

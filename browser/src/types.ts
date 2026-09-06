@@ -1,7 +1,6 @@
 export interface IdentityClientConfiguration {
 	endpoint?: string
 	managementEndpoint?: string
-	tenantId?: string
   workspaceId?: string
   applicationKey: string
   fetch?: typeof globalThis.fetch
@@ -26,7 +25,6 @@ export interface IdentityProviderChallenge {
 
 export interface IdentitySession {
   session_id: string
-  tenant_id: string
   workspace_id: string
   access_token: string
   token_type: string
@@ -40,7 +38,6 @@ export interface IdentitySession {
 
 export interface IdentitySessionView {
   session_id: string
-  tenant_id?: string
   workspace_id: string
   subject_id: string
   authorization_revision?: string

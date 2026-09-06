@@ -202,7 +202,6 @@ export class IdentityClient {
 
   #body(value: Record<string, unknown>): string {
     return JSON.stringify({
-      tenant_id: this.configuration.tenantId,
       workspace_id: this.#workspaceId || undefined,
       ...value,
     })

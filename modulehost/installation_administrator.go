@@ -8,6 +8,7 @@ const (
 	InstallationAdministratorBootstrapContractHashV1         = "30fbfdd92ae68dd93f90f5028d42a3ab8b58bb0363c2740124e4f950c73968b7"
 	CurrentInstallationAdministratorBootstrapContractVersion = InstallationAdministratorBootstrapContractVersionV1
 	CurrentInstallationAdministratorBootstrapContractHash    = InstallationAdministratorBootstrapContractHashV1
+	InstallationAdministratorRoleKey                         = "tenant_admin"
 )
 
 // InstallationAdministratorBootstrapRequest is accepted only by the embedded

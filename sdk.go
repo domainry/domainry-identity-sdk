@@ -123,11 +123,11 @@ type DatabaseFactory interface {
 	OpenWithDatabase(context.Context, ApplicationRef, DatabaseHandle) (Binding, error)
 }
 
-// BootstrapBinding is the deliberately narrow Protocol V3 in-process contract
-// available before the first Workspace exists. It exposes V2 initialization,
-// not the role-selectable V1 legacy WorkspaceProvisioner.
+// BootstrapBinding is the deliberately narrow in-process contract available
+// before the first Workspace exists. It exposes the trusted bootstrap
+// capability, not the earlier role-selectable WorkspaceProvisioner.
 type BootstrapBinding interface {
-	modulehost.WorkspaceIdentityBootstrapV2
+	modulehost.WorkspaceIdentityBootstrap
 	BootstrapProjectRoleCatalogBinder
 	Close(context.Context) error
 }
@@ -462,6 +462,12 @@ type ProjectRoleCatalog = authorization.ProjectRoleCatalog
 type ProjectRoleCatalogReceipt = authorization.ProjectRoleCatalogReceipt
 type ProjectRoleCatalogPublisher = authorization.ProjectRoleCatalogPublisher
 
+// WorkspaceBootstrapProjectRoleCatalogSHA256 is the shared canonical digest
+// used by Runtime and Identity for the trusted Workspace bootstrap role policy.
+func WorkspaceBootstrapProjectRoleCatalogSHA256(catalog ProjectRoleCatalog) (string, error) {
+	return authorization.WorkspaceBootstrapProjectRoleCatalogSHA256(catalog)
+}
+
 const (
 	DataScopeAll       = authorization.DataScopeAll
 	DataScopeOwner     = authorization.DataScopeOwner
@@ -479,32 +485,27 @@ type WorkspaceIdentityProvisionRequest = modulehost.WorkspaceIdentityProvisionRe
 type WorkspaceAcceptanceOrganization = modulehost.WorkspaceAcceptanceOrganization
 type WorkspaceAcceptanceActor = modulehost.WorkspaceAcceptanceActor
 type WorkspaceIdentityProvisionResult = modulehost.WorkspaceIdentityProvisionResult
-type WorkspaceIdentityBootstrapV2Request = modulehost.WorkspaceIdentityBootstrapV2Request
-type WorkspaceIdentityBootstrapV2Receipt = modulehost.WorkspaceIdentityBootstrapV2Receipt
+type WorkspaceIdentityBootstrapRequest = modulehost.WorkspaceIdentityBootstrapRequest
+type WorkspaceIdentityBootstrapReceipt = modulehost.WorkspaceIdentityBootstrapReceipt
+type WorkspaceIdentityBootstrap = modulehost.WorkspaceIdentityBootstrap
 type WorkspaceIdentityBootstrapCredentialClaim = modulehost.WorkspaceIdentityBootstrapCredentialClaim
 type WorkspaceIdentityBootstrapOneTimeCredential = modulehost.WorkspaceIdentityBootstrapOneTimeCredential
 type WorkspaceIdentityBootstrapTransactionOutcome = modulehost.WorkspaceIdentityBootstrapTransactionOutcome
 type WorkspaceIdentityBootstrapCompletion = modulehost.WorkspaceIdentityBootstrapCompletion
 
 const (
-	WorkspaceProvisionFailureAfterIdentityUser       = modulehost.WorkspaceProvisionFailureAfterIdentityUser
-	WorkspaceProvisionFailureAfterIdentityRole       = modulehost.WorkspaceProvisionFailureAfterIdentityRole
-	WorkspaceProvisionFailureAfterRoleAssignment     = modulehost.WorkspaceProvisionFailureAfterRoleAssignment
-	WorkspaceProvisionFailureAfterCredential         = modulehost.WorkspaceProvisionFailureAfterCredential
-	WorkspaceProvisionFailureAfterCompany            = modulehost.WorkspaceProvisionFailureAfterCompany
-	WorkspaceProvisionFailureAfterFirstStore         = modulehost.WorkspaceProvisionFailureAfterFirstStore
-	WorkspaceProvisionFailureAfterBootstrapReceipt   = modulehost.WorkspaceProvisionFailureAfterBootstrapReceipt
-	WorkspaceIdentityBootstrapContractVersionV2      = modulehost.WorkspaceIdentityBootstrapContractVersionV2
-	WorkspaceIdentityBootstrapContractCanonicalV2    = modulehost.WorkspaceIdentityBootstrapContractCanonicalV2
-	WorkspaceIdentityBootstrapContractHashV2         = modulehost.WorkspaceIdentityBootstrapContractHashV2
-	CurrentWorkspaceIdentityBootstrapContractVersion = modulehost.CurrentWorkspaceIdentityBootstrapContractVersion
-	CurrentWorkspaceIdentityBootstrapContractHash    = modulehost.CurrentWorkspaceIdentityBootstrapContractHash
-	WorkspaceBootstrapRoleTenantAdmin                = modulehost.WorkspaceBootstrapRoleTenantAdmin
-	WorkspaceBootstrapRoleHeadquartersAdmin          = modulehost.WorkspaceBootstrapRoleHeadquartersAdmin
-	WorkspaceBootstrapRoleStoreManager               = modulehost.WorkspaceBootstrapRoleStoreManager
-	WorkspaceBootstrapRoleStaff                      = modulehost.WorkspaceBootstrapRoleStaff
-	WorkspaceIdentityBootstrapTransactionCommitted   = modulehost.WorkspaceIdentityBootstrapTransactionCommitted
-	WorkspaceIdentityBootstrapTransactionRolledBack  = modulehost.WorkspaceIdentityBootstrapTransactionRolledBack
+	WorkspaceProvisionFailureAfterIdentityUser      = modulehost.WorkspaceProvisionFailureAfterIdentityUser
+	WorkspaceProvisionFailureAfterIdentityRole      = modulehost.WorkspaceProvisionFailureAfterIdentityRole
+	WorkspaceProvisionFailureAfterRoleAssignment    = modulehost.WorkspaceProvisionFailureAfterRoleAssignment
+	WorkspaceProvisionFailureAfterCredential        = modulehost.WorkspaceProvisionFailureAfterCredential
+	WorkspaceProvisionFailureAfterCompany           = modulehost.WorkspaceProvisionFailureAfterCompany
+	WorkspaceProvisionFailureAfterFirstStore        = modulehost.WorkspaceProvisionFailureAfterFirstStore
+	WorkspaceProvisionFailureAfterBootstrapReceipt  = modulehost.WorkspaceProvisionFailureAfterBootstrapReceipt
+	WorkspaceIdentityBootstrapContractVersion       = modulehost.WorkspaceIdentityBootstrapContractVersion
+	WorkspaceIdentityBootstrapContractCanonical     = modulehost.WorkspaceIdentityBootstrapContractCanonical
+	WorkspaceIdentityBootstrapContractHash          = modulehost.WorkspaceIdentityBootstrapContractHash
+	WorkspaceIdentityBootstrapTransactionCommitted  = modulehost.WorkspaceIdentityBootstrapTransactionCommitted
+	WorkspaceIdentityBootstrapTransactionRolledBack = modulehost.WorkspaceIdentityBootstrapTransactionRolledBack
 )
 
 type WorkspaceRoleReconcileRequest = modulehost.WorkspaceRoleReconcileRequest
@@ -513,7 +514,6 @@ type EmbeddedWorkspaceProvisioner = modulehost.WorkspaceProvisioner
 type WorkspaceAcceptanceFixtureRequest = modulehost.WorkspaceAcceptanceFixtureRequest
 type EmbeddedWorkspaceAcceptanceFixtureProvisioner = modulehost.WorkspaceAcceptanceFixtureProvisioner
 type EmbeddedWorkspaceAcceptanceFixtureProvisionerBinding = modulehost.WorkspaceAcceptanceFixtureProvisionerBinding
-type EmbeddedWorkspaceIdentityBootstrapV2 = modulehost.WorkspaceIdentityBootstrapV2
 type Principal = authorization.Principal
 type RequestIdentity = authorization.RequestIdentity
 type PrincipalAuthenticator = authorization.PrincipalAuthenticator

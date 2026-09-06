@@ -45,13 +45,14 @@ var (
 	_ identity.ProjectRoleCatalogPublisher
 	_ identity.EmbeddedWorkspaceProvisioner
 	_ identity.BootstrapBinding
-	_ identity.EmbeddedWorkspaceIdentityBootstrapV2
+	_ identity.WorkspaceIdentityBootstrap
 	_ identity.EmbeddedWorkspaceAcceptanceFixtureProvisioner
 	_ authentication.Authentication
 	_ authorization.Authorization
 	_ identitymodel.Projection
 		_ httpapi.Adapter
 	_ = application.Bind
+	_ = identity.WorkspaceBootstrapProjectRoleCatalogSHA256
 	_ = evaluator.Evaluate
 	_ = principal.NewResolver
 	_ = browsergateway.New

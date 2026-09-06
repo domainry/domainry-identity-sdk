@@ -72,6 +72,11 @@ type ProjectRoleCatalog struct {
 	// application's metadata model.
 	Objects json.RawMessage         `json:"objects,omitempty"`
 	Roles   []ProjectRoleDefinition `json:"roles"`
+	// InitialWorkspaceAdministratorRoleKey is consumed only by the trusted,
+	// in-process Workspace bootstrap catalog binder. It is deliberately not
+	// serialized: public role-catalog publication and browser-facing DTOs
+	// cannot select the first Workspace administrator's role.
+	InitialWorkspaceAdministratorRoleKey string `json:"-"`
 }
 
 type ProjectRoleCatalogReceipt struct {

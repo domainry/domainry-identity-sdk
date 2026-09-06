@@ -35,9 +35,10 @@ func TestProjectRolePermissionCarriesItsOwnClosedDataScope(t *testing.T) {
 
 func TestProjectRoleCatalogPreservesApplicationObjectCatalog(t *testing.T) {
 	catalog := ProjectRoleCatalog{
-		Application: ApplicationRef{WorkspaceID: "workspace-primary", ApplicationKey: "runtime"},
-		Objects:     json.RawMessage(`[{"key":"customer","fields":[{"key":"name"}]}]`),
-		Roles:       []ProjectRoleDefinition{},
+		Application:                          ApplicationRef{WorkspaceID: "workspace-primary", ApplicationKey: "runtime"},
+		Objects:                              json.RawMessage(`[{"key":"customer","fields":[{"key":"name"}]}]`),
+		Roles:                                []ProjectRoleDefinition{},
+		InitialWorkspaceAdministratorRoleKey: "crm_acceptance_admin",
 	}
 	payload, err := json.Marshal(catalog)
 	if err != nil {
@@ -46,6 +47,9 @@ func TestProjectRoleCatalogPreservesApplicationObjectCatalog(t *testing.T) {
 	var roundTrip ProjectRoleCatalog
 	if err := json.Unmarshal(payload, &roundTrip); err != nil {
 		t.Fatal(err)
+	}
+	if roundTrip.InitialWorkspaceAdministratorRoleKey != "" || strings.Contains(string(payload), "crm_acceptance_admin") {
+		t.Fatalf("trusted bootstrap role leaked through JSON: %s", payload)
 	}
 	var objects []struct {
 		Key    string `json:"key"`

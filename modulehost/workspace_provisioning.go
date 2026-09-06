@@ -87,9 +87,9 @@ type WorkspaceRoleReconcileResult struct {
 	ProvisionedRoles int `json:"provisioned_roles"`
 }
 
-// WorkspaceProvisioner is the isolated V1 legacy capability. Protocol V3's
+// WorkspaceProvisioner is an isolated earlier provisioning capability.
 // BootstrapBinding does not expose it. New hosts must use
-// WorkspaceIdentityBootstrapV2 so callers cannot choose roles or arbitrary
+// WorkspaceIdentityBootstrap so callers cannot choose roles or arbitrary
 // organization relationships and credentials cannot escape before commit.
 type WorkspaceProvisioner interface {
 	ProvisionWorkspaceIdentity(context.Context, WorkspaceIdentityProvisionRequest, Transaction) (WorkspaceIdentityProvisionResult, error)
@@ -97,7 +97,7 @@ type WorkspaceProvisioner interface {
 }
 
 // WorkspaceAcceptanceFixtureRequest is a startup-only verification seam. It
-// can append managed fixtures after the fixed V2 graph inside the same host
+// can append managed fixtures after the trusted bootstrap graph inside the same host
 // transaction, but cannot replace the initial administrator or its credential.
 type WorkspaceAcceptanceFixtureRequest struct {
 	WorkspaceID   string                            `json:"-"`
@@ -114,23 +114,16 @@ type WorkspaceAcceptanceFixtureProvisionerBinding interface {
 }
 
 const (
-	WorkspaceIdentityBootstrapContractVersionV2      = "domainry-workspace-identity-bootstrap-v2"
-	WorkspaceIdentityBootstrapContractCanonicalV2    = "domainry-workspace-identity-bootstrap-v2|request:invocation_id,workspace_id,company_id,company_code,company_name,first_store_id,first_store_code,first_store_name,initial_admin_user_id,initial_admin_login_id,initial_admin_name|roles:tenant_admin,headquarters_admin,store_manager,staff|assignment:initial_admin=headquarters_admin@company|result:receipt_only|completion:committed,rolled_back|credential:post_commit_one_time_nonpersistent"
-	WorkspaceIdentityBootstrapContractHashV2         = "5011287354029d67c64e1f9dedf3767234c9af8d7ec7e29886a9b4b419ccc9c8"
-	CurrentWorkspaceIdentityBootstrapContractVersion = WorkspaceIdentityBootstrapContractVersionV2
-	CurrentWorkspaceIdentityBootstrapContractHash    = WorkspaceIdentityBootstrapContractHashV2
-
-	WorkspaceBootstrapRoleTenantAdmin       = "tenant_admin"
-	WorkspaceBootstrapRoleHeadquartersAdmin = "headquarters_admin"
-	WorkspaceBootstrapRoleStoreManager      = "store_manager"
-	WorkspaceBootstrapRoleStaff             = "staff"
+	WorkspaceIdentityBootstrapContractVersion   = "domainry-workspace-identity-bootstrap-v1"
+	WorkspaceIdentityBootstrapContractCanonical = "domainry-workspace-identity-bootstrap-v1|request:invocation_id,workspace_id,company_id,company_code,company_name,first_store_id,first_store_code,first_store_name,initial_admin_user_id,initial_admin_login_id,initial_admin_name|roles:trusted_bound_catalog(provision_to_workspaces=true,audience=any_or_user_or_business_profile,assignment_mode!=system_managed),role_catalog_sha256|assignment:initial_admin=trusted_explicit_manual_any_or_user_role@company|result:receipt_with_role_policy_evidence|completion:committed,rolled_back|credential:post_commit_one_time_nonpersistent"
+	WorkspaceIdentityBootstrapContractHash      = "2437c3597855a0985c63d82bc4f524e4e28053ba54d956c790262a1500d7c53c"
 )
 
-// WorkspaceIdentityBootstrapV2Request is a trusted, in-process-only graph
+// WorkspaceIdentityBootstrapRequest is a trusted, in-process-only graph
 // command. Every field is excluded from JSON deliberately: a browser or
 // generated public handler cannot select the Workspace, graph identifiers,
 // organization relationship, role, or initial credential.
-type WorkspaceIdentityBootstrapV2Request struct {
+type WorkspaceIdentityBootstrapRequest struct {
 	ContractVersion     string `json:"-"`
 	ContractHash        string `json:"-"`
 	InvocationID        string `json:"-"`
@@ -146,19 +139,21 @@ type WorkspaceIdentityBootstrapV2Request struct {
 	InitialAdminName    string `json:"-"`
 }
 
-// WorkspaceIdentityBootstrapV2Receipt is the only transaction-phase result.
+// WorkspaceIdentityBootstrapReceipt is the only transaction-phase result.
 // It is safe to persist and replay because it never contains a credential.
-type WorkspaceIdentityBootstrapV2Receipt struct {
-	ContractVersion     string `json:"contract_version"`
-	ContractHash        string `json:"contract_hash"`
-	ReceiptID           string `json:"receipt_id"`
-	InvocationID        string `json:"invocation_id"`
-	WorkspaceID         string `json:"workspace_id"`
-	CompanyID           string `json:"company_id"`
-	FirstStoreID        string `json:"first_store_id"`
-	InitialAdminUserID  string `json:"initial_admin_user_id"`
-	InitialAdminLoginID string `json:"initial_admin_login_id"`
-	Replayed            bool   `json:"replayed"`
+type WorkspaceIdentityBootstrapReceipt struct {
+	ContractVersion                      string `json:"contract_version"`
+	ContractHash                         string `json:"contract_hash"`
+	ReceiptID                            string `json:"receipt_id"`
+	InvocationID                         string `json:"invocation_id"`
+	WorkspaceID                          string `json:"workspace_id"`
+	CompanyID                            string `json:"company_id"`
+	FirstStoreID                         string `json:"first_store_id"`
+	InitialAdminUserID                   string `json:"initial_admin_user_id"`
+	InitialAdminLoginID                  string `json:"initial_admin_login_id"`
+	RoleCatalogSHA256                    string `json:"role_catalog_sha256"`
+	InitialWorkspaceAdministratorRoleKey string `json:"initial_workspace_administrator_role_key"`
+	Replayed                             bool   `json:"replayed"`
 }
 
 // WorkspaceIdentityBootstrapCredentialClaim is usable only after the host has
@@ -193,13 +188,13 @@ type WorkspaceIdentityBootstrapOneTimeCredential struct {
 	MustChangePassword bool   `json:"-"`
 }
 
-// WorkspaceIdentityBootstrapV2 is the Protocol V3 initialization capability.
-// BootstrapWorkspaceIdentityV2 joins the host transaction and returns only a
+// WorkspaceIdentityBootstrap is the in-process initialization capability.
+// BootstrapWorkspaceIdentity joins the host transaction and returns only a
 // non-secret receipt. The host must report commit or rollback through
-// CompleteWorkspaceIdentityBootstrapV2. Only a verified commit permits the
+// CompleteWorkspaceIdentityBootstrap. Only a verified commit permits the
 // volatile credential to be claimed exactly once.
-type WorkspaceIdentityBootstrapV2 interface {
-	BootstrapWorkspaceIdentityV2(context.Context, WorkspaceIdentityBootstrapV2Request, Transaction) (WorkspaceIdentityBootstrapV2Receipt, error)
-	CompleteWorkspaceIdentityBootstrapV2(context.Context, WorkspaceIdentityBootstrapCompletion) error
-	ClaimWorkspaceIdentityBootstrapCredentialV2(context.Context, WorkspaceIdentityBootstrapCredentialClaim) (WorkspaceIdentityBootstrapOneTimeCredential, error)
+type WorkspaceIdentityBootstrap interface {
+	BootstrapWorkspaceIdentity(context.Context, WorkspaceIdentityBootstrapRequest, Transaction) (WorkspaceIdentityBootstrapReceipt, error)
+	CompleteWorkspaceIdentityBootstrap(context.Context, WorkspaceIdentityBootstrapCompletion) error
+	ClaimWorkspaceIdentityBootstrapCredential(context.Context, WorkspaceIdentityBootstrapCredentialClaim) (WorkspaceIdentityBootstrapOneTimeCredential, error)
 }

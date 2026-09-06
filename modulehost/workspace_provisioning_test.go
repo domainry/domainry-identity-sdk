@@ -20,10 +20,10 @@ func TestWorkspaceProvisioningPasswordNeverEntersSerializedContract(t *testing.T
 	}
 }
 
-func TestWorkspaceIdentityBootstrapV2IsNonHTTPAndCredentialNeverSerializes(t *testing.T) {
-	requestJSON, err := json.Marshal(WorkspaceIdentityBootstrapV2Request{
-		ContractVersion: CurrentWorkspaceIdentityBootstrapContractVersion,
-		ContractHash:    CurrentWorkspaceIdentityBootstrapContractHash,
+func TestWorkspaceIdentityBootstrapIsNonHTTPAndCredentialNeverSerializes(t *testing.T) {
+	requestJSON, err := json.Marshal(WorkspaceIdentityBootstrapRequest{
+		ContractVersion: WorkspaceIdentityBootstrapContractVersion,
+		ContractHash:    WorkspaceIdentityBootstrapContractHash,
 		InvocationID:    "invocation", WorkspaceID: "workspace", CompanyID: "company",
 		CompanyCode: "COMPANY", CompanyName: "Company", FirstStoreID: "store",
 		FirstStoreCode: "STORE", FirstStoreName: "Store", InitialAdminUserID: "user",
@@ -55,15 +55,15 @@ func TestWorkspaceIdentityBootstrapV2IsNonHTTPAndCredentialNeverSerializes(t *te
 	}
 }
 
-func TestWorkspaceIdentityBootstrapV2ContractConstantsArePinned(t *testing.T) {
-	if CurrentWorkspaceIdentityBootstrapContractVersion != "domainry-workspace-identity-bootstrap-v2" {
-		t.Fatalf("version=%q", CurrentWorkspaceIdentityBootstrapContractVersion)
+func TestWorkspaceIdentityBootstrapContractConstantsArePinned(t *testing.T) {
+	if WorkspaceIdentityBootstrapContractVersion != "domainry-workspace-identity-bootstrap-v1" {
+		t.Fatalf("version=%q", WorkspaceIdentityBootstrapContractVersion)
 	}
-	if CurrentWorkspaceIdentityBootstrapContractHash != "5011287354029d67c64e1f9dedf3767234c9af8d7ec7e29886a9b4b419ccc9c8" {
-		t.Fatalf("hash=%q", CurrentWorkspaceIdentityBootstrapContractHash)
+	if WorkspaceIdentityBootstrapContractHash != "2437c3597855a0985c63d82bc4f524e4e28053ba54d956c790262a1500d7c53c" {
+		t.Fatalf("hash=%q", WorkspaceIdentityBootstrapContractHash)
 	}
-	digest := sha256.Sum256([]byte(WorkspaceIdentityBootstrapContractCanonicalV2))
-	if actual := hex.EncodeToString(digest[:]); actual != CurrentWorkspaceIdentityBootstrapContractHash {
+	digest := sha256.Sum256([]byte(WorkspaceIdentityBootstrapContractCanonical))
+	if actual := hex.EncodeToString(digest[:]); actual != WorkspaceIdentityBootstrapContractHash {
 		t.Fatalf("canonical contract hash=%q", actual)
 	}
 }

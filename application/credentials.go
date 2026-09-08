@@ -42,3 +42,14 @@ func (value credentials) RevokeSessions(ctx context.Context, request identity.Re
 	request.WorkspaceID = workspaceID
 	return value.binding.delegate.Credentials().RevokeSessions(ctx, request)
 }
+
+func (value credentials) ManageTOTP(ctx context.Context, request identity.TOTPRequest) (identity.TOTPResult, error) {
+	if _, err := value.binding.verifyAccessToken(ctx, request.AccessToken); err != nil {
+		return identity.TOTPResult{}, err
+	}
+	manager, ok := value.binding.delegate.Credentials().(identity.TOTPManager)
+	if !ok {
+		return identity.TOTPResult{}, &identity.Error{Code: "auth.totp_unavailable"}
+	}
+	return manager.ManageTOTP(ctx, request)
+}

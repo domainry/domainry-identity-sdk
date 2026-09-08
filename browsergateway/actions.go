@@ -21,6 +21,7 @@ func browserGatewayRouteSpecs() []browserGatewayRouteSpec {
 	anonymous := actioncontract.Authorization{Strategy: actioncontract.AuthorizationAnonymous}
 	principal := actioncontract.Authorization{Strategy: actioncontract.AuthorizationAuthenticated}
 	return []browserGatewayRouteSpec{
+		{key: "identity.browser.credentials.totp", capabilityKey: "identity.browser.credentials", capabilityLabel: "Browser credentials", operationKey: "totp", operationLabel: "Manage verifier", label: "Manage the current subject TOTP authenticator", method: http.MethodPost, suffix: "/auth/totp", handlerKey: "totp", authorization: principal, risk: actioncontract.RiskHigh},
 		{key: "identity.browser.session.get", capabilityKey: "identity.browser.session", capabilityLabel: "Browser session", operationKey: "get", operationLabel: "Get", label: "Read the current browser session", method: http.MethodGet, suffix: "/auth/session", handlerKey: "session", authorization: principal, risk: actioncontract.RiskLow},
 		{key: "identity.browser.authorization_code.exchange", capabilityKey: "identity.browser.authorization_code", capabilityLabel: "Browser authorization code", operationKey: "exchange", operationLabel: "Exchange", label: "Exchange a browser authorization code", method: http.MethodPost, suffix: "/auth/code/exchange", handlerKey: "code_exchange", authorization: anonymous, risk: actioncontract.RiskMedium},
 		{key: "identity.browser.authentication.login", capabilityKey: "identity.browser.authentication", capabilityLabel: "Browser authentication", operationKey: "login", operationLabel: "Login", label: "Create a browser session with credentials", method: http.MethodPost, suffix: "/auth/login", handlerKey: "login", authorization: anonymous, risk: actioncontract.RiskMedium},
@@ -71,6 +72,8 @@ func ActionDefinitions(prefix string) ([]actioncontract.ActionDefinition, error)
 
 func (gateway *Gateway) routeHandler(handlerKey string) http.HandlerFunc {
 	switch handlerKey {
+	case "totp":
+		return gateway.ManageTOTP
 	case "session":
 		return gateway.Session
 	case "code_exchange":

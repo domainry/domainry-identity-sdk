@@ -31,7 +31,7 @@ func TestBrowserGatewayRoutesProjectOneFrozenActionManifest(t *testing.T) {
 	if err := registry.Freeze(); err != nil {
 		t.Fatal(err)
 	}
-	if len(definitions) != 14 || len(patterns) != len(definitions) {
+	if len(definitions) != 15 || len(patterns) != len(definitions) {
 		t.Fatalf("definitions=%d patterns=%d", len(definitions), len(patterns))
 	}
 	for index, definition := range definitions {

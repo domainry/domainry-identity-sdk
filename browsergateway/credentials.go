@@ -59,3 +59,22 @@ func (gateway *Gateway) RevokeSessions(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (gateway *Gateway) ManageTOTP(w http.ResponseWriter, r *http.Request) {
+	var request identity.TOTPRequest
+	if !gateway.decodeJSON(w, r, &request) {
+		return
+	}
+	request.AccessToken = bearerToken(r.Header.Get("Authorization"))
+	manager, ok := gateway.binding.Credentials().(identity.TOTPManager)
+	if !ok {
+		gateway.writeError(w, &identity.Error{Code: "auth.totp_unavailable"})
+		return
+	}
+	result, err := manager.ManageTOTP(r.Context(), request)
+	if err != nil {
+		gateway.writeError(w, err)
+		return
+	}
+	gateway.writeJSON(w, http.StatusOK, result)
+}

@@ -554,3 +554,7 @@ var RestrictAccess = authorization.RestrictAccess
 const (
 	UserStatusActive = identitymodel.UserStatusActive
 )
+
+type TOTPManager = authentication.TOTPManager
+type TOTPRequest = authentication.TOTPRequest
+type TOTPResult = authentication.TOTPResult

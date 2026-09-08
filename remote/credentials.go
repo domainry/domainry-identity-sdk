@@ -33,3 +33,9 @@ func idempotencyHeaders(key string) http.Header {
 	}
 	return http.Header{"Idempotency-Key": []string{key}}
 }
+
+func (adapter credentialClient) ManageTOTP(ctx context.Context, request identity.TOTPRequest) (identity.TOTPResult, error) {
+	var result identity.TOTPResult
+	err := adapter.client.doJSON(ctx, http.MethodPost, "/auth/totp", request.AccessToken, request, &result)
+	return result, err
+}

@@ -18,8 +18,9 @@ import (
 type DeploymentMode string
 
 const (
-	DeploymentModeModule DeploymentMode = "module"
-	DeploymentModeSaaS   DeploymentMode = "saas"
+	DeploymentModeModule   DeploymentMode = "module"
+	DeploymentModeSaaS     DeploymentMode = "saas"
+	DeploymentModeExternal DeploymentMode = "external"
 )
 
 type Descriptor struct {
@@ -80,6 +81,10 @@ type DatabaseHandle struct {
 	// The host must persist it across restarts; deliberate rotation invalidates
 	// outstanding cursors fail closed.
 	WorkspaceIdentityUsageCursorKey []byte
+	// ExternalWorkspaces exposes only Runtime-owned Workspace persistence to an
+	// external identity module. The module supplies the same database transaction
+	// used for its source-owned identity/ownership state.
+	ExternalWorkspaces ExternalWorkspaceHost
 }
 
 // EmbeddedMigrationRegistrar lets an in-process Identity module execute its
@@ -558,3 +563,21 @@ const (
 type TOTPManager = authentication.TOTPManager
 type TOTPRequest = authentication.TOTPRequest
 type TOTPResult = authentication.TOTPResult
+
+// ExternalDatabaseFactory is selected explicitly by project composition. It
+// provides the full read/authorization Binding while authentication and account
+// lifecycle remain owned by an external authority.
+type ExternalDatabaseFactory interface {
+	Factory
+	OpenExternalWithDatabase(context.Context, ApplicationRef, DatabaseHandle) (Binding, error)
+}
+
+// PrincipalAuthenticationBinding replaces the token/session resolver at the
+// authentication edge without changing business authorization semantics.
+type PrincipalAuthenticationBinding interface {
+	PrincipalAuthenticator() PrincipalAuthenticator
+}
+
+type ExternalWorkspaceCreate = modulehost.ExternalWorkspaceCreate
+type ExternalWorkspaceHost = modulehost.ExternalWorkspaceHost
+type RequestCredentialBinding = authentication.RequestCredentialBinding

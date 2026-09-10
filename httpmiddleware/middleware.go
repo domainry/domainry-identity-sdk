@@ -13,6 +13,16 @@ type ErrorWriter func(http.ResponseWriter, *http.Request, int, string)
 
 type Option func(*Middleware)
 
+// WithBindingCredential uses the binding's transport adapter when provided.
+// The default remains the SDK Bearer credential parser.
+func WithBindingCredential(binding identitysdk.Binding) Option {
+	return func(m *Middleware) {
+		if source, ok := binding.(identitysdk.RequestCredentialBinding); ok {
+			m.credential = source.ReadAccessCredential
+		}
+	}
+}
+
 func WithErrorWriter(writer ErrorWriter) Option {
 	return func(middleware *Middleware) {
 		if writer != nil {
@@ -30,6 +40,7 @@ func WithAuthorization(authorization identitysdk.Authorization) Option {
 }
 
 type Middleware struct {
+	credential    func(*http.Request) (string, error)
 	authenticator identitysdk.PrincipalAuthenticator
 	authorization identitysdk.Authorization
 	writeError    ErrorWriter
@@ -93,6 +104,20 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 		accessToken, ok := BearerToken(r)
+		if m.credential != nil {
+			var err error
+			accessToken, err = m.credential(r)
+			if err != nil {
+				status, code := authenticationError(err)
+				var identityError *identitysdk.Error
+				if errors.As(err, &identityError) && identityError.StatusCode == http.StatusForbidden {
+					status = http.StatusForbidden
+				}
+				m.writeError(w, r, status, code)
+				return
+			}
+			ok = strings.TrimSpace(accessToken) != ""
+		}
 		if !ok {
 			m.writeError(w, r, http.StatusUnauthorized, "auth.token_required")
 			return

@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -14,9 +15,15 @@ func TestExternalConsumerCompilesEveryPublicGoPackage(t *testing.T) {
 		t.Fatal("resolve SDK repository path")
 	}
 	repository := filepath.Dir(sourceFile)
-	foundationRepository := filepath.Join(filepath.Dir(repository), "domainry-foundation")
+	resolveFoundation := exec.Command("go", "list", "-m", "-f={{.Dir}}", "github.com/domainry/domainry-foundation")
+	resolveFoundation.Dir = repository
+	selected, err := resolveFoundation.Output()
+	if err != nil {
+		t.Fatalf("resolve selected Foundation module: %v", err)
+	}
+	foundationRepository := strings.TrimSpace(string(selected))
 	if _, err := os.Stat(filepath.Join(foundationRepository, "modulecapability", "contract.go")); err != nil {
-		t.Fatalf("resolve Foundation repository used by the current SDK contract: %v", err)
+		t.Fatalf("selected Foundation capability contract: %v", err)
 	}
 	consumer := t.TempDir()
 	goMod := "module example.com/identity-consumer\n\ngo 1.26.0\n\nrequire (\n\tgithub.com/domainry/domainry-foundation v0.0.0\n\tgithub.com/domainry/domainry-identity-sdk v0.0.0\n)\n\nreplace github.com/domainry/domainry-foundation => " + foundationRepository + "\n\nreplace github.com/domainry/domainry-identity-sdk => " + repository + "\n"
@@ -38,9 +45,15 @@ import (
 		"github.com/domainry/domainry-identity-sdk/httpmiddleware"
 		identitymodel "github.com/domainry/domainry-identity-sdk/identity"
 	"github.com/domainry/domainry-identity-sdk/remote"
+ "github.com/domainry/domainry-identity-sdk/organizationunit"
 )
 
 var (
+	_ identity.ExternalDatabaseFactory
+ _ identity.ExternalWorkspaceHost
+ _ identity.PrincipalAuthenticationBinding
+ _ identity.RequestCredentialBinding
+ _ organizationunit.Binding
 	_ identity.Factory
 	_ identity.ProjectRoleCatalogPublisher
 	_ identity.BootstrapProjectNavigationCatalogBinder
@@ -56,6 +69,7 @@ var (
 	_ = identity.WorkspaceBootstrapProjectRoleCatalogSHA256
 	_ = identity.ProjectNavigationCatalogSHA256
 	_ = evaluator.Evaluate
+	_ = principal.NewAuthenticator
 	_ = principal.NewResolver
 	_ = browsergateway.New
 	_ = httpmiddleware.New

@@ -32,29 +32,19 @@ type DisplayNameProjection interface {
 	ResolveDisplayNames(context.Context, DisplayNameQuery) (DisplayNameResult, error)
 }
 
-type ProjectionQuery struct {
-	// Deprecated: retained for source compatibility. Projection scope is
-	// established by the Binding or remote client and this field is ignored.
-	Application ApplicationScope `json:"-"`
-}
+type ProjectionQuery struct{}
 
 type UserLookup struct {
-	// Deprecated: retained for source compatibility and never serialized.
-	Application ApplicationScope `json:"-"`
-	UserID      SubjectID        `json:"user_id"`
+	UserID SubjectID `json:"user_id"`
 }
 
 type OrganizationUnitLookup struct {
-	// Deprecated: retained for source compatibility and never serialized.
-	Application ApplicationScope `json:"-"`
-	OrgID       string           `json:"org_id"`
+	OrgID string `json:"org_id"`
 }
 
 type DisplayNameQuery struct {
-	// Deprecated: retained for source compatibility and never serialized.
-	Application         ApplicationScope `json:"-"`
-	UserIDs             []string         `json:"user_ids,omitempty"`
-	OrganizationUnitIDs []string         `json:"organization_unit_ids,omitempty"`
+	UserIDs             []string `json:"user_ids,omitempty"`
+	OrganizationUnitIDs []string `json:"organization_unit_ids,omitempty"`
 }
 
 type DisplayName struct {
@@ -68,9 +58,7 @@ type DisplayNameResult struct {
 }
 
 type UserRoleAssignmentQuery struct {
-	// Deprecated: retained for source compatibility and never serialized.
-	Application ApplicationScope `json:"-"`
-	UserID      SubjectID        `json:"user_id,omitempty"`
+	UserID SubjectID `json:"user_id,omitempty"`
 }
 
 // User contains only projection attributes safe for application projections. It

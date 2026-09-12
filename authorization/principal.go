@@ -161,13 +161,9 @@ type PrincipalResolver interface {
 }
 
 type PrincipalResolutionRequest struct {
-	// Application is retained only so clients compiled against v0.1.7 keep
-	// source compatibility. Identity ignores it and never serializes it;
-	// application scope comes from the bound or authenticated context.
-	Application identitymodel.ApplicationScope `json:"-"`
-	SubjectID   identitymodel.SubjectID        `json:"subject_id"`
-	RoleKey     string                         `json:"role_key,omitempty"`
-	Workload    *WorkflowWorkloadResolution    `json:"workload,omitempty"`
+	SubjectID identitymodel.SubjectID     `json:"subject_id"`
+	RoleKey   string                      `json:"role_key,omitempty"`
+	Workload  *WorkflowWorkloadResolution `json:"workload,omitempty"`
 }
 
 type WorkflowWorkloadResolution struct {

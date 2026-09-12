@@ -33,7 +33,6 @@ func TestExternalConsumerCompilesEveryPublicGoPackage(t *testing.T) {
 	source := `package consumer
 
 import (
-	"encoding/json"
 	identity "github.com/domainry/domainry-identity-sdk"
 	"github.com/domainry/domainry-identity-sdk/application"
 	"github.com/domainry/domainry-identity-sdk/authentication"
@@ -75,13 +74,12 @@ var (
 	_ = browsergateway.New
 	_ = httpmiddleware.New
 	_ = remote.NewFactory
-	_ = identity.PrincipalResolutionRequest{Application: identity.ApplicationScope{WorkspaceID: "legacy-workspace", ApplicationKey: "legacy-app"}}
-	_ = identity.ProjectionQuery{Application: identity.ApplicationScope{WorkspaceID: "legacy-workspace", ApplicationKey: "legacy-app"}}
-	_ = identity.UserLookup{Application: identity.ApplicationScope{WorkspaceID: "legacy-workspace", ApplicationKey: "legacy-app"}}
-	_ = identity.OrganizationUnitLookup{Application: identity.ApplicationScope{WorkspaceID: "legacy-workspace", ApplicationKey: "legacy-app"}}
-	_ = identity.DisplayNameQuery{Application: identity.ApplicationScope{WorkspaceID: "legacy-workspace", ApplicationKey: "legacy-app"}}
-	_ = identity.UserRoleAssignmentQuery{Application: identity.ApplicationScope{WorkspaceID: "legacy-workspace", ApplicationKey: "legacy-app"}}
-	_, _ = json.Marshal(identity.UserLookup{Application: identity.ApplicationScope{WorkspaceID: "legacy-workspace", ApplicationKey: "legacy-app"}, UserID: "user"})
+	_ = identity.PrincipalResolutionRequest{SubjectID: "user"}
+	_ = identity.ProjectionQuery{}
+	_ = identity.UserLookup{UserID: "user"}
+	_ = identity.OrganizationUnitLookup{OrgID: "org"}
+	_ = identity.DisplayNameQuery{UserIDs: []string{"user"}}
+	_ = identity.UserRoleAssignmentQuery{UserID: "user"}
 )
 `
 	if err := os.WriteFile(filepath.Join(consumer, "consumer.go"), []byte(source), 0o600); err != nil {

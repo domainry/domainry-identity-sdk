@@ -13,7 +13,7 @@ func (gateway *Gateway) Login(w http.ResponseWriter, r *http.Request) {
 	if !gateway.decodeJSON(w, r, &browserRequest) {
 		return
 	}
-	workspaceID, ok := gateway.workspaceID(w, r, browserRequest.WorkspaceID)
+	workspaceID, ok := gateway.passwordLoginWorkspaceID(w, r, browserRequest.WorkspaceID, browserRequest.Login)
 	if !ok {
 		return
 	}
@@ -55,13 +55,13 @@ func (gateway *Gateway) Refresh(w http.ResponseWriter, r *http.Request) {
 	if !gateway.decodeJSON(w, r, &scope) {
 		return
 	}
-	workspaceID, ok := gateway.workspaceID(w, r, scope.WorkspaceID)
-	if !ok {
-		return
-	}
 	refreshToken, ok := gateway.refreshToken(r)
 	if !ok {
 		gateway.writeCode(w, http.StatusUnauthorized, "auth.refresh_token_required")
+		return
+	}
+	workspaceID, ok := gateway.refreshSessionWorkspaceID(w, r, scope.WorkspaceID, refreshToken)
+	if !ok {
 		return
 	}
 	session, err := gateway.binding.Authentication().RefreshSession(r.Context(), identity.RefreshRequest{
@@ -82,13 +82,13 @@ func (gateway *Gateway) Logout(w http.ResponseWriter, r *http.Request) {
 	if !gateway.decodeJSON(w, r, &scope) {
 		return
 	}
-	workspaceID, ok := gateway.workspaceID(w, r, scope.WorkspaceID)
-	if !ok {
-		return
-	}
-	refreshToken, _ := gateway.refreshToken(r)
+	refreshToken, hasRefreshToken := gateway.refreshToken(r)
 	var logoutErr error
-	if refreshToken != "" {
+	if hasRefreshToken {
+		workspaceID, ok := gateway.refreshSessionWorkspaceID(w, r, scope.WorkspaceID, refreshToken)
+		if !ok {
+			return
+		}
 		logoutErr = gateway.binding.Authentication().LogoutSession(r.Context(), identity.LogoutRequest{
 			WorkspaceID: workspaceID, ApplicationKey: gateway.config.ApplicationKey, RefreshToken: refreshToken,
 		})
@@ -103,8 +103,7 @@ func (gateway *Gateway) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gateway *Gateway) Session(w http.ResponseWriter, r *http.Request) {
-	workspaceID, ok := gateway.workspaceID(w, r, "")
-	if !ok {
+	if gateway.rejectNonWorkspaceBoundary(w, r) {
 		return
 	}
 	token := bearerToken(r.Header.Get("Authorization"))
@@ -117,9 +116,15 @@ func (gateway *Gateway) Session(w http.ResponseWriter, r *http.Request) {
 		gateway.writeError(w, err)
 		return
 	}
-	if session.WorkspaceID != workspaceID {
-		gateway.writeCode(w, http.StatusBadRequest, "identity.workspace_scope_mismatch")
-		return
+	if gateway.hasExplicitWorkspace(r, "") {
+		workspaceID, ok := gateway.workspaceID(w, r, "")
+		if !ok {
+			return
+		}
+		if session.WorkspaceID != workspaceID {
+			gateway.writeCode(w, http.StatusBadRequest, "identity.workspace_scope_mismatch")
+			return
+		}
 	}
 	gateway.writeJSON(w, http.StatusOK, newBrowserSessionView(session))
 }

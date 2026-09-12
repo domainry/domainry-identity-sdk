@@ -72,6 +72,51 @@ func (gateway *Gateway) workspaceID(w http.ResponseWriter, r *http.Request, body
 	return workspaceID, true
 }
 
+func (gateway *Gateway) passwordLoginWorkspaceID(w http.ResponseWriter, r *http.Request, body identity.WorkspaceID, login string) (identity.WorkspaceID, bool) {
+	if gateway.rejectNonWorkspaceBoundary(w, r) {
+		return "", false
+	}
+	if strings.TrimSpace(r.Header.Get("X-Workspace-ID")) != "" || strings.TrimSpace(r.URL.Query().Get("workspace_id")) != "" || strings.TrimSpace(string(body)) != "" {
+		return gateway.workspaceID(w, r, body)
+	}
+	if gateway.config.ResolvePasswordLoginWorkspace == nil {
+		return gateway.workspaceID(w, r, body)
+	}
+	workspaceID, found, err := gateway.config.ResolvePasswordLoginWorkspace(r.Context(), strings.TrimSpace(login))
+	if err != nil {
+		gateway.writeError(w, err)
+		return "", false
+	}
+	if !found || !workspaceID.Valid() {
+		gateway.writeCode(w, http.StatusForbidden, "auth.invalid_credentials")
+		return "", false
+	}
+	return workspaceID, true
+}
+
+func (gateway *Gateway) hasExplicitWorkspace(r *http.Request, body identity.WorkspaceID) bool {
+	return strings.TrimSpace(r.Header.Get("X-Workspace-ID")) != "" ||
+		strings.TrimSpace(r.URL.Query().Get("workspace_id")) != "" ||
+		strings.TrimSpace(string(body)) != ""
+}
+
+func (gateway *Gateway) refreshSessionWorkspaceID(w http.ResponseWriter, r *http.Request, body identity.WorkspaceID, refreshToken string) (identity.WorkspaceID, bool) {
+	if gateway.hasExplicitWorkspace(r, body) || gateway.config.ResolveRefreshSessionWorkspace == nil {
+		return gateway.workspaceID(w, r, body)
+	}
+	workspaceID, found, err := gateway.config.ResolveRefreshSessionWorkspace(r.Context(), strings.TrimSpace(refreshToken))
+	if err != nil {
+		gateway.writeError(w, err)
+		return "", false
+	}
+	if !found || !workspaceID.Valid() {
+		gateway.clearRefreshCookie(w)
+		gateway.writeCode(w, http.StatusUnauthorized, "auth.session_expired")
+		return "", false
+	}
+	return workspaceID, true
+}
+
 func (gateway *Gateway) decodeJSON(w http.ResponseWriter, r *http.Request, target any) bool {
 	if gateway.rejectNonWorkspaceBoundary(w, r) {
 		return false

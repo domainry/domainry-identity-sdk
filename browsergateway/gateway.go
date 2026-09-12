@@ -5,6 +5,7 @@
 package browsergateway
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -28,10 +29,18 @@ type CookieConfig struct {
 type Config struct {
 	// RequireExplicitWorkspace disables the single-workspace fallback for trusted host catalogs.
 	RequireExplicitWorkspace bool
-	ApplicationKey           identity.ApplicationKey
-	DefaultWorkspaceID       identity.WorkspaceID
-	Cookie                   CookieConfig
-	MaxRequestBodySize       int64
+	// ResolvePasswordLoginWorkspace resolves an omitted login scope without
+	// exposing a Workspace selector in the browser. Implementations must return
+	// at most one active Workspace for a globally unique login name.
+	ResolvePasswordLoginWorkspace func(context.Context, string) (identity.WorkspaceID, bool, error)
+	// ResolveRefreshSessionWorkspace resolves an omitted browser session scope
+	// from the opaque HttpOnly refresh credential. Implementations must fail
+	// closed when the credential is missing from the server or is ambiguous.
+	ResolveRefreshSessionWorkspace func(context.Context, string) (identity.WorkspaceID, bool, error)
+	ApplicationKey                 identity.ApplicationKey
+	DefaultWorkspaceID             identity.WorkspaceID
+	Cookie                         CookieConfig
+	MaxRequestBodySize             int64
 }
 
 type Gateway struct {

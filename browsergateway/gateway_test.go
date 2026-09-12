@@ -162,6 +162,41 @@ func TestGatewayRequiresAnInitializedWorkspace(t *testing.T) {
 	}
 }
 
+func TestGatewayResolvesOmittedPasswordLoginWorkspaceWithoutExposingASelector(t *testing.T) {
+	authentication := &testAuthentication{}
+	gateway, err := New(testBinding{auth: authentication}, Config{
+		ApplicationKey:           "identity-admin",
+		RequireExplicitWorkspace: true,
+		ResolvePasswordLoginWorkspace: func(_ context.Context, login string) (identity.WorkspaceID, bool, error) {
+			if login == "admin@example.test" {
+				return "workspace-primary", true, nil
+			}
+			return "", false, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	if err := gateway.RegisterRoutes(mux, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(`{"login":"admin@example.test","password":"secret"}`))
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || authentication.loginRequest.WorkspaceID != "workspace-primary" {
+		t.Fatalf("status=%d request=%#v body=%s", response.Code, authentication.loginRequest, response.Body.String())
+	}
+
+	unknown := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodPost, "/auth/login", strings.NewReader(`{"login":"unknown@example.test","password":"secret"}`))
+	mux.ServeHTTP(unknown, request)
+	if unknown.Code != http.StatusForbidden || !strings.Contains(unknown.Body.String(), "auth.invalid_credentials") {
+		t.Fatalf("status=%d body=%s", unknown.Code, unknown.Body.String())
+	}
+}
+
 func TestGatewayKeepsRefreshCredentialInHTTPOnlyCookie(t *testing.T) {
 	authentication := &testAuthentication{}
 	mux := newTestGateway(t, authentication)
@@ -226,6 +261,63 @@ func TestGatewayRefreshAcceptsOnlyCookieCredential(t *testing.T) {
 		t.Fatalf("status=%d request=%#v body=%s", response.Code, authentication.refreshRequest, response.Body.String())
 	}
 	assertBrowserBodyOmitsLegacyCredentials(t, response.Body.Bytes())
+}
+
+func TestGatewayResolvesOmittedRefreshWorkspaceFromHTTPOnlyCredential(t *testing.T) {
+	authentication := &testAuthentication{}
+	gateway, err := New(testBinding{auth: authentication}, Config{
+		ApplicationKey:           "identity-admin",
+		RequireExplicitWorkspace: true,
+		ResolveRefreshSessionWorkspace: func(_ context.Context, refreshToken string) (identity.WorkspaceID, bool, error) {
+			if refreshToken == "known-refresh" {
+				return "workspace-primary", true, nil
+			}
+			return "", false, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	if err := gateway.RegisterRoutes(mux, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/auth/refresh", strings.NewReader(`{}`))
+	request.AddCookie(&http.Cookie{Name: DefaultRefreshCookieName, Value: "known-refresh"})
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || authentication.refreshRequest.WorkspaceID != "workspace-primary" || authentication.refreshRequest.RefreshToken != "known-refresh" {
+		t.Fatalf("status=%d request=%#v body=%s", response.Code, authentication.refreshRequest, response.Body.String())
+	}
+
+	unknownRequest := httptest.NewRequest(http.MethodPost, "/auth/refresh", strings.NewReader(`{}`))
+	unknownRequest.AddCookie(&http.Cookie{Name: DefaultRefreshCookieName, Value: "unknown-refresh"})
+	unknown := httptest.NewRecorder()
+	mux.ServeHTTP(unknown, unknownRequest)
+	cookies := unknown.Result().Cookies()
+	if unknown.Code != http.StatusUnauthorized || !strings.Contains(unknown.Body.String(), "auth.session_expired") || len(cookies) != 1 || cookies[0].MaxAge >= 0 {
+		t.Fatalf("status=%d cookies=%#v body=%s", unknown.Code, cookies, unknown.Body.String())
+	}
+}
+
+func TestGatewaySessionDerivesWorkspaceFromAccessTokenWhenSelectorIsOmitted(t *testing.T) {
+	authentication := &testAuthentication{currentSession: identity.SessionView{WorkspaceID: "workspace-primary", SubjectID: "user-1"}}
+	gateway, err := New(testBinding{auth: authentication}, Config{ApplicationKey: "identity-admin", RequireExplicitWorkspace: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	if err := gateway.RegisterRoutes(mux, ""); err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/auth/session", nil)
+	request.Header.Set("Authorization", "Bearer access")
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || authentication.currentRequest.AccessToken != "access" {
+		t.Fatalf("status=%d request=%#v body=%s", response.Code, authentication.currentRequest, response.Body.String())
+	}
 }
 
 func TestGatewayClearsInvalidRefreshButKeepsTransientCredential(t *testing.T) {

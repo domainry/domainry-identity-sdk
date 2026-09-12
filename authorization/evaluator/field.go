@@ -145,7 +145,7 @@ func baselineFieldDecision(policy identity.FieldPolicy, action identity.Action) 
 		allowed = policy.Write
 	}
 	if !allowed {
-		return FieldDecision{Effect: identity.FieldEffectHide, Reason: policy.Reason}
+		return FieldDecision{Effect: identity.FieldEffectHide, RuleKey: "static_field_policy", Reason: policy.Reason, AuditDenial: policy.AuditDenial}
 	}
 	if policy.Masked && action != "write" && action != "update" && action != "create" {
 		return FieldDecision{Effect: identity.FieldEffectMask, Reason: policy.Reason}

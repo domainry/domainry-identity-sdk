@@ -359,6 +359,17 @@ func TestContextualFieldEvaluatorOwnsPriorityMaskAndGuardrailSemantics(t *testin
 	}
 }
 
+func TestStaticFieldDenialCarriesExplicitAuditPolicy(t *testing.T) {
+	bundle := identity.AccessBundle{FieldPolicies: []identity.FieldPolicy{{
+		Resource: "health_record", Field: "payload", Read: false,
+		Reason: "sensitive health data", AuditDenial: true,
+	}}}
+	decision, err := EvaluateField(bundle, FieldRequest{Resource: "health_record", Field: "payload", Action: "read"}, nil)
+	if err != nil || decision.Effect != identity.FieldEffectHide || decision.RuleKey != "static_field_policy" || decision.Reason != "sensitive health data" || !decision.AuditDenial {
+		t.Fatalf("static denial=%+v err=%v", decision, err)
+	}
+}
+
 func TestFieldRequiresPolicyEvaluationIdentifiesRulesAndGuardrails(t *testing.T) {
 	bundle := identity.AccessBundle{
 		FieldPolicies: []identity.FieldPolicy{

@@ -113,14 +113,15 @@ type DataPolicy struct {
 }
 
 type FieldPolicy struct {
-	Resource ResourceType `json:"resource"`
-	Field    string       `json:"field"`
-	Read     bool         `json:"read"`
-	Write    bool         `json:"write"`
-	Export   bool         `json:"export"`
-	Masked   bool         `json:"masked"`
-	Reason   string       `json:"reason,omitempty"`
-	Rules    []FieldRule  `json:"rules,omitempty"`
+	Resource    ResourceType `json:"resource"`
+	Field       string       `json:"field"`
+	Read        bool         `json:"read"`
+	Write       bool         `json:"write"`
+	Export      bool         `json:"export"`
+	Masked      bool         `json:"masked"`
+	Reason      string       `json:"reason,omitempty"`
+	AuditDenial bool         `json:"audit_denial,omitempty"`
+	Rules       []FieldRule  `json:"rules,omitempty"`
 }
 
 // FieldRule refines a field's static access envelope for a matching record.

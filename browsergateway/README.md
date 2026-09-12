@@ -12,20 +12,20 @@ gateway neither sets them on binding requests nor serializes them in responses.
 All JSON is decoded strictly. Unknown fields return HTTP 400. The session and
 federated authentication bodies accept only these fields:
 
-- `POST /auth/login`: `workspace_id`, `application_key`, `login`, `password`
+- `POST /auth/login`: `workspace_id`, `login`, `password`
 - `POST /auth/refresh`: `workspace_id`
 - `POST /auth/logout`: `workspace_id`
-- `POST /auth/providers/{provider}/start`: `workspace_id`, `application_key`,
+- `POST /auth/providers/{provider}/start`: `workspace_id`,
   `return_url`, `phone`
 - `POST /auth/providers/{provider}/verify`: `workspace_id`, `state`, `code`
-- `POST /auth/code/exchange`: `workspace_id`, `application_key`, `code`,
+- `POST /auth/code/exchange`: `workspace_id`, `code`,
   `return_url`
 - `GET /auth/providers` and `GET /auth/session`: no JSON body
 
 Workspace selectors from `X-Workspace-ID`, `workspace_id` query parameters,
 and JSON must agree. When omitted, the host's initialized Workspace is used.
-The host-configured application key is authoritative; compatibility body fields
-named `application_key` never override it.
+The application key is established by the Binding and is never accepted from
+browser input.
 
 `refresh_token` is not a valid JSON field on any browser session mutation. A
 browser sends the refresh cookie using `credentials: include`.

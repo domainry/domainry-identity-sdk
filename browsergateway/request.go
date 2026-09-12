@@ -15,17 +15,15 @@ type browserRequestScope struct {
 }
 
 type browserPasswordLoginRequest struct {
-	WorkspaceID    identity.WorkspaceID    `json:"workspace_id,omitempty"`
-	ApplicationKey identity.ApplicationKey `json:"application_key,omitempty"`
-	Login          string                  `json:"login"`
-	Password       string                  `json:"password"`
+	WorkspaceID identity.WorkspaceID `json:"workspace_id,omitempty"`
+	Login       string               `json:"login"`
+	Password    string               `json:"password"`
 }
 
 type browserProviderStartRequest struct {
-	WorkspaceID    identity.WorkspaceID    `json:"workspace_id,omitempty"`
-	ApplicationKey identity.ApplicationKey `json:"application_key,omitempty"`
-	ReturnURL      string                  `json:"return_url,omitempty"`
-	Phone          string                  `json:"phone,omitempty"`
+	WorkspaceID identity.WorkspaceID `json:"workspace_id,omitempty"`
+	ReturnURL   string               `json:"return_url,omitempty"`
+	Phone       string               `json:"phone,omitempty"`
 }
 
 type browserVerifyOTPRequest struct {
@@ -35,10 +33,9 @@ type browserVerifyOTPRequest struct {
 }
 
 type browserAuthorizationCodeExchangeRequest struct {
-	WorkspaceID    identity.WorkspaceID    `json:"workspace_id,omitempty"`
-	ApplicationKey identity.ApplicationKey `json:"application_key,omitempty"`
-	Code           string                  `json:"code"`
-	ReturnURL      string                  `json:"return_url"`
+	WorkspaceID identity.WorkspaceID `json:"workspace_id,omitempty"`
+	Code        string               `json:"code"`
+	ReturnURL   string               `json:"return_url"`
 }
 
 func (gateway *Gateway) workspaceID(w http.ResponseWriter, r *http.Request, body identity.WorkspaceID) (identity.WorkspaceID, bool) {

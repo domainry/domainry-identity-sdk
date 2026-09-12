@@ -471,7 +471,7 @@ func TestGatewayFederatedRequestsDoNotPropagateLegacyTenantScope(t *testing.T) {
 	}
 
 	start := httptest.NewRecorder()
-	mux.ServeHTTP(start, httptest.NewRequest(http.MethodPost, "/browser/auth/providers/sms/start", strings.NewReader(`{"application_key":"untrusted","phone":"+8613800000000"}`)))
+	mux.ServeHTTP(start, httptest.NewRequest(http.MethodPost, "/browser/auth/providers/sms/start", strings.NewReader(`{"phone":"+8613800000000"}`)))
 	if start.Code != http.StatusOK || authentication.beginRequest.WorkspaceID != "workspace-primary" || authentication.beginRequest.ApplicationKey != "identity-admin" || authentication.beginRequest.TenantID != "" {
 		t.Fatalf("start status=%d request=%#v body=%s", start.Code, authentication.beginRequest, start.Body.String())
 	}
@@ -484,7 +484,7 @@ func TestGatewayFederatedRequestsDoNotPropagateLegacyTenantScope(t *testing.T) {
 	assertBrowserBodyOmitsLegacyCredentials(t, verify.Body.Bytes())
 
 	exchange := httptest.NewRecorder()
-	mux.ServeHTTP(exchange, httptest.NewRequest(http.MethodPost, "/browser/auth/code/exchange", strings.NewReader(`{"application_key":"untrusted","code":"code-1","return_url":"https://app.example.test/callback"}`)))
+	mux.ServeHTTP(exchange, httptest.NewRequest(http.MethodPost, "/browser/auth/code/exchange", strings.NewReader(`{"code":"code-1","return_url":"https://app.example.test/callback"}`)))
 	if exchange.Code != http.StatusOK || authentication.exchangeRequest.WorkspaceID != "workspace-primary" || authentication.exchangeRequest.ApplicationKey != "identity-admin" {
 		t.Fatalf("exchange status=%d request=%#v body=%s", exchange.Code, authentication.exchangeRequest, exchange.Body.String())
 	}

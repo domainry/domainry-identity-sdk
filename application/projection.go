@@ -8,36 +8,35 @@ import (
 
 type projection struct{ binding *binding }
 
-func (value projection) query(ctx context.Context, input identity.ProjectionQuery) (identity.ProjectionQuery, error) {
-	scope, err := value.binding.applicationScope(ctx, input.Application)
-	input.Application = scope
-	return input, err
+func (value projection) context(ctx context.Context) (context.Context, error) {
+	scope, err := value.binding.applicationScope(ctx, identity.ApplicationScope{})
+	if err != nil {
+		return ctx, err
+	}
+	return WithScope(ctx, scope), nil
 }
 
 func (value projection) FindUser(ctx context.Context, input identity.UserLookup) (identity.User, bool, error) {
-	scope, err := value.binding.applicationScope(ctx, input.Application)
+	ctx, err := value.context(ctx)
 	if err != nil {
 		return identity.User{}, false, err
 	}
-	input.Application = scope
 	return value.binding.delegate.Projection().FindUser(ctx, input)
 }
 
 func (value projection) FindOrganizationUnit(ctx context.Context, input identity.OrganizationUnitLookup) (identity.OrganizationUnit, bool, error) {
-	scope, err := value.binding.applicationScope(ctx, input.Application)
+	ctx, err := value.context(ctx)
 	if err != nil {
 		return identity.OrganizationUnit{}, false, err
 	}
-	input.Application = scope
 	return value.binding.delegate.Projection().FindOrganizationUnit(ctx, input)
 }
 
 func (value projection) ResolveDisplayNames(ctx context.Context, input identity.DisplayNameQuery) (identity.DisplayNameResult, error) {
-	scope, err := value.binding.applicationScope(ctx, input.Application)
+	ctx, err := value.context(ctx)
 	if err != nil {
 		return identity.DisplayNameResult{}, err
 	}
-	input.Application = scope
 	resolver, ok := value.binding.delegate.Projection().(identity.DisplayNameProjection)
 	if !ok {
 		return identity.DisplayNameResult{}, &identity.Error{Code: "identity.display_name_projection_unavailable"}
@@ -46,7 +45,7 @@ func (value projection) ResolveDisplayNames(ctx context.Context, input identity.
 }
 
 func (value projection) ListUsers(ctx context.Context, input identity.ProjectionQuery) ([]identity.User, error) {
-	input, err := value.query(ctx, input)
+	ctx, err := value.context(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +53,7 @@ func (value projection) ListUsers(ctx context.Context, input identity.Projection
 }
 
 func (value projection) ListRoles(ctx context.Context, input identity.ProjectionQuery) ([]identity.Role, error) {
-	input, err := value.query(ctx, input)
+	ctx, err := value.context(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -62,11 +61,10 @@ func (value projection) ListRoles(ctx context.Context, input identity.Projection
 }
 
 func (value projection) ListUserRoleAssignments(ctx context.Context, input identity.UserRoleAssignmentQuery) ([]identity.UserRoleAssignment, error) {
-	scope, err := value.binding.applicationScope(ctx, input.Application)
+	ctx, err := value.context(ctx)
 	if err != nil {
 		return nil, err
 	}
-	input.Application = scope
 	return value.binding.delegate.Projection().ListUserRoleAssignments(ctx, input)
 }
 

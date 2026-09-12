@@ -11,7 +11,7 @@ import (
 type projectionClient struct{ client *client }
 
 func (adapter projectionClient) FindUser(ctx context.Context, request identity.UserLookup) (identity.User, bool, error) {
-	if err := adapter.normalizeScope(&request.Application); err != nil {
+	if err := adapter.requireCredential(); err != nil {
 		return identity.User{}, false, err
 	}
 	if !request.UserID.Valid() {
@@ -28,7 +28,7 @@ func (adapter projectionClient) FindUser(ctx context.Context, request identity.U
 }
 
 func (adapter projectionClient) FindOrganizationUnit(ctx context.Context, request identity.OrganizationUnitLookup) (identity.OrganizationUnit, bool, error) {
-	if err := adapter.normalizeScope(&request.Application); err != nil {
+	if err := adapter.requireCredential(); err != nil {
 		return identity.OrganizationUnit{}, false, err
 	}
 	request.OrgID = strings.TrimSpace(request.OrgID)
@@ -46,7 +46,7 @@ func (adapter projectionClient) FindOrganizationUnit(ctx context.Context, reques
 }
 
 func (adapter projectionClient) ResolveDisplayNames(ctx context.Context, request identity.DisplayNameQuery) (identity.DisplayNameResult, error) {
-	if err := adapter.normalizeScope(&request.Application); err != nil {
+	if err := adapter.requireCredential(); err != nil {
 		return identity.DisplayNameResult{}, err
 	}
 	var result identity.DisplayNameResult
@@ -55,7 +55,7 @@ func (adapter projectionClient) ResolveDisplayNames(ctx context.Context, request
 }
 
 func (adapter projectionClient) ListUsers(ctx context.Context, request identity.ProjectionQuery) ([]identity.User, error) {
-	if err := adapter.normalizeScope(&request.Application); err != nil {
+	if err := adapter.requireCredential(); err != nil {
 		return nil, err
 	}
 	var values []identity.User
@@ -64,7 +64,7 @@ func (adapter projectionClient) ListUsers(ctx context.Context, request identity.
 }
 
 func (adapter projectionClient) ListRoles(ctx context.Context, request identity.ProjectionQuery) ([]identity.Role, error) {
-	if err := adapter.normalizeScope(&request.Application); err != nil {
+	if err := adapter.requireCredential(); err != nil {
 		return nil, err
 	}
 	var values []identity.Role
@@ -73,7 +73,7 @@ func (adapter projectionClient) ListRoles(ctx context.Context, request identity.
 }
 
 func (adapter projectionClient) ListUserRoleAssignments(ctx context.Context, request identity.UserRoleAssignmentQuery) ([]identity.UserRoleAssignment, error) {
-	if err := adapter.normalizeScope(&request.Application); err != nil {
+	if err := adapter.requireCredential(); err != nil {
 		return nil, err
 	}
 	var values []identity.UserRoleAssignment
@@ -81,9 +81,23 @@ func (adapter projectionClient) ListUserRoleAssignments(ctx context.Context, req
 	return values, err
 }
 
-func (adapter projectionClient) normalizeScope(scope *identity.ApplicationScope) error {
+func (adapter projectionClient) requireCredential() error {
 	if adapter.client == nil || strings.TrimSpace(adapter.client.serviceAccessToken) == "" {
 		return &identity.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.service_credential_required"}
+	}
+	workspaceID := identity.WorkspaceID(adapter.client.resolveWorkspace(""))
+	if err := (authentication{client: adapter.client}).requireWorkspace(workspaceID); err != nil {
+		return err
+	}
+	if _, err := adapter.client.resolveApplication(""); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (adapter projectionClient) normalizeScope(scope *identity.ApplicationScope) error {
+	if err := adapter.requireCredential(); err != nil {
+		return err
 	}
 	workspaceID := identity.WorkspaceID(adapter.client.resolveWorkspace(string(scope.WorkspaceID)))
 	if err := (authentication{client: adapter.client}).requireWorkspace(workspaceID); err != nil {

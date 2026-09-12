@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/domainry/domainry-foundation/modulecapability"
+	"github.com/domainry/domainry-foundation/requestcontext"
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
@@ -95,6 +96,9 @@ func (value *binding) Close(ctx context.Context) error { return value.delegate.C
 
 func (value *binding) workspace(ctx context.Context, input identity.WorkspaceID) (identity.WorkspaceID, error) {
 	input = identity.WorkspaceID(strings.TrimSpace(string(input)))
+	if input == "" {
+		input = identity.WorkspaceID(requestcontext.WorkspaceID(ctx))
+	}
 	if value.resolver != nil {
 		resolved, err := value.resolveWorkspace(ctx, input)
 		if err != nil {

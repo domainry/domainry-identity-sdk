@@ -33,21 +33,26 @@ type DisplayNameProjection interface {
 }
 
 type ProjectionQuery struct {
-	Application ApplicationScope `json:"application"`
+	// Deprecated: retained for source compatibility. Projection scope is
+	// established by the Binding or remote client and this field is ignored.
+	Application ApplicationScope `json:"-"`
 }
 
 type UserLookup struct {
-	Application ApplicationScope `json:"application"`
+	// Deprecated: retained for source compatibility and never serialized.
+	Application ApplicationScope `json:"-"`
 	UserID      SubjectID        `json:"user_id"`
 }
 
 type OrganizationUnitLookup struct {
-	Application ApplicationScope `json:"application"`
+	// Deprecated: retained for source compatibility and never serialized.
+	Application ApplicationScope `json:"-"`
 	OrgID       string           `json:"org_id"`
 }
 
 type DisplayNameQuery struct {
-	Application         ApplicationScope `json:"application"`
+	// Deprecated: retained for source compatibility and never serialized.
+	Application         ApplicationScope `json:"-"`
 	UserIDs             []string         `json:"user_ids,omitempty"`
 	OrganizationUnitIDs []string         `json:"organization_unit_ids,omitempty"`
 }
@@ -63,7 +68,8 @@ type DisplayNameResult struct {
 }
 
 type UserRoleAssignmentQuery struct {
-	Application ApplicationScope `json:"application"`
+	// Deprecated: retained for source compatibility and never serialized.
+	Application ApplicationScope `json:"-"`
 	UserID      SubjectID        `json:"user_id,omitempty"`
 }
 

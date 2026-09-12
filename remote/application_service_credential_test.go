@@ -14,6 +14,9 @@ func TestApplicationServiceCredentialProtectsRegistrationAndProjectionRequests(t
 		if got := r.Header.Get("Authorization"); got != "Bearer application-service-secret" {
 			t.Fatalf("%s authorization=%q", r.URL.Path, got)
 		}
+		if r.Header.Get("X-Domainry-Workspace-ID") != "workspace-a" || r.Header.Get("X-Domainry-Application-Key") != "runtime-app" {
+			t.Fatalf("%s application headers are incomplete", r.URL.Path)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/identity/applications/current":
@@ -30,17 +33,11 @@ func TestApplicationServiceCredentialProtectsRegistrationAndProjectionRequests(t
 			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 				t.Fatal(err)
 			}
-			if request.Application.TenantID != "workspace-a" || request.Application.WorkspaceID != "workspace-a" || request.Application.ApplicationKey != "runtime-app" {
-				t.Fatalf("projection application=%+v", request.Application)
-			}
 			_, _ = w.Write([]byte(`[]`))
 		case "/identity/display-names/resolve":
 			var request identity.DisplayNameQuery
 			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 				t.Fatal(err)
-			}
-			if request.Application.TenantID != "workspace-a" || request.Application.WorkspaceID != "workspace-a" || request.Application.ApplicationKey != "runtime-app" {
-				t.Fatalf("display-name application=%+v", request.Application)
 			}
 			if len(request.UserIDs) != 1 || request.UserIDs[0] != "user-1" || len(request.OrganizationUnitIDs) != 1 || request.OrganizationUnitIDs[0] != "org-1" {
 				t.Fatalf("display-name query=%+v", request)

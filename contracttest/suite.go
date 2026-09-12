@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/domainry/domainry-foundation/requestcontext"
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
@@ -93,30 +94,28 @@ func Run(t *testing.T, fixture Fixture) {
 	if err != nil || denied.Allowed {
 		t.Fatalf("reauthorization without resource facts must fail closed: decision=%+v err=%v", denied, err)
 	}
-	application := identity.ApplicationScope{TenantID: fixture.TenantID, WorkspaceID: fixture.WorkspaceID, ApplicationKey: fixture.ApplicationKey}
-	user, found, err := fixture.Binding.Projection().FindUser(ctx, identity.UserLookup{Application: application, UserID: verified.SubjectID})
+	user, found, err := fixture.Binding.Projection().FindUser(ctx, identity.UserLookup{UserID: verified.SubjectID})
 	if err != nil || !found || user.ID != string(verified.SubjectID) {
 		t.Fatalf("projection user=%+v found=%v err=%v", user, found, err)
 	}
-	users, err := fixture.Binding.Projection().ListUsers(ctx, identity.ProjectionQuery{Application: application})
+	users, err := fixture.Binding.Projection().ListUsers(ctx, identity.ProjectionQuery{})
 	if err != nil || !containsUser(users, user.ID) {
 		t.Fatalf("projection users=%+v err=%v", users, err)
 	}
-	roles, err := fixture.Binding.Projection().ListRoles(ctx, identity.ProjectionQuery{Application: application})
+	roles, err := fixture.Binding.Projection().ListRoles(ctx, identity.ProjectionQuery{})
 	if err != nil || len(roles) == 0 {
 		t.Fatalf("projection roles=%+v err=%v", roles, err)
 	}
-	assignments, err := fixture.Binding.Projection().ListUserRoleAssignments(ctx, identity.UserRoleAssignmentQuery{Application: application, UserID: verified.SubjectID})
+	assignments, err := fixture.Binding.Projection().ListUserRoleAssignments(ctx, identity.UserRoleAssignmentQuery{UserID: verified.SubjectID})
 	if err != nil || len(assignments) == 0 {
 		t.Fatalf("projection role assignments=%+v err=%v", assignments, err)
 	}
-	resolution, err := fixture.Binding.Principals().Resolve(ctx, identity.PrincipalResolutionRequest{Application: application, SubjectID: verified.SubjectID})
+	resolution, err := fixture.Binding.Principals().Resolve(ctx, identity.PrincipalResolutionRequest{SubjectID: verified.SubjectID})
 	if err != nil || !resolution.Principal.Known || resolution.Principal.UserID != string(verified.SubjectID) || resolution.AccessBundle.Subject.SubjectID != verified.SubjectID || resolution.AccessBundle.AuthorizationRevision != bundle.AuthorizationRevision {
 		t.Fatalf("principal resolution=%+v err=%v", resolution, err)
 	}
-	otherApplication := application
-	otherApplication.WorkspaceID += "-other"
-	if _, err := fixture.Binding.Projection().ListUsers(ctx, identity.ProjectionQuery{Application: otherApplication}); err == nil {
+	otherWorkspace := requestcontext.WithWorkspaceID(ctx, string(fixture.WorkspaceID)+"-other")
+	if _, err := fixture.Binding.Projection().ListUsers(otherWorkspace, identity.ProjectionQuery{}); err == nil {
 		t.Fatal("projection accepted a different application workspace")
 	}
 	if err := fixture.Binding.Authentication().LogoutSession(ctx, identity.LogoutRequest{TenantID: fixture.TenantID, WorkspaceID: fixture.WorkspaceID, ApplicationKey: fixture.ApplicationKey, SessionID: session.SessionID, RefreshToken: session.RefreshToken}); err != nil {

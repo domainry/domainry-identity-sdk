@@ -26,12 +26,11 @@ func (value authorization) Reauthorize(ctx context.Context, request identity.Dec
 type principals struct{ binding *binding }
 
 func (value principals) Resolve(ctx context.Context, request identity.PrincipalResolutionRequest) (identity.PrincipalResolution, error) {
-	scope, err := value.binding.applicationScope(ctx, request.Application)
+	scope, err := value.binding.applicationScope(ctx, identity.ApplicationScope{})
 	if err != nil {
 		return identity.PrincipalResolution{}, err
 	}
-	request.Application = scope
-	resolution, err := value.binding.delegate.Principals().Resolve(ctx, request)
+	resolution, err := value.binding.delegate.Principals().Resolve(WithScope(ctx, scope), request)
 	if err != nil {
 		return identity.PrincipalResolution{}, err
 	}

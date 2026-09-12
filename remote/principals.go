@@ -11,7 +11,7 @@ import (
 type principalResolver struct{ client *client }
 
 func (adapter principalResolver) Resolve(ctx context.Context, request identity.PrincipalResolutionRequest) (identity.PrincipalResolution, error) {
-	if err := (projectionClient{client: adapter.client}).normalizeScope(&request.Application); err != nil {
+	if err := (projectionClient{client: adapter.client}).requireCredential(); err != nil {
 		return identity.PrincipalResolution{}, err
 	}
 	request.RoleKey = strings.TrimSpace(request.RoleKey)
@@ -28,8 +28,9 @@ func (adapter principalResolver) Resolve(ctx context.Context, request identity.P
 	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/principal/resolve", adapter.client.serviceAccessToken, request, &resolution); err != nil {
 		return identity.PrincipalResolution{}, err
 	}
-	if resolution.Principal.WorkspaceID != string(request.Application.WorkspaceID) || resolution.Principal.UserID != string(request.SubjectID) ||
-		resolution.AccessBundle.Subject.WorkspaceID != request.Application.WorkspaceID || resolution.AccessBundle.Subject.SubjectID != request.SubjectID {
+	workspaceID := identity.WorkspaceID(adapter.client.resolveWorkspace(""))
+	if resolution.Principal.WorkspaceID != string(workspaceID) || resolution.Principal.UserID != string(request.SubjectID) ||
+		resolution.AccessBundle.Subject.WorkspaceID != workspaceID || resolution.AccessBundle.Subject.SubjectID != request.SubjectID {
 		return identity.PrincipalResolution{}, &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.principal_response_invalid"}
 	}
 	resolution.Principal.AccessBundle = &resolution.AccessBundle

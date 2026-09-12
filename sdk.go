@@ -548,6 +548,25 @@ type PrincipalAuthenticator = authorization.PrincipalAuthenticator
 type PrincipalResolver = authorization.PrincipalResolver
 type PrincipalResolutionRequest = authorization.PrincipalResolutionRequest
 type PrincipalResolution = authorization.PrincipalResolution
+type WorkflowWorkloadResolution = authorization.WorkflowWorkloadResolution
+type WorkflowWorkloadPrincipalContext = authorization.WorkflowWorkloadPrincipalContext
+type WorkflowWorkloadBindingSpec = identitymodel.WorkflowWorkloadBindingSpec
+type ApplyWorkflowWorkloadBindingsRequest = identitymodel.ApplyWorkflowWorkloadBindingsRequest
+type ApplyWorkflowWorkloadBindingsResult = identitymodel.ApplyWorkflowWorkloadBindingsResult
+type WorkflowWorkloadBinding = identitymodel.WorkflowWorkloadBinding
+type GetWorkflowWorkloadBindingRequest = identitymodel.GetWorkflowWorkloadBindingRequest
+type WorkflowWorkloadIdentity = identitymodel.WorkflowWorkloadIdentity
+type WorkflowWorkloadIdentityBinding = identitymodel.WorkflowWorkloadIdentityBinding
+
+var WorkflowWorkloadSubjectID = identitymodel.WorkflowWorkloadSubjectID
+var WorkflowWorkloadReleaseDigest = identitymodel.WorkflowWorkloadReleaseDigest
+var WorkflowWorkloadReleaseID = identitymodel.WorkflowWorkloadReleaseID
+
+const (
+	WorkflowWorkloadSubjectPrefix   = identitymodel.WorkflowWorkloadSubjectPrefix
+	WorkflowWorkloadBindingActive   = identitymodel.WorkflowWorkloadBindingActive
+	WorkflowWorkloadBindingInactive = identitymodel.WorkflowWorkloadBindingInactive
+)
 
 var ValidateIdentifier = identitymodel.ValidateIdentifier
 var WithRequestIdentity = authorization.WithRequestIdentity

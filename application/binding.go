@@ -64,7 +64,10 @@ func (value *binding) Authorization() identity.Authorization {
 	return authorization{binding: value}
 }
 func (value *binding) Principals() identity.PrincipalResolver { return principals{binding: value} }
-func (value *binding) Projection() identity.Projection        { return projection{binding: value} }
+func (value *binding) WorkflowWorkloads() identity.WorkflowWorkloadIdentity {
+	return workflowWorkloads{binding: value}
+}
+func (value *binding) Projection() identity.Projection { return projection{binding: value} }
 func (value *binding) Applications() identity.ApplicationRegistry {
 	return applications{binding: value}
 }
@@ -176,6 +179,9 @@ func (value *applicationServiceBinding) ChallengeAuthentication() identity.Chall
 func (value *applicationServiceBinding) ActionAssurance() identity.ActionAssurance {
 	return value.binding.ActionAssurance()
 }
+func (value *applicationServiceBinding) WorkflowWorkloads() identity.WorkflowWorkloadIdentity {
+	return value.binding.WorkflowWorkloads()
+}
 
 type applicationServiceVerificationBinding struct {
 	identity.Binding
@@ -191,12 +197,17 @@ func (value *applicationServiceVerificationBinding) ChallengeAuthentication() id
 func (value *applicationServiceVerificationBinding) ActionAssurance() identity.ActionAssurance {
 	return value.binding.ActionAssurance()
 }
+func (value *applicationServiceVerificationBinding) WorkflowWorkloads() identity.WorkflowWorkloadIdentity {
+	return value.binding.WorkflowWorkloads()
+}
 
 var _ identity.Binding = (*applicationServiceBinding)(nil)
 var _ identity.ApplicationServiceBinding = (*applicationServiceBinding)(nil)
 var _ identity.ApplicationServiceVerificationBinding = (*applicationServiceBinding)(nil)
 var _ identity.Binding = (*applicationServiceVerificationBinding)(nil)
 var _ identity.ApplicationServiceVerificationBinding = (*applicationServiceVerificationBinding)(nil)
+var _ identity.WorkflowWorkloadIdentityBinding = (*applicationServiceBinding)(nil)
+var _ identity.WorkflowWorkloadIdentityBinding = (*applicationServiceVerificationBinding)(nil)
 var _ identity.ChallengeAuthenticationBinding = (*binding)(nil)
 var _ identity.ChallengeAuthenticationBinding = (*applicationServiceBinding)(nil)
 var _ identity.ChallengeAuthenticationBinding = (*applicationServiceVerificationBinding)(nil)

@@ -34,6 +34,21 @@ type Principal struct {
 	// AccessBundle is resolved policy state for in-process authorization. It is
 	// never serialized into tokens, logs, or domain records.
 	AccessBundle *AccessBundle `json:"-"`
+	// Workload is present only for a governed non-human Workflow execution.
+	// It preserves release and execution lineage without treating the workload
+	// subject as the human initiator.
+	Workload *WorkflowWorkloadPrincipalContext `json:"workload,omitempty"`
+}
+
+type WorkflowWorkloadPrincipalContext struct {
+	WorkflowKey         string    `json:"workflow_key"`
+	DefinitionVersionID string    `json:"definition_version_id"`
+	DefinitionVersion   int       `json:"definition_version"`
+	ReleaseID           string    `json:"release_id"`
+	ReleaseDigest       string    `json:"release_digest"`
+	TaskID              string    `json:"task_id,omitempty"`
+	SourceEventID       string    `json:"source_event_id,omitempty"`
+	InitiatorSubjectID  SubjectID `json:"initiator_subject_id,omitempty"`
 }
 
 func (p Principal) HasPermission(expected string) bool {
@@ -149,6 +164,18 @@ type PrincipalResolutionRequest struct {
 	Application identitymodel.ApplicationScope `json:"application"`
 	SubjectID   identitymodel.SubjectID        `json:"subject_id"`
 	RoleKey     string                         `json:"role_key,omitempty"`
+	Workload    *WorkflowWorkloadResolution    `json:"workload,omitempty"`
+}
+
+type WorkflowWorkloadResolution struct {
+	WorkflowKey         string                  `json:"workflow_key"`
+	DefinitionVersionID string                  `json:"definition_version_id"`
+	DefinitionVersion   int                     `json:"definition_version"`
+	ReleaseID           string                  `json:"release_id"`
+	ReleaseDigest       string                  `json:"release_digest"`
+	TaskID              string                  `json:"task_id,omitempty"`
+	SourceEventID       string                  `json:"source_event_id,omitempty"`
+	InitiatorSubjectID  identitymodel.SubjectID `json:"initiator_subject_id,omitempty"`
 }
 
 // PrincipalResolution keeps the policy bundle explicit on the wire. The

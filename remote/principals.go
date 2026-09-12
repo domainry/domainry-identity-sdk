@@ -15,6 +15,12 @@ func (adapter principalResolver) Resolve(ctx context.Context, request identity.P
 		return identity.PrincipalResolution{}, err
 	}
 	request.RoleKey = strings.TrimSpace(request.RoleKey)
+	if request.Workload != nil {
+		request.Workload.WorkflowKey = strings.TrimSpace(request.Workload.WorkflowKey)
+		request.Workload.DefinitionVersionID = strings.TrimSpace(request.Workload.DefinitionVersionID)
+		request.Workload.ReleaseID = strings.TrimSpace(request.Workload.ReleaseID)
+		request.Workload.ReleaseDigest = strings.TrimSpace(request.Workload.ReleaseDigest)
+	}
 	if !request.SubjectID.Valid() {
 		return identity.PrincipalResolution{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.subject_id_invalid"}
 	}

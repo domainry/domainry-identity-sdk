@@ -57,6 +57,10 @@ func (gateway *Gateway) workspaceID(w http.ResponseWriter, r *http.Request, body
 		}
 		resolved = value
 	}
+	if resolved == "" && gateway.config.RequireExplicitWorkspace {
+		gateway.writeCode(w, http.StatusForbidden, "auth.invalid_credentials")
+		return "", false
+	}
 	if resolved == "" {
 		resolved = string(gateway.config.DefaultWorkspaceID)
 	}

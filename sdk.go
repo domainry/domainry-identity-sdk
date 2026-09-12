@@ -64,7 +64,16 @@ type PermissionUsageProviderBinder interface {
 // DatabaseHandle is a project-owned database pool borrowed by an in-process
 // Identity module. The provider retains lifecycle ownership; consumers must
 // never close DB.
+// WorkspaceResolver is injected only by an embedded host. It resolves a public
+// reference or physical ID against the host's active installation catalog.
+// Unknown, inactive, foreign, and empty references must fail closed.
+// It is never supplied by HTTP or project metadata.
+type WorkspaceResolver interface {
+	ResolveWorkspace(context.Context, WorkspaceID) (WorkspaceID, error)
+}
+
 type DatabaseHandle struct {
+	WorkspaceResolver       WorkspaceResolver
 	Pool                    any
 	Driver                  string
 	Schema                  string

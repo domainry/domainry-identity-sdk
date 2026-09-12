@@ -23,7 +23,10 @@ func (value tokens) Verify(ctx context.Context, request identity.VerifyTokenRequ
 	if err != nil {
 		return identity.VerifiedToken{}, err
 	}
-	if verified.WorkspaceID != value.binding.application.WorkspaceID || verified.Audience != value.binding.application.ApplicationKey {
+	if _, err := value.binding.workspace(ctx, verified.WorkspaceID); err != nil {
+		return identity.VerifiedToken{}, err
+	}
+	if verified.Audience != value.binding.application.ApplicationKey {
 		return identity.VerifiedToken{}, scopeError(http.StatusForbidden, "identity.token_scope_mismatch")
 	}
 	return verified, nil

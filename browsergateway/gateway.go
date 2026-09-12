@@ -26,10 +26,12 @@ type CookieConfig struct {
 }
 
 type Config struct {
-	ApplicationKey     identity.ApplicationKey
-	DefaultWorkspaceID identity.WorkspaceID
-	Cookie             CookieConfig
-	MaxRequestBodySize int64
+	// RequireExplicitWorkspace disables the single-workspace fallback for trusted host catalogs.
+	RequireExplicitWorkspace bool
+	ApplicationKey           identity.ApplicationKey
+	DefaultWorkspaceID       identity.WorkspaceID
+	Cookie                   CookieConfig
+	MaxRequestBodySize       int64
 }
 
 type Gateway struct {
@@ -44,7 +46,7 @@ func New(binding identity.Binding, config Config) (*Gateway, error) {
 	if !config.ApplicationKey.Valid() {
 		return nil, errors.New("Identity browser application key is required")
 	}
-	if !config.DefaultWorkspaceID.Valid() {
+	if !config.RequireExplicitWorkspace && !config.DefaultWorkspaceID.Valid() {
 		return nil, errors.New("Identity browser initialized workspace is required")
 	}
 	if strings.TrimSpace(config.Cookie.Name) == "" {

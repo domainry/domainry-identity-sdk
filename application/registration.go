@@ -10,7 +10,7 @@ import (
 type applications struct{ binding *binding }
 
 func (value applications) Register(ctx context.Context, input identity.ApplicationRegistration) (identity.ApplicationRegistrationReceipt, error) {
-	application, err := value.binding.scopedApplication(input.Application)
+	application, err := value.binding.scopedApplication(ctx, input.Application)
 	if err != nil {
 		return identity.ApplicationRegistrationReceipt{}, err
 	}
@@ -21,7 +21,7 @@ func (value applications) Register(ctx context.Context, input identity.Applicati
 type permissions struct{ binding *binding }
 
 func (value permissions) Reconcile(ctx context.Context, input identity.PermissionReconcileRequest) (identity.PermissionReconcileReceipt, error) {
-	application, err := value.binding.scopedApplication(input.Application)
+	application, err := value.binding.scopedApplication(ctx, input.Application)
 	if err != nil {
 		return identity.PermissionReconcileReceipt{}, err
 	}
@@ -30,7 +30,7 @@ func (value permissions) Reconcile(ctx context.Context, input identity.Permissio
 }
 
 func (value permissions) CurrentSourceSnapshot(ctx context.Context, input identity.PermissionSourceSnapshotRequest) (identity.PermissionSourceSnapshot, error) {
-	application, err := value.binding.scopedApplication(input.Application)
+	application, err := value.binding.scopedApplication(ctx, input.Application)
 	if err != nil {
 		return identity.PermissionSourceSnapshot{}, err
 	}
@@ -42,8 +42,8 @@ func (value permissions) CurrentSourceSnapshot(ctx context.Context, input identi
 	return reader.CurrentSourceSnapshot(ctx, input)
 }
 
-func (value *binding) scopedApplication(input identity.ApplicationRef) (identity.ApplicationRef, error) {
-	workspaceID, err := value.workspace(input.WorkspaceID)
+func (value *binding) scopedApplication(ctx context.Context, input identity.ApplicationRef) (identity.ApplicationRef, error) {
+	workspaceID, err := value.workspace(ctx, input.WorkspaceID)
 	if err != nil {
 		return identity.ApplicationRef{}, err
 	}

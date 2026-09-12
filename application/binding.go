@@ -14,6 +14,19 @@ import (
 // Bind scopes delegate to exactly one workspace and application key. Both the
 // in-process module factory and the remote SaaS factory use this wrapper.
 func Bind(delegate identity.Binding, application identity.ApplicationRef) (identity.Binding, error) {
+	return bind(delegate, application, nil)
+}
+
+// BindWithWorkspaceResolver enables host-authorized installation scopes.
+// The ordinary Bind contract remains strictly single-workspace.
+func BindWithWorkspaceResolver(delegate identity.Binding, application identity.ApplicationRef, resolver identity.WorkspaceResolver) (identity.Binding, error) {
+	if resolver == nil {
+		return nil, scopeError(http.StatusBadRequest, "identity.workspace_resolver_required")
+	}
+	return bind(delegate, application, resolver)
+}
+
+func bind(delegate identity.Binding, application identity.ApplicationRef, resolver identity.WorkspaceResolver) (identity.Binding, error) {
 	application.WorkspaceID = identity.WorkspaceID(strings.TrimSpace(string(application.WorkspaceID)))
 	application.ApplicationKey = identity.ApplicationKey(strings.TrimSpace(string(application.ApplicationKey)))
 	if delegate == nil || !application.WorkspaceID.Valid() || !application.ApplicationKey.Valid() {
@@ -24,7 +37,7 @@ func Bind(delegate identity.Binding, application identity.ApplicationRef) (ident
 		return nil, scopeError(http.StatusForbidden, "identity.application_scope_mismatch")
 	}
 	descriptor.Audience = string(application.ApplicationKey)
-	scoped := &binding{delegate: delegate, application: application, descriptor: descriptor}
+	scoped := &binding{delegate: delegate, application: application, descriptor: descriptor, resolver: resolver}
 	if services, ok := delegate.(identity.ApplicationServiceBinding); ok && services.ApplicationServices() != nil {
 		return &applicationServiceBinding{Binding: scoped, binding: scoped}, nil
 	}
@@ -35,6 +48,7 @@ func Bind(delegate identity.Binding, application identity.ApplicationRef) (ident
 }
 
 type binding struct {
+	resolver    identity.WorkspaceResolver
 	delegate    identity.Binding
 	application identity.ApplicationRef
 	descriptor  identity.Descriptor
@@ -79,8 +93,18 @@ func (value *binding) Credentials() identity.CredentialManager {
 }
 func (value *binding) Close(ctx context.Context) error { return value.delegate.Close(ctx) }
 
-func (value *binding) workspace(input identity.WorkspaceID) (identity.WorkspaceID, error) {
+func (value *binding) workspace(ctx context.Context, input identity.WorkspaceID) (identity.WorkspaceID, error) {
 	input = identity.WorkspaceID(strings.TrimSpace(string(input)))
+	if value.resolver != nil {
+		resolved, err := value.resolveWorkspace(ctx, input)
+		if err != nil {
+			return "", err
+		}
+		if resolved != input {
+			return "", scopeError(http.StatusForbidden, "auth.workspace_mismatch")
+		}
+		return resolved, nil
+	}
 	if input == "" {
 		return value.application.WorkspaceID, nil
 	}
@@ -101,8 +125,8 @@ func (value *binding) applicationKey(input identity.ApplicationKey) (identity.Ap
 	return input, nil
 }
 
-func (value *binding) applicationScope(input identity.ApplicationScope) (identity.ApplicationScope, error) {
-	workspaceID, err := value.workspace(input.WorkspaceID)
+func (value *binding) applicationScope(ctx context.Context, input identity.ApplicationScope) (identity.ApplicationScope, error) {
+	workspaceID, err := value.workspace(ctx, input.WorkspaceID)
 	if err != nil {
 		return identity.ApplicationScope{}, err
 	}
@@ -119,33 +143,47 @@ func (value *binding) applicationScope(input identity.ApplicationScope) (identit
 	return input, nil
 }
 
+func (value *binding) resolveWorkspace(ctx context.Context, input identity.WorkspaceID) (identity.WorkspaceID, error) {
+	if value.resolver == nil {
+		return value.workspace(ctx, input)
+	}
+	if !input.Valid() {
+		return "", scopeError(http.StatusForbidden, "auth.invalid_credentials")
+	}
+	resolved, err := value.resolver.ResolveWorkspace(ctx, input)
+	if err != nil || !resolved.Valid() {
+		return "", scopeError(http.StatusForbidden, "auth.invalid_credentials")
+	}
+	return resolved, nil
+}
+
 func (value *binding) verifyAccessToken(ctx context.Context, accessToken string) (identity.VerifiedToken, error) {
-	return value.delegate.Tokens().Verify(ctx, identity.VerifyTokenRequest{
+	return (tokens{binding: value}).Verify(ctx, identity.VerifyTokenRequest{
 		AccessToken: accessToken, Issuer: value.descriptor.Issuer, Audience: value.application.ApplicationKey,
 	})
 }
 
-func (value *binding) verifySession(ctx context.Context, session identity.AuthSession) error {
-	if identity.WorkspaceID(strings.TrimSpace(session.WorkspaceID)) != value.application.WorkspaceID || strings.TrimSpace(session.AccessToken) == "" {
+func (value *binding) verifySession(ctx context.Context, session identity.AuthSession, expected identity.WorkspaceID) error {
+	if identity.WorkspaceID(strings.TrimSpace(session.WorkspaceID)) != expected || strings.TrimSpace(session.AccessToken) == "" {
 		return scopeError(http.StatusBadGateway, "identity.session_scope_invalid")
 	}
 	verified, err := value.verifyAccessToken(ctx, session.AccessToken)
 	if err != nil {
 		return err
 	}
-	if verified.WorkspaceID != value.application.WorkspaceID || verified.Audience != value.application.ApplicationKey {
+	if verified.WorkspaceID != expected || verified.Audience != value.application.ApplicationKey {
 		return scopeError(http.StatusBadGateway, "identity.session_scope_invalid")
 	}
 	return nil
 }
 
-func (value *binding) verifyAuthenticationOutcome(ctx context.Context, outcome identity.AuthenticationOutcome) error {
+func (value *binding) verifyAuthenticationOutcome(ctx context.Context, outcome identity.AuthenticationOutcome, expected identity.WorkspaceID) error {
 	switch outcome.Status {
 	case identity.AuthenticationStatusAuthenticated:
 		if outcome.Session == nil {
 			return scopeError(http.StatusBadGateway, "identity.authentication_response_invalid")
 		}
-		return value.verifySession(ctx, *outcome.Session)
+		return value.verifySession(ctx, *outcome.Session, expected)
 	case identity.AuthenticationStatusChallengeRequired:
 		if outcome.Challenge == nil || strings.TrimSpace(outcome.Challenge.State) == "" {
 			return scopeError(http.StatusBadGateway, "identity.authentication_response_invalid")

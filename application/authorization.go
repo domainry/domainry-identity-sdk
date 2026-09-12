@@ -26,7 +26,7 @@ func (value authorization) Reauthorize(ctx context.Context, request identity.Dec
 type principals struct{ binding *binding }
 
 func (value principals) Resolve(ctx context.Context, request identity.PrincipalResolutionRequest) (identity.PrincipalResolution, error) {
-	scope, err := value.binding.applicationScope(request.Application)
+	scope, err := value.binding.applicationScope(ctx, request.Application)
 	if err != nil {
 		return identity.PrincipalResolution{}, err
 	}
@@ -35,9 +35,9 @@ func (value principals) Resolve(ctx context.Context, request identity.PrincipalR
 	if err != nil {
 		return identity.PrincipalResolution{}, err
 	}
-	if resolution.Principal.WorkspaceID != string(value.binding.application.WorkspaceID) ||
+	if resolution.Principal.WorkspaceID != string(scope.WorkspaceID) ||
 		resolution.Principal.UserID != string(request.SubjectID) ||
-		resolution.AccessBundle.Subject.WorkspaceID != value.binding.application.WorkspaceID ||
+		resolution.AccessBundle.Subject.WorkspaceID != scope.WorkspaceID ||
 		resolution.AccessBundle.Subject.SubjectID != request.SubjectID {
 		return identity.PrincipalResolution{}, scopeError(http.StatusBadGateway, "identity.principal_scope_invalid")
 	}

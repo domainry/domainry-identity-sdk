@@ -9,12 +9,13 @@ import (
 type credentials struct{ binding *binding }
 
 func (value credentials) ChangePassword(ctx context.Context, request identity.ChangePasswordRequest) (identity.AuthSession, error) {
-	if _, err := value.binding.verifyAccessToken(ctx, request.AccessToken); err != nil {
+	verified, err := value.binding.verifyAccessToken(ctx, request.AccessToken)
+	if err != nil {
 		return identity.AuthSession{}, err
 	}
 	session, err := value.binding.delegate.Credentials().ChangePassword(ctx, request)
 	if err == nil {
-		err = value.binding.verifySession(ctx, session)
+		err = value.binding.verifySession(ctx, session, verified.WorkspaceID)
 	}
 	return session, err
 }
@@ -23,7 +24,7 @@ func (value credentials) ResetPassword(ctx context.Context, request identity.Res
 	if _, err := value.binding.verifyAccessToken(ctx, request.AccessToken); err != nil {
 		return err
 	}
-	workspaceID, err := value.binding.workspace(request.WorkspaceID)
+	workspaceID, err := value.binding.workspace(ctx, request.WorkspaceID)
 	if err != nil {
 		return err
 	}
@@ -35,7 +36,7 @@ func (value credentials) RevokeSessions(ctx context.Context, request identity.Re
 	if _, err := value.binding.verifyAccessToken(ctx, request.AccessToken); err != nil {
 		return err
 	}
-	workspaceID, err := value.binding.workspace(request.WorkspaceID)
+	workspaceID, err := value.binding.workspace(ctx, request.WorkspaceID)
 	if err != nil {
 		return err
 	}

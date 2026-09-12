@@ -19,7 +19,7 @@ func (value actionAssurance) delegate() (identity.ActionAssurance, error) {
 }
 
 func (value actionAssurance) BeginActionAssurance(ctx context.Context, request identity.BeginActionAssuranceRequest) (identity.ProviderChallenge, error) {
-	workspaceID, err := value.binding.workspace(request.WorkspaceID)
+	workspaceID, err := value.binding.workspace(ctx, request.WorkspaceID)
 	if err != nil {
 		return identity.ProviderChallenge{}, err
 	}
@@ -32,7 +32,7 @@ func (value actionAssurance) BeginActionAssurance(ctx context.Context, request i
 }
 
 func (value actionAssurance) VerifyActionAssurance(ctx context.Context, request identity.VerifyActionAssuranceRequest) (identity.ActionAssuranceReceipt, error) {
-	workspaceID, err := value.binding.workspace(request.WorkspaceID)
+	workspaceID, err := value.binding.workspace(ctx, request.WorkspaceID)
 	if err != nil {
 		return identity.ActionAssuranceReceipt{}, err
 	}
@@ -49,7 +49,7 @@ func (value actionAssurance) VerifyActionAssurance(ctx context.Context, request 
 }
 
 func (value actionAssurance) ValidateActionAssuranceReceipt(ctx context.Context, request identity.ValidateActionAssuranceReceiptRequest) (identity.ActionAssuranceReceipt, error) {
-	workspaceID, err := value.binding.workspace(request.WorkspaceID)
+	workspaceID, err := value.binding.workspace(ctx, request.WorkspaceID)
 	if err != nil {
 		return identity.ActionAssuranceReceipt{}, err
 	}

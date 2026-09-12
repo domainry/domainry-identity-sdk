@@ -18,7 +18,7 @@ func (value workflowWorkloads) delegate() (identity.WorkflowWorkloadIdentity, er
 }
 
 func (value workflowWorkloads) ApplyWorkflowWorkloadBindings(ctx context.Context, request identity.ApplyWorkflowWorkloadBindingsRequest) (identity.ApplyWorkflowWorkloadBindingsResult, error) {
-	application, err := value.binding.applicationScope(request.Application)
+	application, err := value.binding.applicationScope(ctx, request.Application)
 	if err != nil {
 		return identity.ApplyWorkflowWorkloadBindingsResult{}, err
 	}
@@ -31,7 +31,7 @@ func (value workflowWorkloads) ApplyWorkflowWorkloadBindings(ctx context.Context
 }
 
 func (value workflowWorkloads) GetWorkflowWorkloadBinding(ctx context.Context, request identity.GetWorkflowWorkloadBindingRequest) (identity.WorkflowWorkloadBinding, error) {
-	application, err := value.binding.applicationScope(request.Application)
+	application, err := value.binding.applicationScope(ctx, request.Application)
 	if err != nil {
 		return identity.WorkflowWorkloadBinding{}, err
 	}

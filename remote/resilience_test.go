@@ -94,7 +94,7 @@ func TestRemoteClientPropagatesSafeContextHeaders(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer access-token" || r.Header.Get("X-Workspace-ID") != "workspace-a" || r.Header.Get("Cookie") != "" {
 			t.Fatalf("protected headers=%v", r.Header)
 		}
-		_, _ = w.Write([]byte(`{"session_id":"session-1","tenant_id":"tenant-a","workspace_id":"workspace-a","subject_id":"user-1","authorization_revision":"revision-1","user":{"id":"user-1"}}`))
+		_, _ = w.Write([]byte(`{"session_id":"session-1","workspace_id":"workspace-a","subject_id":"user-1","authorization_revision":"revision-1","user":{"id":"user-1"}}`))
 	}))
 	t.Cleanup(server.Close)
 	client, err := newClient(Config{

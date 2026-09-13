@@ -22,7 +22,6 @@ const (
 
 type client struct {
 	baseURL            *url.URL
-	tenantID           string
 	workspaceID        string
 	applicationKey     string
 	httpClient         *http.Client
@@ -57,7 +56,7 @@ func newClient(config Config) (*client, error) {
 		userAgent = "domainry-identity-sdk-go"
 	}
 	return &client{
-		baseURL: baseURL, tenantID: strings.TrimSpace(config.TenantID), workspaceID: strings.TrimSpace(config.WorkspaceID), applicationKey: strings.TrimSpace(config.Audience),
+		baseURL: baseURL, workspaceID: strings.TrimSpace(config.WorkspaceID), applicationKey: strings.TrimSpace(config.Audience),
 		httpClient: httpClient, userAgent: userAgent, serviceAccessToken: strings.TrimSpace(config.ServiceAccessToken),
 		requestTimeout: config.RequestTimeout, retry: config.Retry, contextHeaders: config.ContextHeaders,
 		breaker: newAvailabilityCircuitBreaker(config.CircuitBreaker, config.Clock),
@@ -197,9 +196,6 @@ func (c *client) execute(ctx context.Context, method, endpoint, accessToken, con
 	if c.workspaceID != "" {
 		request.Header.Set("X-Workspace-ID", c.workspaceID)
 		request.Header.Set("X-Domainry-Workspace-ID", c.workspaceID)
-	}
-	if c.tenantID != "" {
-		request.Header.Set("X-Domainry-Tenant-ID", c.tenantID)
 	}
 	if c.applicationKey != "" {
 		request.Header.Set("X-Domainry-Application-Key", c.applicationKey)

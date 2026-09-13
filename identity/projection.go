@@ -9,7 +9,6 @@ const UserStatusActive = "active"
 // ApplicationScope identifies the application allowed to consume an
 // Identity projection. It deliberately excludes redirect and catalog data.
 type ApplicationScope struct {
-	TenantID       TenantID       `json:"tenant_id,omitempty"`
 	WorkspaceID    WorkspaceID    `json:"workspace_id"`
 	ApplicationKey ApplicationKey `json:"application_key"`
 }

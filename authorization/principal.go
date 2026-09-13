@@ -164,6 +164,12 @@ type PrincipalResolutionRequest struct {
 	SubjectID identitymodel.SubjectID     `json:"subject_id"`
 	RoleKey   string                      `json:"role_key,omitempty"`
 	Workload  *WorkflowWorkloadResolution `json:"workload,omitempty"`
+	// SessionRoleKey restores the effective authorization of a bearer session.
+	// It validates the session's displayed role against current assignments but
+	// does not narrow the effective bundle. It is mutually exclusive with RoleKey
+	// (a role-restricted execution) and Workload. With neither role selector,
+	// Resolve returns effective authorization and the current session default role.
+	SessionRoleKey string `json:"session_role_key,omitempty"`
 }
 
 type WorkflowWorkloadResolution struct {

@@ -2,7 +2,6 @@ package authorization
 
 import identity "github.com/domainry/domainry-identity-sdk/identity"
 
-type TenantID = identity.TenantID
 type WorkspaceID = identity.WorkspaceID
 type SubjectID = identity.SubjectID
 type ApplicationKey = identity.ApplicationKey

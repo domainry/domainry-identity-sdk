@@ -79,7 +79,6 @@ type AccessBundle struct {
 }
 
 type Subject struct {
-	TenantID              TenantID    `json:"tenant_id,omitempty"`
 	WorkspaceID           WorkspaceID `json:"workspace_id"`
 	SubjectID             SubjectID   `json:"subject_id"`
 	OrgID                 string      `json:"org_id,omitempty"`

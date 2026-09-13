@@ -101,8 +101,6 @@ func decodeJWT(token string) (jwtHeader, identity.VerifiedToken, string, []byte,
 		Issuer         string                         `json:"iss"`
 		Audience       identity.ApplicationKey        `json:"aud"`
 		Subject        identity.SubjectID             `json:"sub"`
-		Tenant         identity.TenantID              `json:"tenant_id"`
-		TenantShort    identity.TenantID              `json:"tid"`
 		Workspace      identity.WorkspaceID           `json:"workspace_id"`
 		WorkspaceShort identity.WorkspaceID           `json:"wid"`
 		Session        identity.SessionID             `json:"sid"`
@@ -118,16 +116,13 @@ func decodeJWT(token string) (jwtHeader, identity.VerifiedToken, string, []byte,
 	if json.Unmarshal(headerBytes, &header) != nil || json.Unmarshal(payloadBytes, &wire) != nil {
 		return jwtHeader{}, identity.VerifiedToken{}, "", nil, errors.New("token json")
 	}
-	if wire.Tenant == "" {
-		wire.Tenant = wire.TenantShort
-	}
 	if wire.Workspace == "" {
 		wire.Workspace = wire.WorkspaceShort
 	}
 	if wire.Revision == "" {
 		wire.Revision = wire.RevisionShort
 	}
-	claims := identity.VerifiedToken{Issuer: wire.Issuer, Audience: wire.Audience, SubjectID: wire.Subject, TenantID: wire.Tenant, WorkspaceID: wire.Workspace, SessionID: wire.Session, AuthorizationRevision: wire.Revision, AuthenticationTime: wire.AuthTime, AuthenticationMethods: wire.Methods, AssuranceLevel: wire.Assurance, IssuedAt: wire.IssuedAt, ExpiresAt: wire.ExpiresAt, TokenID: wire.TokenID}
+	claims := identity.VerifiedToken{Issuer: wire.Issuer, Audience: wire.Audience, SubjectID: wire.Subject, WorkspaceID: wire.Workspace, SessionID: wire.Session, AuthorizationRevision: wire.Revision, AuthenticationTime: wire.AuthTime, AuthenticationMethods: wire.Methods, AssuranceLevel: wire.Assurance, IssuedAt: wire.IssuedAt, ExpiresAt: wire.ExpiresAt, TokenID: wire.TokenID}
 	return header, claims, parts[0] + "." + parts[1], signature, nil
 }
 

@@ -12,8 +12,8 @@ import (
 )
 
 type Fixture struct {
-	Binding        identity.Binding
-	TenantID       identity.TenantID
+	Binding identity.Binding
+
 	WorkspaceID    identity.WorkspaceID
 	ApplicationKey identity.ApplicationKey
 	Login          string
@@ -43,11 +43,11 @@ func Run(t *testing.T, fixture Fixture) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	providers, err := fixture.Binding.Authentication().Providers(ctx, identity.ProviderQuery{TenantID: fixture.TenantID, WorkspaceID: fixture.WorkspaceID})
+	providers, err := fixture.Binding.Authentication().Providers(ctx, identity.ProviderQuery{WorkspaceID: fixture.WorkspaceID})
 	if err != nil || len(providers) == 0 {
 		t.Fatalf("providers=%+v err=%v", providers, err)
 	}
-	session, err := fixture.Binding.Authentication().LoginWithPassword(ctx, identity.PasswordLoginRequest{TenantID: fixture.TenantID, WorkspaceID: fixture.WorkspaceID, ApplicationKey: fixture.ApplicationKey, Login: fixture.Login, Password: fixture.Password})
+	session, err := fixture.Binding.Authentication().LoginWithPassword(ctx, identity.PasswordLoginRequest{WorkspaceID: fixture.WorkspaceID, ApplicationKey: fixture.ApplicationKey, Login: fixture.Login, Password: fixture.Password})
 	if err != nil || session.AccessToken == "" || session.RefreshToken == "" || session.SessionID == "" {
 		t.Fatalf("login session=%+v err=%v", session, err)
 	}
@@ -63,7 +63,7 @@ func Run(t *testing.T, fixture Fixture) {
 		t.Fatalf("current session=%+v token=%+v err=%v", view, verified, err)
 	}
 	rotated, err := fixture.Binding.Authentication().RefreshSession(ctx, identity.RefreshRequest{
-		TenantID: fixture.TenantID, WorkspaceID: fixture.WorkspaceID, ApplicationKey: fixture.ApplicationKey, SessionID: session.SessionID, RefreshToken: session.RefreshToken,
+		WorkspaceID: fixture.WorkspaceID, ApplicationKey: fixture.ApplicationKey, SessionID: session.SessionID, RefreshToken: session.RefreshToken,
 	})
 	if err != nil || rotated.AccessToken == "" || rotated.RefreshToken == "" || rotated.RefreshToken == session.RefreshToken || rotated.SessionID != session.SessionID {
 		t.Fatalf("rotated session=%+v err=%v", rotated, err)
@@ -118,7 +118,7 @@ func Run(t *testing.T, fixture Fixture) {
 	if _, err := fixture.Binding.Projection().ListUsers(otherWorkspace, identity.ProjectionQuery{}); err == nil {
 		t.Fatal("projection accepted a different application workspace")
 	}
-	if err := fixture.Binding.Authentication().LogoutSession(ctx, identity.LogoutRequest{TenantID: fixture.TenantID, WorkspaceID: fixture.WorkspaceID, ApplicationKey: fixture.ApplicationKey, SessionID: session.SessionID, RefreshToken: session.RefreshToken}); err != nil {
+	if err := fixture.Binding.Authentication().LogoutSession(ctx, identity.LogoutRequest{WorkspaceID: fixture.WorkspaceID, ApplicationKey: fixture.ApplicationKey, SessionID: session.SessionID, RefreshToken: session.RefreshToken}); err != nil {
 		t.Fatalf("logout: %v", err)
 	}
 }

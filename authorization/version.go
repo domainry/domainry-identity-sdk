@@ -6,5 +6,6 @@ const (
 	PolicyBundleVersionV3      = "domainry-identity-access-bundle-v3"
 	PolicyBundleVersionV4      = "domainry-identity-access-bundle-v4"
 	PolicyBundleVersionV5      = "domainry-identity-access-bundle-v5"
-	CurrentPolicyBundleVersion = PolicyBundleVersionV5
+	PolicyBundleVersionV6      = "domainry-identity-access-bundle-v6"
+	CurrentPolicyBundleVersion = PolicyBundleVersionV6
 )

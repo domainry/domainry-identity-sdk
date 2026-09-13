@@ -32,7 +32,6 @@ func (adapter applicationServices) Verify(ctx context.Context, request identity.
 	}
 	var principal identity.ApplicationServicePrincipal
 	headers := http.Header{}
-	headers.Set("X-Domainry-Tenant-ID", adapter.client.tenantID)
 	headers.Set("X-Domainry-Workspace-ID", adapter.client.workspaceID)
 	if err := adapter.client.doJSONWithHeaders(ctx, http.MethodPost, "/identity/application-service/verify", adapter.client.serviceAccessToken, request, &principal, headers); err != nil {
 		return identity.ApplicationServicePrincipal{}, err

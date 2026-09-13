@@ -70,7 +70,7 @@ func (grant ApplicationServiceGrant) Valid() bool {
 }
 
 func (request ExchangeApplicationServiceTokenRequest) Validate() error {
-	if !request.Application.TenantID.Valid() || !request.Application.WorkspaceID.Valid() || !request.Application.ApplicationKey.Valid() ||
+	if !request.Application.WorkspaceID.Valid() || !request.Application.ApplicationKey.Valid() ||
 		!request.Audience.Valid() || strings.TrimSpace(request.Credential) == "" || len(request.Grants) == 0 {
 		return &authorization.Error{Code: "identity.application_service_exchange_invalid"}
 	}

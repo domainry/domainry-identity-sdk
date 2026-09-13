@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-type TenantID string
 type WorkspaceID string
 type SubjectID string
 type SessionID string
@@ -14,8 +13,7 @@ type ResourceType string
 type Action string
 type AuthorizationRevision string
 
-func (value TenantID) Valid() bool              { return validTenantBoundaryIdentifier(string(value)) }
-func (value WorkspaceID) Valid() bool           { return validTenantBoundaryIdentifier(string(value)) }
+func (value WorkspaceID) Valid() bool           { return validWorkspaceIdentifier(string(value)) }
 func (value SubjectID) Valid() bool             { return validIdentifier(string(value)) }
 func (value SessionID) Valid() bool             { return validIdentifier(string(value)) }
 func (value ApplicationKey) Valid() bool        { return validIdentifier(string(value)) }
@@ -43,9 +41,9 @@ func validIdentifier(value string) bool {
 	return true
 }
 
-// validTenantBoundaryIdentifier rejects the historical "default" fallback.
-// A tenant boundary must name a workspace that was explicitly initialized;
+// validWorkspaceIdentifier rejects the historical "default" fallback.
+// The boundary must name a workspace that was explicitly initialized;
 // using a placeholder would silently collapse isolation.
-func validTenantBoundaryIdentifier(value string) bool {
+func validWorkspaceIdentifier(value string) bool {
 	return validIdentifier(value) && !strings.EqualFold(strings.TrimSpace(value), "default")
 }

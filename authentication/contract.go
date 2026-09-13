@@ -3,21 +3,21 @@ package authentication
 import "context"
 
 type AuthSession struct {
-	SessionID             SessionID `json:"session_id,omitempty"`
-	TenantID              TenantID  `json:"tenant_id,omitempty"`
-	WorkspaceID           string    `json:"workspace_id"`
-	AccessToken           string    `json:"access_token"`
-	RefreshToken          string    `json:"refresh_token,omitempty"`
-	TokenType             string    `json:"token_type"`
-	ExpiresAt             string    `json:"expires_at"`
-	User                  User      `json:"user"`
-	Roles                 []Role    `json:"roles"`
-	DefaultRole           string    `json:"default_role"`
-	Permissions           []string  `json:"permissions"`
-	MustChangePassword    bool      `json:"must_change_password"`
-	AuthenticationTime    int64     `json:"auth_time,omitempty"`
-	AuthenticationMethods []string  `json:"amr,omitempty"`
-	AssuranceLevel        string    `json:"acr,omitempty"`
+	SessionID SessionID `json:"session_id,omitempty"`
+
+	WorkspaceID           string   `json:"workspace_id"`
+	AccessToken           string   `json:"access_token"`
+	RefreshToken          string   `json:"refresh_token,omitempty"`
+	TokenType             string   `json:"token_type"`
+	ExpiresAt             string   `json:"expires_at"`
+	User                  User     `json:"user"`
+	Roles                 []Role   `json:"roles"`
+	DefaultRole           string   `json:"default_role"`
+	Permissions           []string `json:"permissions"`
+	MustChangePassword    bool     `json:"must_change_password"`
+	AuthenticationTime    int64    `json:"auth_time,omitempty"`
+	AuthenticationMethods []string `json:"amr,omitempty"`
+	AssuranceLevel        string   `json:"acr,omitempty"`
 }
 
 type Provider struct {
@@ -79,12 +79,10 @@ type AuthenticationOutcome struct {
 }
 
 type ProviderQuery struct {
-	TenantID    TenantID    `json:"tenant_id,omitempty"`
 	WorkspaceID WorkspaceID `json:"workspace_id"`
 }
 
 type PasswordLoginRequest struct {
-	TenantID       TenantID       `json:"tenant_id,omitempty"`
 	WorkspaceID    WorkspaceID    `json:"workspace_id"`
 	ApplicationKey ApplicationKey `json:"application_key,omitempty"`
 	Login          string         `json:"login"`
@@ -92,7 +90,6 @@ type PasswordLoginRequest struct {
 }
 
 type BeginFederatedLoginRequest struct {
-	TenantID       TenantID       `json:"tenant_id,omitempty"`
 	WorkspaceID    WorkspaceID    `json:"workspace_id"`
 	ApplicationKey ApplicationKey `json:"application_key,omitempty"`
 	Provider       string         `json:"provider"`
@@ -115,7 +112,6 @@ type FederatedLoginCompletion struct {
 }
 
 type VerifyOTPRequest struct {
-	TenantID    TenantID    `json:"tenant_id,omitempty"`
 	WorkspaceID WorkspaceID `json:"workspace_id"`
 	Provider    string      `json:"provider"`
 	State       string      `json:"state"`
@@ -123,7 +119,6 @@ type VerifyOTPRequest struct {
 }
 
 type RefreshRequest struct {
-	TenantID       TenantID       `json:"tenant_id,omitempty"`
 	WorkspaceID    WorkspaceID    `json:"workspace_id"`
 	ApplicationKey ApplicationKey `json:"application_key"`
 	SessionID      SessionID      `json:"session_id,omitempty"`
@@ -131,7 +126,6 @@ type RefreshRequest struct {
 }
 
 type LogoutRequest struct {
-	TenantID       TenantID       `json:"tenant_id,omitempty"`
 	WorkspaceID    WorkspaceID    `json:"workspace_id"`
 	ApplicationKey ApplicationKey `json:"application_key"`
 	SessionID      SessionID      `json:"session_id,omitempty"`
@@ -150,8 +144,8 @@ type ExchangeAuthorizationCodeRequest struct {
 }
 
 type SessionView struct {
-	SessionID             SessionID             `json:"session_id,omitempty"`
-	TenantID              TenantID              `json:"tenant_id,omitempty"`
+	SessionID SessionID `json:"session_id,omitempty"`
+
 	WorkspaceID           WorkspaceID           `json:"workspace_id"`
 	SubjectID             SubjectID             `json:"subject_id"`
 	AuthorizationRevision AuthorizationRevision `json:"authorization_revision,omitempty"`

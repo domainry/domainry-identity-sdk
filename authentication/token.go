@@ -9,10 +9,10 @@ type VerifyTokenRequest struct {
 }
 
 type VerifiedToken struct {
-	Issuer                string                `json:"iss"`
-	Audience              ApplicationKey        `json:"aud"`
-	SubjectID             SubjectID             `json:"sub"`
-	TenantID              TenantID              `json:"tenant_id"`
+	Issuer    string         `json:"iss"`
+	Audience  ApplicationKey `json:"aud"`
+	SubjectID SubjectID      `json:"sub"`
+
 	WorkspaceID           WorkspaceID           `json:"workspace_id"`
 	SessionID             SessionID             `json:"sid"`
 	AuthorizationRevision AuthorizationRevision `json:"authz_revision"`

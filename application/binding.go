@@ -139,11 +139,6 @@ func (value *binding) applicationScope(ctx context.Context, input identity.Appli
 		return identity.ApplicationScope{}, err
 	}
 	input.WorkspaceID, input.ApplicationKey = workspaceID, applicationKey
-	if input.TenantID == "" {
-		input.TenantID = value.application.TenantID
-	} else if value.application.TenantID != "" && input.TenantID != value.application.TenantID {
-		return identity.ApplicationScope{}, scopeError(http.StatusForbidden, "identity.tenant_mismatch")
-	}
 	return input, nil
 }
 

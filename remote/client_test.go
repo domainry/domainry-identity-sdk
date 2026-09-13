@@ -13,14 +13,13 @@ import (
 
 func TestRemoteFactoryConfigurationComesFromCompositionEnvironment(t *testing.T) {
 	t.Setenv("IDENTITY_ENDPOINT", " https://identity.example.test ")
-	t.Setenv("IDENTITY_TENANT_ID", " tenant-a ")
 	t.Setenv("IDENTITY_WORKSPACE_ID", " workspace-a ")
 	t.Setenv("IDENTITY_ISSUER", " https://issuer.example.test ")
 	t.Setenv("IDENTITY_AUDIENCE", " runtime-app ")
 	t.Setenv("IDENTITY_SERVICE_ACCESS_TOKEN", " service-token ")
 	t.Setenv("IDENTITY_USER_AGENT", " domainry-runtime/test ")
 	config := ConfigFromEnvironment()
-	if config.Endpoint != "https://identity.example.test" || config.TenantID != "tenant-a" || config.WorkspaceID != "workspace-a" || config.Issuer != "https://issuer.example.test" ||
+	if config.Endpoint != "https://identity.example.test" || config.WorkspaceID != "workspace-a" || config.Issuer != "https://issuer.example.test" ||
 		config.Audience != "runtime-app" || config.ServiceAccessToken != "service-token" || config.UserAgent != "domainry-runtime/test" {
 		t.Fatalf("environment configuration = %#v", config)
 	}
@@ -47,7 +46,7 @@ func TestAuthenticationAndOnlineAuthorization(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/auth/session":
-			_, _ = w.Write([]byte(`{"session_id":"session-1","tenant_id":"tenant-a","workspace_id":"workspace-a","subject_id":"user-1","authorization_revision":"revision-1","user":{"id":"user-1","name":"Ada","status":"active"},"roles":[{"id":"role-1","key":"admin","label":"Admin"}],"default_role":"admin","permissions":["order.write","order.read"],"must_change_password":false}`))
+			_, _ = w.Write([]byte(`{"session_id":"session-1","workspace_id":"workspace-a","subject_id":"user-1","authorization_revision":"revision-1","user":{"id":"user-1","name":"Ada","status":"active"},"roles":[{"id":"role-1","key":"admin","label":"Admin"}],"default_role":"admin","permissions":["order.write","order.read"],"must_change_password":false}`))
 		case "/identity/reauthorize":
 			var request struct {
 				Access identity.AccessRequest `json:"access"`

@@ -15,6 +15,10 @@ func (adapter principalResolver) Resolve(ctx context.Context, request identity.P
 		return identity.PrincipalResolution{}, err
 	}
 	request.RoleKey = strings.TrimSpace(request.RoleKey)
+	request.SessionRoleKey = strings.TrimSpace(request.SessionRoleKey)
+	if request.SessionRoleKey != "" && (request.RoleKey != "" || request.Workload != nil) {
+		return identity.PrincipalResolution{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.principal_role_selection_invalid"}
+	}
 	if request.Workload != nil {
 		request.Workload.WorkflowKey = strings.TrimSpace(request.Workload.WorkflowKey)
 		request.Workload.DefinitionVersionID = strings.TrimSpace(request.Workload.DefinitionVersionID)
@@ -32,6 +36,11 @@ func (adapter principalResolver) Resolve(ctx context.Context, request identity.P
 	if resolution.Principal.WorkspaceID != string(workspaceID) || resolution.Principal.UserID != string(request.SubjectID) ||
 		resolution.AccessBundle.Subject.WorkspaceID != workspaceID || resolution.AccessBundle.Subject.SubjectID != request.SubjectID {
 		return identity.PrincipalResolution{}, &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.principal_response_invalid"}
+	}
+	if !resolution.Principal.Known || resolution.Principal.AuthorizationRevision == "" ||
+		resolution.Principal.AuthorizationRevision != string(resolution.AccessBundle.AuthorizationRevision) ||
+		request.SessionRoleKey != "" && resolution.Principal.RoleKey != request.SessionRoleKey {
+		return identity.PrincipalResolution{}, &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.principal_authorization_invalid"}
 	}
 	resolution.Principal.AccessBundle = &resolution.AccessBundle
 	return resolution, nil

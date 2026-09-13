@@ -8,7 +8,7 @@ import (
 
 func TestExchangeApplicationServiceTokenRequestRequiresExactScopedUniqueGrants(t *testing.T) {
 	valid := ExchangeApplicationServiceTokenRequest{
-		Application: authorization.ApplicationRef{TenantID: "tenant-a", WorkspaceID: "workspace-a", ApplicationKey: "orders-runtime"},
+		Application: authorization.ApplicationRef{WorkspaceID: "workspace-a", ApplicationKey: "orders-runtime"},
 		Audience:    "domainry-notification",
 		Credential:  "static-secret",
 		Grants:      []ApplicationServiceGrant{{Resource: "notification_event", Action: "publish"}},
@@ -17,7 +17,6 @@ func TestExchangeApplicationServiceTokenRequestRequiresExactScopedUniqueGrants(t
 		t.Fatal(err)
 	}
 	for name, mutate := range map[string]func(*ExchangeApplicationServiceTokenRequest){
-		"missing tenant":      func(value *ExchangeApplicationServiceTokenRequest) { value.Application.TenantID = "" },
 		"missing workspace":   func(value *ExchangeApplicationServiceTokenRequest) { value.Application.WorkspaceID = "" },
 		"missing application": func(value *ExchangeApplicationServiceTokenRequest) { value.Application.ApplicationKey = "" },
 		"missing audience":    func(value *ExchangeApplicationServiceTokenRequest) { value.Audience = "" },

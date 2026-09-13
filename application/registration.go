@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"net/http"
 
 	identity "github.com/domainry/domainry-identity-sdk"
 )
@@ -52,10 +51,5 @@ func (value *binding) scopedApplication(ctx context.Context, input identity.Appl
 		return identity.ApplicationRef{}, err
 	}
 	input.WorkspaceID, input.ApplicationKey = workspaceID, applicationKey
-	if input.TenantID == "" {
-		input.TenantID = value.application.TenantID
-	} else if value.application.TenantID != "" && input.TenantID != value.application.TenantID {
-		return identity.ApplicationRef{}, scopeError(http.StatusForbidden, "identity.tenant_mismatch")
-	}
 	return input, nil
 }

@@ -157,7 +157,7 @@ type BootstrapProjectRoleCatalogBinder interface {
 
 // BootstrapProjectNavigationCatalogBinder supplies the compiled, source-owned
 // navigation file before Workspace provisioning. Implementations keep the
-// template in memory and materialize tenant rows only inside bootstrap.
+// template in memory and materialize workspace rows only inside bootstrap.
 type BootstrapProjectNavigationCatalogBinder interface {
 	BindBootstrapProjectNavigationCatalog(context.Context, ProjectNavigationCatalog) error
 }
@@ -191,6 +191,7 @@ const (
 	PolicyBundleVersionV3                 = authorization.PolicyBundleVersionV3
 	PolicyBundleVersionV4                 = authorization.PolicyBundleVersionV4
 	PolicyBundleVersionV5                 = authorization.PolicyBundleVersionV5
+	PolicyBundleVersionV6                 = authorization.PolicyBundleVersionV6
 	CurrentPolicyBundleVersion            = authorization.CurrentPolicyBundleVersion
 	AuthorizationContractVersionV1        = authorization.AuthorizationContractVersionV1
 	AuthorizationContractVersionV2        = authorization.AuthorizationContractVersionV2
@@ -229,7 +230,7 @@ const (
 )
 
 type Error = identitymodel.Error
-type TenantID = identitymodel.TenantID
+
 type WorkspaceID = identitymodel.WorkspaceID
 type SubjectID = identitymodel.SubjectID
 type SessionID = identitymodel.SessionID
@@ -609,3 +610,8 @@ type PrincipalAuthenticationBinding interface {
 type ExternalWorkspaceCreate = modulehost.ExternalWorkspaceCreate
 type ExternalWorkspaceHost = modulehost.ExternalWorkspaceHost
 type RequestCredentialBinding = authentication.RequestCredentialBinding
+
+// Trusted source-owned subject lifecycle contracts.
+type SystemSubjects = identitymodel.SystemSubjects
+type SystemSubjectBinding = identitymodel.SystemSubjectBinding
+type SubjectErasureRequest = identitymodel.SubjectErasureRequest

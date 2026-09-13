@@ -118,7 +118,7 @@ func (authentication *testAuthentication) CurrentSession(_ context.Context, requ
 	if authentication.currentSession.WorkspaceID.Valid() {
 		return authentication.currentSession, nil
 	}
-	return identity.SessionView{TenantID: "legacy-tenant", WorkspaceID: "workspace-primary", SubjectID: "user-1"}, nil
+	return identity.SessionView{WorkspaceID: "workspace-primary", SubjectID: "user-1"}, nil
 }
 
 type testCredentials struct{}
@@ -134,7 +134,7 @@ func (testCredentials) RevokeSessions(context.Context, identity.RevokeSessionsRe
 }
 
 func fakeAuthSession(refreshToken string) identity.AuthSession {
-	return identity.AuthSession{TenantID: "legacy-tenant", WorkspaceID: "workspace-primary", AccessToken: "access", RefreshToken: refreshToken, TokenType: "Bearer"}
+	return identity.AuthSession{WorkspaceID: "workspace-primary", AccessToken: "access", RefreshToken: refreshToken, TokenType: "Bearer"}
 }
 
 func newTestGateway(t *testing.T, authentication *testAuthentication) *http.ServeMux {
@@ -219,7 +219,7 @@ func TestGatewayKeepsRefreshCredentialInHTTPOnlyCookie(t *testing.T) {
 		}
 		t.Fatalf("cookies=%#v", cookies)
 	}
-	if authentication.loginRequest.ApplicationKey != "identity-admin" || authentication.loginRequest.WorkspaceID != "workspace-primary" || authentication.loginRequest.TenantID != "" {
+	if authentication.loginRequest.ApplicationKey != "identity-admin" || authentication.loginRequest.WorkspaceID != "workspace-primary" {
 		t.Fatalf("login request=%#v", authentication.loginRequest)
 	}
 }
@@ -257,7 +257,7 @@ func TestGatewayRefreshAcceptsOnlyCookieCredential(t *testing.T) {
 	request.AddCookie(&http.Cookie{Name: DefaultRefreshCookieName, Value: "cookie-refresh"})
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, request)
-	if response.Code != http.StatusOK || authentication.refreshRequest.RefreshToken != "cookie-refresh" || authentication.refreshRequest.TenantID != "" {
+	if response.Code != http.StatusOK || authentication.refreshRequest.RefreshToken != "cookie-refresh" {
 		t.Fatalf("status=%d request=%#v body=%s", response.Code, authentication.refreshRequest, response.Body.String())
 	}
 	assertBrowserBodyOmitsLegacyCredentials(t, response.Body.Bytes())
@@ -355,7 +355,7 @@ func TestGatewayAlwaysClearsBrowserCookieOnLogout(t *testing.T) {
 	if response.Code != http.StatusServiceUnavailable || len(cookies) != 1 || cookies[0].MaxAge >= 0 {
 		t.Fatalf("status=%d cookies=%#v body=%s", response.Code, cookies, response.Body.String())
 	}
-	if authentication.logoutRequest.RefreshToken != "cookie-refresh" || authentication.logoutRequest.TenantID != "" || authentication.logoutRequest.WorkspaceID != "workspace-primary" {
+	if authentication.logoutRequest.RefreshToken != "cookie-refresh" || authentication.logoutRequest.WorkspaceID != "workspace-primary" {
 		t.Fatalf("logout request=%#v", authentication.logoutRequest)
 	}
 }
@@ -447,7 +447,7 @@ func TestGatewayRejectsLegacyTenantSelectorsOutsideJSON(t *testing.T) {
 
 func TestGatewaySessionResponseIsWorkspaceOnly(t *testing.T) {
 	authentication := &testAuthentication{currentSession: identity.SessionView{
-		SessionID: "session-1", TenantID: "legacy-tenant", WorkspaceID: "workspace-primary", SubjectID: "user-1",
+		SessionID: "session-1", WorkspaceID: "workspace-primary", SubjectID: "user-1",
 	}}
 	request := httptest.NewRequest(http.MethodGet, "/browser/auth/session", nil)
 	request.Header.Set("Authorization", "Bearer access")
@@ -466,19 +466,19 @@ func TestGatewayFederatedRequestsDoNotPropagateLegacyTenantScope(t *testing.T) {
 
 	providers := httptest.NewRecorder()
 	mux.ServeHTTP(providers, httptest.NewRequest(http.MethodGet, "/browser/auth/providers", nil))
-	if providers.Code != http.StatusOK || authentication.providerQuery.WorkspaceID != "workspace-primary" || authentication.providerQuery.TenantID != "" {
+	if providers.Code != http.StatusOK || authentication.providerQuery.WorkspaceID != "workspace-primary" {
 		t.Fatalf("providers status=%d query=%#v body=%s", providers.Code, authentication.providerQuery, providers.Body.String())
 	}
 
 	start := httptest.NewRecorder()
 	mux.ServeHTTP(start, httptest.NewRequest(http.MethodPost, "/browser/auth/providers/sms/start", strings.NewReader(`{"phone":"+8613800000000"}`)))
-	if start.Code != http.StatusOK || authentication.beginRequest.WorkspaceID != "workspace-primary" || authentication.beginRequest.ApplicationKey != "identity-admin" || authentication.beginRequest.TenantID != "" {
+	if start.Code != http.StatusOK || authentication.beginRequest.WorkspaceID != "workspace-primary" || authentication.beginRequest.ApplicationKey != "identity-admin" {
 		t.Fatalf("start status=%d request=%#v body=%s", start.Code, authentication.beginRequest, start.Body.String())
 	}
 
 	verify := httptest.NewRecorder()
 	mux.ServeHTTP(verify, httptest.NewRequest(http.MethodPost, "/browser/auth/providers/sms/verify", strings.NewReader(`{"state":"state-1","code":"123456"}`)))
-	if verify.Code != http.StatusOK || authentication.verifyRequest.WorkspaceID != "workspace-primary" || authentication.verifyRequest.TenantID != "" {
+	if verify.Code != http.StatusOK || authentication.verifyRequest.WorkspaceID != "workspace-primary" {
 		t.Fatalf("verify status=%d request=%#v body=%s", verify.Code, authentication.verifyRequest, verify.Body.String())
 	}
 	assertBrowserBodyOmitsLegacyCredentials(t, verify.Body.Bytes())

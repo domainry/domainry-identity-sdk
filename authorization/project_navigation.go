@@ -35,8 +35,8 @@ type ProjectRoleMenuSet struct {
 }
 
 // ProjectNavigationCatalog is a versioned file contract. It deliberately has
-// no tenant/workspace or client/surface dimension; Workspace bootstrap injects
-// the tenant scope and frontend routing remains frontend-owned.
+// no workspace or client/surface dimension; Workspace bootstrap injects
+// the workspace scope and frontend routing remains frontend-owned.
 type ProjectNavigationCatalog struct {
 	ContractVersion string                  `json:"contract_version"`
 	Menus           []ProjectMenuDefinition `json:"menus"`

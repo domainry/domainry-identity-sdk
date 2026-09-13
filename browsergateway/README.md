@@ -4,8 +4,7 @@ The browser gateway is a Workspace-scoped session boundary over the
 deployment-neutral Identity binding. Browser callers never select a tenant:
 `tenant_id` is rejected as an unknown JSON field, and `tenant_id` query values
 or `X-Tenant-ID` headers return HTTP 400 (`identity.workspace_scope_only`).
-Compatibility-only `TenantID` fields may remain in lower SDK contracts, but the
-gateway neither sets them on binding requests nor serializes them in responses.
+The SDK uses `WorkspaceID` as its sole workspace boundary.
 
 ## Request boundary
 

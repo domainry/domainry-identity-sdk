@@ -9,10 +9,8 @@ import (
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
-// Browser response types are deliberately separate from the deployment-neutral
-// authentication contracts. The latter retain TenantID for compatibility with
-// older non-browser adapters; the browser boundary is Workspace-only and never
-// serializes either a tenant selector or a refresh credential.
+// Browser response types omit refresh credentials; both browser and service
+// authentication contracts use Workspace as their sole isolation boundary.
 type browserAuthenticationOutcome struct {
 	Status    identity.AuthenticationStatus `json:"status"`
 	Challenge *identity.ProviderChallenge   `json:"challenge,omitempty"`

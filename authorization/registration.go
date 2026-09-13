@@ -14,7 +14,6 @@ const (
 )
 
 type ApplicationRef struct {
-	TenantID       TenantID       `json:"tenant_id,omitempty"`
 	WorkspaceID    WorkspaceID    `json:"workspace_id,omitempty"`
 	ApplicationKey ApplicationKey `json:"application_key"`
 }

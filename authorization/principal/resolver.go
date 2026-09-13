@@ -25,9 +25,9 @@ type Clock interface {
 	Now() time.Time
 }
 
-// Resolver verifies bounded JWT claims locally, resolves the richer session
-// and AccessBundle once, and caches only until the earliest token, bundle, or
-// configured expiry.
+// Resolver verifies bounded JWT claims locally and validates the current
+// source session on every request. AccessBundle projections remain cached
+// until the earliest token, bundle, or configured expiry.
 type Resolver struct {
 	binding      Binding
 	clock        Clock
@@ -73,6 +73,21 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 	}
 	now := resolver.clock.Now()
 	cacheKey := resolverCacheKey(verified)
+	// A bounded signature proves token integrity, not current account status.
+	// Revalidate the source session before using cached PII or authorization.
+	session, err := resolver.binding.Authentication().CurrentSession(ctx, authentication.CurrentSessionRequest{AccessToken: accessToken})
+	if err != nil {
+		resolver.Invalidate(verified.SubjectID, verified.WorkspaceID)
+		return identity.Principal{}, err
+	}
+	if session.SubjectID != "" && session.SubjectID != verified.SubjectID || session.WorkspaceID != "" && session.WorkspaceID != verified.WorkspaceID || strings.TrimSpace(session.User.ID) != "" && identity.SubjectID(session.User.ID) != verified.SubjectID {
+		resolver.Invalidate(verified.SubjectID, verified.WorkspaceID)
+		return identity.Principal{}, &identity.Error{Code: "identity.session_subject_mismatch"}
+	}
+	if session.AuthorizationRevision != "" && identity.AuthorizationRevision(session.AuthorizationRevision) != verified.AuthorizationRevision {
+		resolver.Invalidate(verified.SubjectID, verified.WorkspaceID)
+		return identity.Principal{}, &identity.Error{Code: "identity.authorization_revision_stale"}
+	}
 	cached, found, cacheErr := resolver.cache.Get(ctx, cacheKey, now)
 	if cacheErr != nil {
 		resolver.handleCacheError(cacheErr)
@@ -84,16 +99,6 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 			resolver.handleCacheError(err)
 		}
 	}
-	session, err := resolver.binding.Authentication().CurrentSession(ctx, authentication.CurrentSessionRequest{AccessToken: accessToken})
-	if err != nil {
-		return identity.Principal{}, err
-	}
-	if session.SubjectID != "" && session.SubjectID != verified.SubjectID || session.WorkspaceID != "" && session.WorkspaceID != verified.WorkspaceID || strings.TrimSpace(session.User.ID) != "" && identity.SubjectID(session.User.ID) != verified.SubjectID {
-		return identity.Principal{}, &identity.Error{Code: "identity.session_subject_mismatch"}
-	}
-	if session.AuthorizationRevision != "" && identity.AuthorizationRevision(session.AuthorizationRevision) != verified.AuthorizationRevision {
-		return identity.Principal{}, &identity.Error{Code: "identity.authorization_revision_stale"}
-	}
 	requestIdentity := identity.RequestIdentity{Principal: identity.Principal{Known: true, WorkspaceID: string(verified.WorkspaceID), UserID: string(verified.SubjectID), AuthorizationRevision: string(verified.AuthorizationRevision)}, AccessToken: accessToken}
 	bundle, err := resolver.binding.Authorization().ResolveAccess(ctx, identity.AccessBundleRequest{Identity: requestIdentity})
 	if err != nil {
@@ -102,7 +107,7 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 	if err := bundle.Validate(now); err != nil {
 		return identity.Principal{}, err
 	}
-	if bundle.Subject.TenantID != verified.TenantID || bundle.Subject.SubjectID != verified.SubjectID || bundle.Subject.WorkspaceID != verified.WorkspaceID || bundle.AuthorizationRevision != verified.AuthorizationRevision {
+	if bundle.Subject.SubjectID != verified.SubjectID || bundle.Subject.WorkspaceID != verified.WorkspaceID || bundle.AuthorizationRevision != verified.AuthorizationRevision {
 		return identity.Principal{}, &identity.Error{Code: "identity.access_bundle_subject_mismatch"}
 	}
 	resolved := principalFromResolution(verified, session, bundle)
@@ -144,7 +149,7 @@ func cachedPrincipalValid(entry CacheEntry, token authentication.VerifiedToken, 
 	if err := bundle.Validate(now); err != nil {
 		return false
 	}
-	return bundle.Subject.TenantID == token.TenantID && bundle.Subject.WorkspaceID == token.WorkspaceID && bundle.Subject.SubjectID == token.SubjectID && bundle.AuthorizationRevision == token.AuthorizationRevision
+	return bundle.Subject.WorkspaceID == token.WorkspaceID && bundle.Subject.SubjectID == token.SubjectID && bundle.AuthorizationRevision == token.AuthorizationRevision
 }
 
 func principalFromResolution(token authentication.VerifiedToken, session authentication.SessionView, bundle identity.AccessBundle) identity.Principal {

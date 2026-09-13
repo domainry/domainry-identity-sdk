@@ -108,9 +108,6 @@ func (adapter projectionClient) normalizeScope(scope *identity.ApplicationScope)
 		return err
 	}
 	scope.WorkspaceID = workspaceID
-	if !scope.TenantID.Valid() {
-		scope.TenantID = identity.TenantID(workspaceID)
-	}
 	scope.ApplicationKey = identity.ApplicationKey(applicationKey)
 	return nil
 }

@@ -33,7 +33,7 @@ func TestWorkflowWorkloadClientUsesApplicationCredentialAndExactReleaseScope(t *
 			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 				t.Fatal(err)
 			}
-			if request.Application != (identity.ApplicationScope{TenantID: "workspace-a", WorkspaceID: "workspace-a", ApplicationKey: "runtime-app"}) || request.ReleaseID != releaseID || request.ReleaseDigest != digest || !reflect.DeepEqual(request.Bindings, bindings) {
+			if request.Application != (identity.ApplicationScope{WorkspaceID: "workspace-a", ApplicationKey: "runtime-app"}) || request.ReleaseID != releaseID || request.ReleaseDigest != digest || !reflect.DeepEqual(request.Bindings, bindings) {
 				t.Fatalf("apply request=%+v", request)
 			}
 			_ = json.NewEncoder(w).Encode(identity.ApplyWorkflowWorkloadBindingsResult{Bindings: []identity.WorkflowWorkloadBinding{{
@@ -47,7 +47,7 @@ func TestWorkflowWorkloadClientUsesApplicationCredentialAndExactReleaseScope(t *
 			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 				t.Fatal(err)
 			}
-			if request.Application != (identity.ApplicationScope{TenantID: "workspace-a", WorkspaceID: "workspace-a", ApplicationKey: "runtime-app"}) || request.WorkflowKey != "settlement" || request.DefinitionVersionID != "version-2" || request.ReleaseDigest != digest {
+			if request.Application != (identity.ApplicationScope{WorkspaceID: "workspace-a", ApplicationKey: "runtime-app"}) || request.WorkflowKey != "settlement" || request.DefinitionVersionID != "version-2" || request.ReleaseDigest != digest {
 				t.Fatalf("resolve request=%+v", request)
 			}
 			_ = json.NewEncoder(w).Encode(identity.WorkflowWorkloadBinding{

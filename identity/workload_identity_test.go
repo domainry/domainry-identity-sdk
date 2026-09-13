@@ -15,7 +15,7 @@ func TestWorkflowWorkloadReleaseValidationPinsCanonicalDigest(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := ApplyWorkflowWorkloadBindingsRequest{
-		Application: ApplicationScope{TenantID: "tenant", WorkspaceID: "workspace", ApplicationKey: "runtime"},
+		Application: ApplicationScope{WorkspaceID: "workspace", ApplicationKey: "runtime"},
 		ReleaseID:   WorkflowWorkloadReleaseID(digest), ReleaseDigest: digest, Bindings: bindings,
 	}
 	if err := request.Validate(); err != nil {
@@ -34,7 +34,7 @@ func TestWorkflowWorkloadEmptyReleaseHasStableDigest(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := ApplyWorkflowWorkloadBindingsRequest{
-		Application: ApplicationScope{TenantID: "tenant", WorkspaceID: "workspace", ApplicationKey: "runtime"},
+		Application: ApplicationScope{WorkspaceID: "workspace", ApplicationKey: "runtime"},
 		ReleaseID:   WorkflowWorkloadReleaseID(digest), ReleaseDigest: digest,
 	}
 	if err := request.Validate(); err != nil {

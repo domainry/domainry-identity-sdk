@@ -93,7 +93,7 @@ func TestBindPreservesVerifierOnlyCapabilityWithoutAdvertisingExchange(t *testin
 
 func TestBindPreservesFullServiceCapabilityAndExposesNarrowVerifier(t *testing.T) {
 	services := &applicationServicesTestStub{}
-	application := identity.ApplicationRef{TenantID: "tenant-a", WorkspaceID: "workspace-a", ApplicationKey: "runtime-a"}
+	application := identity.ApplicationRef{WorkspaceID: "workspace-a", ApplicationKey: "runtime-a"}
 	scoped, err := Bind(&fullServiceBindingTestStub{applicationBindingTestBase: &applicationBindingTestBase{}, services: services}, application)
 	if err != nil {
 		t.Fatal(err)

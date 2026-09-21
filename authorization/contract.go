@@ -223,7 +223,6 @@ const (
 	OperatorNotIn    Operator = "not_in"
 	OperatorExists   Operator = "exists"
 	OperatorPrefix   Operator = "prefix"
-	OperatorContains Operator = "contains"
 )
 
 type ResourceFacts map[string]any

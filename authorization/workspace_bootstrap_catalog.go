@@ -129,8 +129,12 @@ func normalizeWorkspaceBootstrapRoleDefinition(input ProjectRoleDefinition) (Pro
 	}
 	for index := range input.Permissions {
 		input.Permissions[index].PermissionKey = strings.TrimSpace(input.Permissions[index].PermissionKey)
-		if input.Permissions[index].PermissionKey == "" || !input.Permissions[index].DataScope.Valid() {
+		if err := input.Permissions[index].Validate(); err != nil {
 			return ProjectRoleDefinition{}, fmt.Errorf("Workspace bootstrap role %q has an invalid permission", input.Key)
+		}
+		if input.Permissions[index].DataPolicy != nil {
+			policy := canonicalProjectDataPolicy(*input.Permissions[index].DataPolicy)
+			input.Permissions[index].DataPolicy = &policy
 		}
 	}
 	sort.Slice(input.Permissions, func(left, right int) bool {

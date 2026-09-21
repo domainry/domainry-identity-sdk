@@ -200,12 +200,6 @@ func EvaluatePredicateWithContext(predicate identity.Predicate, facts identity.R
 		left, leftOK := actual.(string)
 		right, rightOK := expected.(string)
 		return exists && leftOK && rightOK && strings.HasPrefix(left, right), nil
-	case identity.OperatorContains:
-		match, ok := contains(actual, expected)
-		if !ok {
-			return false, &identity.Error{Code: "identity.policy_value_invalid"}
-		}
-		return exists && match, nil
 	default:
 		return false, &identity.Error{Code: "identity.policy_operator_unsupported"}
 	}

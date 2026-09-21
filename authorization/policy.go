@@ -262,7 +262,7 @@ func containsDataScope(values []DataScope, expected DataScope) bool {
 
 func (operator Operator) Valid() bool {
 	switch operator {
-	case OperatorEqual, OperatorNotEqual, OperatorIn, OperatorNotIn, OperatorExists, OperatorPrefix, OperatorContains:
+	case OperatorEqual, OperatorNotEqual, OperatorIn, OperatorNotIn, OperatorExists, OperatorPrefix:
 		return true
 	default:
 		return false

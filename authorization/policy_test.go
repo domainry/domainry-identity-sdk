@@ -88,6 +88,16 @@ func TestAccessBundleRejectsAmbiguousEffectivePolicies(t *testing.T) {
 	}
 }
 
+func TestCollectionContainsIsNotPublishedWithoutAStorageNeutralQueryContract(t *testing.T) {
+	if Operator("contains").Valid() {
+		t.Fatal("contains must not be published until every policy consumer can execute collection membership")
+	}
+	predicate := Predicate{Fact: "tags", Operator: Operator("contains"), Value: "restricted"}
+	if err := predicate.Validate(); err == nil {
+		t.Fatal("contains predicate was accepted by the public SDK contract")
+	}
+}
+
 func TestAccessBundleV2PreservesContextualAndRelationshipPolicy(t *testing.T) {
 	now := time.Now().UTC()
 	predicate := Predicate{

@@ -61,3 +61,47 @@ func TestProjectRoleCatalogPreservesApplicationObjectCatalog(t *testing.T) {
 		t.Fatalf("objects=%#v err=%v", objects, err)
 	}
 }
+
+func TestProjectRolePermissionCompilesClosedRelationalDataPolicy(t *testing.T) {
+	policy := ProjectDataPolicy{
+		Operator: ProjectDataPolicyAnd,
+		Children: []ProjectDataPolicy{
+			{Operator: ProjectDataPolicyEq, FieldKey: "workspace_id", SubjectClaim: ProjectSubjectClaimWorkspaceID},
+			{
+				Operator: ProjectDataPolicyIn,
+				Path:     []ProjectDataPolicyRelationSegment{{Direction: RelationForward, RelationFieldKey: "customer_id", TargetObjectKey: "customer"}},
+				FieldKey: "organization_id", SubjectClaim: ProjectSubjectClaimOrgScopeIDs,
+			},
+		},
+	}
+	permission := ProjectRolePermission{PermissionKey: "order.read", DataPolicy: &policy}
+	if err := permission.Validate(); err != nil {
+		t.Fatalf("valid relational data policy: %v", err)
+	}
+	predicate, err := policy.Predicate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(predicate.All) != 2 || predicate.All[0].Fact != "workspace_id" || predicate.All[0].Operator != OperatorEqual || predicate.All[0].Value != "$subject.workspace_id" {
+		t.Fatalf("compiled direct predicate = %#v", predicate)
+	}
+	if got := predicate.All[1]; got.Fact != "organization_id" || got.Operator != OperatorIn || got.Value != "$subject.org_scope_ids" || len(got.Path) != 1 || got.Path[0].Reference != "customer_id" || got.Path[0].TargetResource != "customer" {
+		t.Fatalf("compiled relation predicate = %#v", got)
+	}
+}
+
+func TestProjectRolePermissionRejectsAmbiguousOrOpenEndedPolicies(t *testing.T) {
+	tests := []ProjectRolePermission{
+		{PermissionKey: "order.read"},
+		{PermissionKey: "order.read", DataScope: DataScopeAll, DataPolicy: &ProjectDataPolicy{Operator: ProjectDataPolicyEq, FieldKey: "owner_id", SubjectClaim: ProjectSubjectClaimID}},
+		{PermissionKey: "order.read", DataPolicy: &ProjectDataPolicy{Operator: "sql", FieldKey: "owner_id", SubjectClaim: ProjectSubjectClaimID}},
+		{PermissionKey: "order.read", DataPolicy: &ProjectDataPolicy{Operator: ProjectDataPolicyEq, FieldKey: "owner_id", SubjectClaim: ProjectSubjectClaimOrgScopeIDs}},
+		{PermissionKey: "order.read", DataPolicy: &ProjectDataPolicy{Operator: ProjectDataPolicyIn, FieldKey: "owner_id", SubjectClaim: ProjectSubjectClaimID}},
+		{PermissionKey: "order.read", DataPolicy: &ProjectDataPolicy{Operator: ProjectDataPolicyEq, FieldKey: "owner_id", SubjectClaim: "business_role"}},
+	}
+	for index, permission := range tests {
+		if err := permission.Validate(); err == nil {
+			t.Fatalf("invalid permission %d was accepted: %#v", index, permission)
+		}
+	}
+}

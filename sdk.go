@@ -207,7 +207,6 @@ const (
 	OperatorNotIn                         = authorization.OperatorNotIn
 	OperatorExists                        = authorization.OperatorExists
 	OperatorPrefix                        = authorization.OperatorPrefix
-	OperatorContains                      = authorization.OperatorContains
 	FieldEffectAllow                      = authorization.FieldEffectAllow
 	FieldEffectDeny                       = authorization.FieldEffectDeny
 	FieldEffectHide                       = authorization.FieldEffectHide
@@ -480,6 +479,8 @@ func PermissionSnapshotHash(sourceOwner string, definitions []PermissionDefiniti
 
 type ProjectRoleDefinition = authorization.ProjectRoleDefinition
 type ProjectRolePermission = authorization.ProjectRolePermission
+type ProjectDataPolicy = authorization.ProjectDataPolicy
+type ProjectDataPolicyRelationSegment = authorization.ProjectDataPolicyRelationSegment
 type DataScope = authorization.DataScope
 type ProjectRoleCatalog = authorization.ProjectRoleCatalog
 type ProjectRoleCatalogReceipt = authorization.ProjectRoleCatalogReceipt
@@ -504,7 +505,25 @@ func WorkspaceBootstrapProjectRoleCatalogSHA256(catalog ProjectRoleCatalog) (str
 	return authorization.WorkspaceBootstrapProjectRoleCatalogSHA256(catalog)
 }
 
+func NormalizeProjectDataPolicy(policy ProjectDataPolicy) (ProjectDataPolicy, error) {
+	return authorization.NormalizeProjectDataPolicy(policy)
+}
+
 const (
+	ProjectDataPolicyAnd = authorization.ProjectDataPolicyAnd
+	ProjectDataPolicyOr  = authorization.ProjectDataPolicyOr
+	ProjectDataPolicyNot = authorization.ProjectDataPolicyNot
+	ProjectDataPolicyEq  = authorization.ProjectDataPolicyEq
+	ProjectDataPolicyIn  = authorization.ProjectDataPolicyIn
+
+	ProjectSubjectClaimID                    = authorization.ProjectSubjectClaimID
+	ProjectSubjectClaimWorkspaceID           = authorization.ProjectSubjectClaimWorkspaceID
+	ProjectSubjectClaimOrgID                 = authorization.ProjectSubjectClaimOrgID
+	ProjectSubjectClaimOrgScopeIDs           = authorization.ProjectSubjectClaimOrgScopeIDs
+	ProjectSubjectClaimSupportOrgID          = authorization.ProjectSubjectClaimSupportOrgID
+	ProjectSubjectClaimSupportOrgScopeIDs    = authorization.ProjectSubjectClaimSupportOrgScopeIDs
+	ProjectSubjectClaimReportingScopeUserIDs = authorization.ProjectSubjectClaimReportingScopeUserIDs
+
 	DataScopeAll       = authorization.DataScopeAll
 	DataScopeOwner     = authorization.DataScopeOwner
 	DataScopeOrg       = authorization.DataScopeOrg

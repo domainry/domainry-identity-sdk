@@ -116,29 +116,31 @@ type WorkspaceAcceptanceFixtureProvisionerBinding interface {
 }
 
 const (
-	WorkspaceIdentityBootstrapContractVersion   = "domainry-workspace-identity-bootstrap-v2"
-	WorkspaceIdentityBootstrapContractCanonical = "domainry-workspace-identity-bootstrap-v2|request:invocation_id,workspace_id,company_id,company_code,company_name,first_store_id,first_store_code,first_store_name,initial_admin_user_id,initial_admin_login_id,initial_admin_name|roles:trusted_bound_catalog(provision_to_workspaces=true,audience=any_or_user_or_business_profile,assignment_mode!=system_managed),role_catalog_sha256|navigation:trusted_bound_file_catalog,source_owned_menu_definitions,authored_role_menu_sets,navigation_catalog_sha256|assignment:initial_admin=trusted_explicit_manual_any_or_user_role@company|result:receipt_with_role_and_navigation_policy_evidence|completion:committed,rolled_back|credential:post_commit_one_time_nonpersistent"
-	WorkspaceIdentityBootstrapContractHash      = "76af97110f188cd2e18b71fbbde56e931fb3faad867612d392179073f3d3d3b8"
+	WorkspaceIdentityBootstrapContractVersion   = "domainry-workspace-identity-bootstrap-v3"
+	WorkspaceIdentityBootstrapContractCanonical = "domainry-workspace-identity-bootstrap-v3|request:invocation_id,workspace_id,company_id,company_code,company_name,first_store_id,first_store_code,first_store_name,initial_admin_user_id,initial_admin_login_id,initial_admin_name,initial_admin_password|roles:trusted_bound_catalog(provision_to_workspaces=true,audience=any_or_user_or_business_profile,assignment_mode!=system_managed),role_catalog_sha256|navigation:trusted_bound_file_catalog,source_owned_menu_definitions,authored_role_menu_sets,navigation_catalog_sha256|assignment:initial_admin=trusted_explicit_manual_any_or_user_role@company|result:receipt_with_role_and_navigation_policy_evidence|completion:committed,rolled_back|credential:trusted_request_password_post_commit_one_time_nonpersistent"
+	WorkspaceIdentityBootstrapContractHash      = "6e1e208dc7987957f5eb172dbe6ebfd011c38a19a7a0cea54d7458b70b1af66b"
 )
 
 // WorkspaceIdentityBootstrapRequest is a trusted, in-process-only graph
 // command. Every field is excluded from JSON deliberately: a browser or
 // generated public handler cannot select the Workspace, graph identifiers,
-// organization relationship, role, or initial credential.
+// organization relationship, role, or initial credential. The initial
+// administrator password comes from the compiler-owned Runtime manifest.
 type WorkspaceIdentityBootstrapRequest struct {
-	ContractVersion     string `json:"-"`
-	ContractHash        string `json:"-"`
-	InvocationID        string `json:"-"`
-	WorkspaceID         string `json:"-"`
-	CompanyID           string `json:"-"`
-	CompanyCode         string `json:"-"`
-	CompanyName         string `json:"-"`
-	FirstStoreID        string `json:"-"`
-	FirstStoreCode      string `json:"-"`
-	FirstStoreName      string `json:"-"`
-	InitialAdminUserID  string `json:"-"`
-	InitialAdminLoginID string `json:"-"`
-	InitialAdminName    string `json:"-"`
+	ContractVersion      string `json:"-"`
+	ContractHash         string `json:"-"`
+	InvocationID         string `json:"-"`
+	WorkspaceID          string `json:"-"`
+	CompanyID            string `json:"-"`
+	CompanyCode          string `json:"-"`
+	CompanyName          string `json:"-"`
+	FirstStoreID         string `json:"-"`
+	FirstStoreCode       string `json:"-"`
+	FirstStoreName       string `json:"-"`
+	InitialAdminUserID   string `json:"-"`
+	InitialAdminLoginID  string `json:"-"`
+	InitialAdminName     string `json:"-"`
+	InitialAdminPassword string `json:"-"`
 }
 
 // WorkspaceIdentityBootstrapReceipt is the only transaction-phase result.

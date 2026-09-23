@@ -13,6 +13,9 @@ func NewAuthenticator(binding Binding, options Options) (identity.PrincipalAuthe
 		if authenticator == nil {
 			return nil, &identity.Error{Code: "identity.authenticator_required"}
 		}
+		if credentialCache, ok := options.Cache.(CredentialCache); ok && credentialCache != nil {
+			return newCachedAuthenticator(authenticator, options, credentialCache), nil
+		}
 		return authenticator, nil
 	}
 	return NewResolver(binding, options)

@@ -25,9 +25,10 @@ type Clock interface {
 	Now() time.Time
 }
 
-// Resolver verifies bounded JWT claims locally and validates the current
-// source session on every request. AccessBundle projections remain cached
-// until the earliest token, bundle, or configured expiry.
+// Resolver verifies bounded JWT claims locally on every request, then reuses a
+// cached session and authorization snapshot until the earliest token, bundle,
+// or configured expiry. The authoritative Identity binding is consulted only
+// on a cache miss.
 type Resolver struct {
 	binding      Binding
 	clock        Clock
@@ -73,8 +74,19 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 	}
 	now := resolver.clock.Now()
 	cacheKey := resolverCacheKey(verified)
-	// A bounded signature proves token integrity, not current account status.
-	// Revalidate the source session before using cached PII or authorization.
+	cached, found, cacheErr := resolver.cache.Get(ctx, cacheKey, now)
+	if cacheErr != nil {
+		resolver.handleCacheError(cacheErr)
+	} else if found {
+		if cachedPrincipalValid(cached, verified, now) {
+			return clonePrincipal(cached.Principal), nil
+		}
+		if err := resolver.cache.Delete(ctx, cacheKey); err != nil {
+			resolver.handleCacheError(err)
+		}
+	}
+	// The cache is a bounded acceleration layer. On a miss, revalidate the
+	// source session before resolving fresh PII and authorization state.
 	session, err := resolver.binding.Authentication().CurrentSession(ctx, authentication.CurrentSessionRequest{AccessToken: accessToken})
 	if err != nil {
 		resolver.Invalidate(verified.SubjectID, verified.WorkspaceID)
@@ -87,17 +99,6 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 	if session.AuthorizationRevision != "" && identity.AuthorizationRevision(session.AuthorizationRevision) != verified.AuthorizationRevision {
 		resolver.Invalidate(verified.SubjectID, verified.WorkspaceID)
 		return identity.Principal{}, &identity.Error{Code: "identity.authorization_revision_stale"}
-	}
-	cached, found, cacheErr := resolver.cache.Get(ctx, cacheKey, now)
-	if cacheErr != nil {
-		resolver.handleCacheError(cacheErr)
-	} else if found {
-		if cachedPrincipalValid(cached, verified, now) {
-			return clonePrincipal(cached.Principal), nil
-		}
-		if err := resolver.cache.Delete(ctx, cacheKey); err != nil {
-			resolver.handleCacheError(err)
-		}
 	}
 	requestIdentity := identity.RequestIdentity{Principal: identity.Principal{Known: true, WorkspaceID: string(verified.WorkspaceID), UserID: string(verified.SubjectID), AuthorizationRevision: string(verified.AuthorizationRevision)}, AccessToken: accessToken}
 	bundle, err := resolver.binding.Authorization().ResolveAccess(ctx, identity.AccessBundleRequest{Identity: requestIdentity})

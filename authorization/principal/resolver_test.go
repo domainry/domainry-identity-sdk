@@ -13,7 +13,7 @@ import (
 
 type resolverBinding struct {
 	auth   *resolverAuthentication
-	tokens resolverTokens
+	tokens *resolverTokens
 	author *resolverAuthorization
 	clock  *resolverClock
 }
@@ -22,7 +22,7 @@ func newResolverBinding() *resolverBinding {
 	clock := &resolverClock{now: time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)}
 	return &resolverBinding{
 		clock:  clock,
-		tokens: resolverTokens{claims: identity.VerifiedToken{SubjectID: "user-1", WorkspaceID: "workspace-1", SessionID: "session-1", AuthorizationRevision: "revision-1", TokenID: "token-1", IssuedAt: clock.now.Add(-time.Minute).Unix(), ExpiresAt: clock.now.Add(time.Hour).Unix()}},
+		tokens: &resolverTokens{claims: identity.VerifiedToken{SubjectID: "user-1", WorkspaceID: "workspace-1", SessionID: "session-1", AuthorizationRevision: "revision-1", TokenID: "token-1", IssuedAt: clock.now.Add(-time.Minute).Unix(), ExpiresAt: clock.now.Add(time.Hour).Unix()}},
 		auth:   &resolverAuthentication{session: identity.SessionView{WorkspaceID: "workspace-1", SubjectID: "user-1", AuthorizationRevision: "revision-1", User: identity.User{ID: "user-1"}, Roles: []identity.Role{{Key: "admin"}}, Permissions: []string{"workspace.admin"}}},
 		author: &resolverAuthorization{bundle: identity.AccessBundle{ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "revision-1", ExpiresAt: clock.now.Add(5 * time.Minute), Subject: identity.Subject{WorkspaceID: "workspace-1", SubjectID: "user-1", OrgID: "sales", OrgScopeIDs: []string{"sales", "store-a"}, ReportingScopeUserIDs: []identity.SubjectID{"user-1", "user-2"}}, FunctionGrants: []identity.FunctionGrant{{Resource: "orders", Action: "read", Effect: identity.EffectAllow}, {Resource: "workspace", Action: "admin", Effect: identity.EffectAllow}}, DataPolicies: []identity.DataPolicy{{Key: "orders.read", Resource: "orders", Action: "read", Effect: identity.EffectAllow, DataScopes: []identity.DataScope{identity.DataScopeAll}}, {Key: "workspace.admin", Resource: "workspace", Action: "admin", Effect: identity.EffectAllow, DataScopes: []identity.DataScope{identity.DataScopeAll}}}}},
 	}
@@ -43,9 +43,13 @@ type resolverClock struct{ now time.Time }
 
 func (clock *resolverClock) Now() time.Time { return clock.now }
 
-type resolverTokens struct{ claims identity.VerifiedToken }
+type resolverTokens struct {
+	claims identity.VerifiedToken
+	calls  int
+}
 
-func (tokens resolverTokens) Verify(context.Context, identity.VerifyTokenRequest) (identity.VerifiedToken, error) {
+func (tokens *resolverTokens) Verify(context.Context, identity.VerifyTokenRequest) (identity.VerifiedToken, error) {
+	tokens.calls++
 	return tokens.claims, nil
 }
 
@@ -111,14 +115,14 @@ func TestResolverCachesByTokenAndAuthorizationRevision(t *testing.T) {
 			t.Fatalf("principal=%#v", resolved)
 		}
 	}
-	if binding.auth.calls != 2 || binding.author.calls != 1 {
-		t.Fatalf("session calls=%d bundle calls=%d", binding.auth.calls, binding.author.calls)
+	if binding.tokens.calls != 2 || binding.auth.calls != 1 || binding.author.calls != 1 {
+		t.Fatalf("token calls=%d session calls=%d bundle calls=%d", binding.tokens.calls, binding.auth.calls, binding.author.calls)
 	}
 	resolver.Invalidate("user-1", "workspace-1")
 	if _, err := resolver.Authenticate(t.Context(), "access"); err != nil {
 		t.Fatal(err)
 	}
-	if binding.auth.calls != 3 || binding.author.calls != 2 {
+	if binding.auth.calls != 2 || binding.author.calls != 2 {
 		t.Fatalf("invalidate did not evict: session=%d bundle=%d", binding.auth.calls, binding.author.calls)
 	}
 }
@@ -232,7 +236,7 @@ func TestResolverCacheReturnsDeeplyIsolatedPolicySnapshots(t *testing.T) {
 	if got := second.AccessBundle.Guardrails[0].Predicate.Value.(map[string]any)["state"].([]any)[0]; got != "original" {
 		t.Fatalf("guardrail cache was mutated: %v", got)
 	}
-	if binding.auth.calls != 2 || binding.author.calls != 1 {
+	if binding.auth.calls != 1 || binding.author.calls != 1 {
 		t.Fatalf("expected cache hit: session=%d bundle=%d", binding.auth.calls, binding.author.calls)
 	}
 }

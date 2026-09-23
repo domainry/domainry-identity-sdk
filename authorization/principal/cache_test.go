@@ -24,14 +24,14 @@ func TestResolverDefaultsToFiveMinuteCacheWindow(t *testing.T) {
 	if _, err := resolver.Authenticate(t.Context(), "access"); err != nil {
 		t.Fatal(err)
 	}
-	if binding.auth.calls != 2 || binding.author.calls != 1 {
+	if binding.auth.calls != 1 || binding.author.calls != 1 {
 		t.Fatalf("cache expired before five minutes: session=%d bundle=%d", binding.auth.calls, binding.author.calls)
 	}
 	binding.clock.now = binding.clock.now.Add(2 * time.Second)
 	if _, err := resolver.Authenticate(t.Context(), "access"); err != nil {
 		t.Fatal(err)
 	}
-	if binding.auth.calls != 3 || binding.author.calls != 2 {
+	if binding.auth.calls != 2 || binding.author.calls != 2 {
 		t.Fatalf("cache did not expire after five minutes: session=%d bundle=%d", binding.auth.calls, binding.author.calls)
 	}
 }
@@ -57,7 +57,7 @@ func TestResolversCanSharePrincipalCache(t *testing.T) {
 	if !resolved.HasPermission("orders.read") {
 		t.Fatalf("shared cache lost AccessBundle: %#v", resolved)
 	}
-	if binding.auth.calls != 2 || binding.author.calls != 1 {
+	if binding.auth.calls != 1 || binding.author.calls != 1 {
 		t.Fatalf("shared cache missed: session=%d bundle=%d", binding.auth.calls, binding.author.calls)
 	}
 }

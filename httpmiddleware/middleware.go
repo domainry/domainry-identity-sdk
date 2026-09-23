@@ -137,19 +137,27 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
-// RequireAuthenticated protects a route after Authenticate has populated the
-// SDK RequestIdentity. It intentionally checks the SDK context rather than a
-// host-owned principal projection so every embedding Runtime shares the same
-// authentication semantics.
+// RequireAuthenticated protects a route after its host has populated the SDK
+// RequestIdentity. It does not parse or authenticate a credential again.
+func RequireAuthenticated(next http.Handler) http.Handler {
+	return requireAuthenticated(writeJSONError, next)
+}
+
+// RequireAuthenticated applies the same context-only guard while preserving
+// this Middleware's configured error writer.
 func (m *Middleware) RequireAuthenticated(next http.Handler) http.Handler {
+	return requireAuthenticated(m.writeError, next)
+}
+
+func requireAuthenticated(writeError ErrorWriter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		identity, ok := identitysdk.RequestIdentityFromContext(r.Context())
 		if !ok || !identity.Principal.Known {
-			m.writeError(w, r, http.StatusUnauthorized, "auth.token_required")
+			writeError(w, r, http.StatusUnauthorized, "auth.token_required")
 			return
 		}
 		if next == nil {
-			m.writeError(w, r, http.StatusInternalServerError, "identity.middleware_handler_required")
+			writeError(w, r, http.StatusInternalServerError, "identity.middleware_handler_required")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -193,24 +201,34 @@ func (m *Middleware) PermissionFunc(permission string) func(http.HandlerFunc) ht
 	}
 }
 
+// RequirePermission applies an exact, fail-closed Permission guard to a route
+// whose host has already populated the SDK RequestIdentity.
+func RequirePermission(permission string, next http.Handler) http.Handler {
+	return requirePermission(writeJSONError, permission, next)
+}
+
 func (m *Middleware) RequirePermission(permission string, next http.Handler) http.Handler {
+	return requirePermission(m.writeError, permission, next)
+}
+
+func requirePermission(writeError ErrorWriter, permission string, next http.Handler) http.Handler {
 	required := strings.TrimSpace(permission)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		identity, ok := identitysdk.RequestIdentityFromContext(r.Context())
-		if !ok {
-			m.writeError(w, r, http.StatusUnauthorized, "auth.token_required")
+		if !ok || !identity.Principal.Known {
+			writeError(w, r, http.StatusUnauthorized, "auth.token_required")
 			return
 		}
 		if next == nil {
-			m.writeError(w, r, http.StatusInternalServerError, "identity.middleware_handler_required")
+			writeError(w, r, http.StatusInternalServerError, "identity.middleware_handler_required")
 			return
 		}
 		if required == "" {
-			m.writeError(w, r, http.StatusForbidden, "auth.permission_required")
+			writeError(w, r, http.StatusForbidden, "auth.permission_required")
 			return
 		}
 		if !identity.Principal.HasPermission(required) {
-			m.writeError(w, r, http.StatusForbidden, "auth.permission_denied")
+			writeError(w, r, http.StatusForbidden, "auth.permission_denied")
 			return
 		}
 		next.ServeHTTP(w, r)

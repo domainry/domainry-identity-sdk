@@ -153,6 +153,35 @@ func TestPermissionGatesRequireAuthenticatedContext(t *testing.T) {
 	}
 }
 
+func TestContextOnlyMiddlewareFunctionsUseHostPublishedIdentity(t *testing.T) {
+	called := 0
+	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called++ })
+	identity := identitysdk.RequestIdentity{Principal: identitysdk.Principal{
+		Known: true, UserID: "user", AccessBundle: permissionBundle("order.read"),
+	}}
+	request := httptest.NewRequest(http.MethodGet, "/orders", nil).WithContext(
+		identitysdk.WithRequestIdentity(context.Background(), identity),
+	)
+
+	response := httptest.NewRecorder()
+	RequireAuthenticated(RequirePermission("order.read", next)).ServeHTTP(response, request)
+	if response.Code != http.StatusOK || called != 1 {
+		t.Fatalf("status=%d called=%d body=%s", response.Code, called, response.Body.String())
+	}
+
+	denied := httptest.NewRecorder()
+	RequirePermission("order.write", next).ServeHTTP(denied, request)
+	if denied.Code != http.StatusForbidden || called != 1 {
+		t.Fatalf("status=%d called=%d body=%s", denied.Code, called, denied.Body.String())
+	}
+
+	unauthenticated := httptest.NewRecorder()
+	RequireAuthenticated(next).ServeHTTP(unauthenticated, httptest.NewRequest(http.MethodGet, "/orders", nil))
+	if unauthenticated.Code != http.StatusUnauthorized || called != 1 {
+		t.Fatalf("status=%d called=%d body=%s", unauthenticated.Code, called, unauthenticated.Body.String())
+	}
+}
+
 func TestRequirePasswordChangedOwnsTemporaryPasswordBusinessGate(t *testing.T) {
 	middleware, _ := New(&authenticatorStub{})
 	nextCalls := 0

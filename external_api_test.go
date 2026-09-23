@@ -22,8 +22,8 @@ func TestExternalConsumerCompilesEveryPublicGoPackage(t *testing.T) {
 		t.Fatalf("resolve selected Foundation module: %v", err)
 	}
 	foundationRepository := strings.TrimSpace(string(selected))
-	if _, err := os.Stat(filepath.Join(foundationRepository, "modulecapability", "contract.go")); err != nil {
-		t.Fatalf("selected Foundation capability contract: %v", err)
+	if _, err := os.Stat(filepath.Join(foundationRepository, "modulehttp", "adapter.go")); err != nil {
+		t.Fatalf("selected Foundation HTTP adapter contract: %v", err)
 	}
 	consumer := t.TempDir()
 	goMod := "module example.com/identity-consumer\n\ngo 1.26.0\n\nrequire (\n\tgithub.com/domainry/domainry-foundation v0.0.0\n\tgithub.com/domainry/domainry-identity-sdk v0.0.0\n)\n\nreplace github.com/domainry/domainry-foundation => " + foundationRepository + "\n\nreplace github.com/domainry/domainry-identity-sdk => " + repository + "\n"
@@ -56,7 +56,6 @@ var (
  _ organizationunit.Binding
 	_ identity.Factory
 	_ identity.ProjectRoleCatalogPublisher
-	_ identity.BootstrapProjectNavigationCatalogBinder
 	_ identity.EmbeddedWorkspaceProvisioner
 	_ identity.BootstrapBinding
 	_ identity.WorkspaceIdentityBootstrap
@@ -67,7 +66,6 @@ var (
 		_ httpapi.Adapter
 	_ = application.Bind
 	_ = identity.WorkspaceBootstrapProjectRoleCatalogSHA256
-	_ = identity.ProjectNavigationCatalogSHA256
 	_ = evaluator.Evaluate
 	_ = principal.NewAuthenticator
 	_ = principal.NewResolver

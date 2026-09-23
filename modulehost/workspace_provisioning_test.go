@@ -56,10 +56,10 @@ func TestWorkspaceIdentityBootstrapIsNonHTTPAndCredentialNeverSerializes(t *test
 }
 
 func TestWorkspaceIdentityBootstrapContractConstantsArePinned(t *testing.T) {
-	if WorkspaceIdentityBootstrapContractVersion != "domainry-workspace-identity-bootstrap-v3" {
+	if WorkspaceIdentityBootstrapContractVersion != "domainry-workspace-identity-bootstrap-v4" {
 		t.Fatalf("version=%q", WorkspaceIdentityBootstrapContractVersion)
 	}
-	if WorkspaceIdentityBootstrapContractHash != "6e1e208dc7987957f5eb172dbe6ebfd011c38a19a7a0cea54d7458b70b1af66b" {
+	if WorkspaceIdentityBootstrapContractHash != "a45006763a7f31393506426c8dd57d55a0dd2036426f0e43cd8ece49bcdd7c82" {
 		t.Fatalf("hash=%q", WorkspaceIdentityBootstrapContractHash)
 	}
 	digest := sha256.Sum256([]byte(WorkspaceIdentityBootstrapContractCanonical))

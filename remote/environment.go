@@ -12,11 +12,10 @@ func ConfigFromEnvironment() Config {
 	return Config{
 		Endpoint: strings.TrimSpace(os.Getenv("IDENTITY_ENDPOINT")),
 
-		WorkspaceID:              strings.TrimSpace(os.Getenv("IDENTITY_WORKSPACE_ID")),
-		Issuer:                   strings.TrimSpace(os.Getenv("IDENTITY_ISSUER")),
-		Audience:                 strings.TrimSpace(os.Getenv("IDENTITY_AUDIENCE")),
-		ServiceAccessToken:       strings.TrimSpace(os.Getenv("IDENTITY_SERVICE_ACCESS_TOKEN")),
-		CapabilityContractSHA256: strings.TrimSpace(os.Getenv("IDENTITY_CAPABILITY_CONTRACT_SHA256")),
-		UserAgent:                strings.TrimSpace(os.Getenv("IDENTITY_USER_AGENT")),
+		WorkspaceID:        strings.TrimSpace(os.Getenv("IDENTITY_WORKSPACE_ID")),
+		Issuer:             strings.TrimSpace(os.Getenv("IDENTITY_ISSUER")),
+		Audience:           strings.TrimSpace(os.Getenv("IDENTITY_AUDIENCE")),
+		ServiceAccessToken: strings.TrimSpace(os.Getenv("IDENTITY_SERVICE_ACCESS_TOKEN")),
+		UserAgent:          strings.TrimSpace(os.Getenv("IDENTITY_USER_AGENT")),
 	}
 }

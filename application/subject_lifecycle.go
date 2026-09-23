@@ -16,6 +16,22 @@ func (value *applicationServiceVerificationBinding) SystemSubjects() identity.Sy
 	return value.binding.SystemSubjects()
 }
 
+func (value *binding) BindSubjectLifecyclePersistence() error {
+	binder, ok := value.delegate.(identity.SubjectLifecyclePersistenceBinding)
+	if !ok {
+		return scopeError(http.StatusNotImplemented, "identity.subject_lifecycle_persistence_unavailable")
+	}
+	return binder.BindSubjectLifecyclePersistence()
+}
+
+func (value *applicationServiceBinding) BindSubjectLifecyclePersistence() error {
+	return value.binding.BindSubjectLifecyclePersistence()
+}
+
+func (value *applicationServiceVerificationBinding) BindSubjectLifecyclePersistence() error {
+	return value.binding.BindSubjectLifecyclePersistence()
+}
+
 type systemSubjects struct{ binding *binding }
 
 func (value systemSubjects) delegate(ctx context.Context, workspaceID string) (identity.SystemSubjects, error) {
@@ -52,3 +68,7 @@ func (value systemSubjects) EraseSubjectForRequest(ctx context.Context, request 
 	}
 	return delegate.EraseSubjectForRequest(requestcontext.WithWorkspaceID(ctx, request.WorkspaceID), request)
 }
+
+var _ identity.SubjectLifecyclePersistenceBinding = (*binding)(nil)
+var _ identity.SubjectLifecyclePersistenceBinding = (*applicationServiceBinding)(nil)
+var _ identity.SubjectLifecyclePersistenceBinding = (*applicationServiceVerificationBinding)(nil)

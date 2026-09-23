@@ -8,7 +8,6 @@ import (
 	"time"
 
 	actioncontract "github.com/domainry/domainry-foundation/action"
-	"github.com/domainry/domainry-foundation/modulecapability"
 	"github.com/domainry/domainry-identity-sdk/authentication"
 	"github.com/domainry/domainry-identity-sdk/authorization"
 	identitymodel "github.com/domainry/domainry-identity-sdk/identity"
@@ -36,7 +35,6 @@ type Descriptor struct {
 // Binding is the sole deployment-neutral Runtime dependency. An in-process
 // module and the remote SaaS adapter expose the same cohesive capabilities.
 type Binding interface {
-	modulecapability.Binding
 	Descriptor() Descriptor
 	Authentication() Authentication
 	Tokens() TokenVerifier
@@ -139,11 +137,12 @@ type DatabaseFactory interface {
 
 // BootstrapBinding is the deliberately narrow in-process contract available
 // before the first Workspace exists. It exposes the trusted bootstrap
-// capability, not the earlier role-selectable WorkspaceProvisioner.
+// capability and an explicit hook for the host-owned Operations kernel, not
+// the earlier role-selectable WorkspaceProvisioner.
 type BootstrapBinding interface {
 	modulehost.WorkspaceIdentityBootstrap
 	BootstrapProjectRoleCatalogBinder
-	BootstrapProjectNavigationCatalogBinder
+	OperationsPersistenceBinding
 	Close(context.Context) error
 }
 
@@ -153,13 +152,6 @@ type BootstrapBinding interface {
 // provisioning transaction.
 type BootstrapProjectRoleCatalogBinder interface {
 	BindBootstrapProjectRoleCatalog(context.Context, ProjectRoleCatalog) error
-}
-
-// BootstrapProjectNavigationCatalogBinder supplies the compiled, source-owned
-// navigation file before Workspace provisioning. Implementations keep the
-// template in memory and materialize workspace rows only inside bootstrap.
-type BootstrapProjectNavigationCatalogBinder interface {
-	BindBootstrapProjectNavigationCatalog(context.Context, ProjectNavigationCatalog) error
 }
 
 // BootstrapDatabaseFactory is implemented only by an embedded Identity
@@ -485,19 +477,6 @@ type DataScope = authorization.DataScope
 type ProjectRoleCatalog = authorization.ProjectRoleCatalog
 type ProjectRoleCatalogReceipt = authorization.ProjectRoleCatalogReceipt
 type ProjectRoleCatalogPublisher = authorization.ProjectRoleCatalogPublisher
-type ProjectMenuDefinition = authorization.ProjectMenuDefinition
-type ProjectRoleMenuSet = authorization.ProjectRoleMenuSet
-type ProjectNavigationCatalog = authorization.ProjectNavigationCatalog
-
-const ProjectNavigationContractVersion = authorization.ProjectNavigationContractVersion
-
-func NormalizeProjectNavigationCatalog(catalog ProjectNavigationCatalog) (ProjectNavigationCatalog, error) {
-	return authorization.NormalizeProjectNavigationCatalog(catalog)
-}
-
-func ProjectNavigationCatalogSHA256(catalog ProjectNavigationCatalog) (string, error) {
-	return authorization.ProjectNavigationCatalogSHA256(catalog)
-}
 
 // WorkspaceBootstrapProjectRoleCatalogSHA256 is the shared canonical digest
 // used by Runtime and Identity for the trusted Workspace bootstrap role policy.
@@ -633,4 +612,6 @@ type RequestCredentialBinding = authentication.RequestCredentialBinding
 // Trusted source-owned subject lifecycle contracts.
 type SystemSubjects = identitymodel.SystemSubjects
 type SystemSubjectBinding = identitymodel.SystemSubjectBinding
+type SubjectLifecyclePersistenceBinding = identitymodel.SubjectLifecyclePersistenceBinding
+type OperationsPersistenceBinding = identitymodel.OperationsPersistenceBinding
 type SubjectErasureRequest = identitymodel.SubjectErasureRequest

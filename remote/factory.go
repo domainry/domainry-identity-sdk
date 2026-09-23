@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/domainry/domainry-foundation/modulecapability"
 	identity "github.com/domainry/domainry-identity-sdk"
 	identityapplication "github.com/domainry/domainry-identity-sdk/application"
 )
@@ -22,9 +21,6 @@ func (factory *Factory) Open(ctx context.Context, application identity.Applicati
 		return nil, &identity.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.context_unavailable", Cause: err}
 	}
 	config := factory.config
-	if err := modulecapability.ValidateRemoteExpectation("identity", config.CapabilityContractSHA256); err != nil {
-		return nil, err
-	}
 	config, application, err := remoteApplication(config, application)
 	if err != nil {
 		return nil, err
@@ -54,15 +50,11 @@ func (factory *Factory) Open(ctx context.Context, application identity.Applicati
 	if err != nil {
 		return nil, err
 	}
-	capabilities, err := openCapabilityBinding(ctx, client, strings.TrimSpace(config.CapabilityContractSHA256))
-	if err != nil {
-		return nil, err
-	}
 	delegate := &binding{client: client, tokens: verifier, descriptor: identity.Descriptor{
 		ProtocolVersion: identity.CurrentProtocolVersion, BundleVersion: identity.CurrentPolicyBundleVersion,
 		AuthorizationVersion: identity.CurrentAuthorizationContractVersion, Mode: identity.DeploymentModeSaaS, Issuer: issuer, Audience: audience,
 		Capabilities: []string{"authentication", "challenge_authentication", "action_assurance", "token_verification", "authorization", "principal_resolution", "workflow_workload_identity", "identity_projection", "application_registration", "permission_reconciliation", "credentials", "oidc", "saml"},
-	}, capabilities: capabilities}
+	}}
 	return identityapplication.Bind(delegate, application)
 }
 
@@ -109,22 +101,12 @@ func validateDiscovery(descriptor identity.Descriptor, expectedIssuer string) er
 }
 
 type binding struct {
-	client       *client
-	tokens       identity.TokenVerifier
-	descriptor   identity.Descriptor
-	capabilities modulecapability.Binding
+	client     *client
+	tokens     identity.TokenVerifier
+	descriptor identity.Descriptor
 }
 
 func (value *binding) Descriptor() identity.Descriptor { return value.descriptor }
-func (value *binding) CapabilitySummary(ctx context.Context) (modulecapability.ModuleSummary, error) {
-	return value.capabilities.CapabilitySummary(ctx)
-}
-func (value *binding) CapabilityCategory(ctx context.Context, key string) (modulecapability.CategoryDocument, error) {
-	return value.capabilities.CapabilityCategory(ctx, key)
-}
-func (value *binding) ValidateCapabilityCandidate(ctx context.Context, request modulecapability.ValidationRequest) (modulecapability.ValidationResult, error) {
-	return value.capabilities.ValidateCapabilityCandidate(ctx, request)
-}
 func (value *binding) Authentication() identity.Authentication {
 	return authentication{client: value.client}
 }

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	actioncontract "github.com/domainry/domainry-foundation/action"
-	"github.com/domainry/domainry-foundation/modulecapability"
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
@@ -45,7 +44,6 @@ func TestBrowserGatewayRoutesProjectOneFrozenActionManifest(t *testing.T) {
 }
 
 type testBinding struct {
-	modulecapability.Binding
 	auth        *testAuthentication
 	credentials testCredentials
 }

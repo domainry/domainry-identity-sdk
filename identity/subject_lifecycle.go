@@ -21,3 +21,10 @@ type SubjectErasureRequest struct {
 }
 
 type SystemSubjectBinding interface{ SystemSubjects() SystemSubjects }
+
+// SubjectLifecyclePersistenceBinding lets the host explicitly enable the
+// shared Lifecycle fence and execution-step persistence after those tables
+// have been installed in the owner database.
+type SubjectLifecyclePersistenceBinding interface {
+	BindSubjectLifecyclePersistence() error
+}

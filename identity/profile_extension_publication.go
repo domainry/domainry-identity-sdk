@@ -6,22 +6,13 @@ import "context"
 // Identity's profile binding service. It deliberately publishes field names as
 // metadata only; HandlerDelivery never accepts a relation column from a caller.
 type ProjectProfileExtension struct {
-	ContractVersion          string
-	MinReaderVersion         string
-	ObjectKey                string
-	IdentityRelationField    string
-	Cardinality              string
-	BusinessIdentity         ProjectBusinessIdentityBinding
-	BindingLifecycle         ProjectProfileBindingLifecycle
-	SummaryFields            []string
-	ProfileTabs              []string
-	ProfileTabLabels         map[string]string
-	ProfileTabFields         map[string][]string
-	ProfileTabRelatedObjects map[string][]string
-	ProfileTabComponents     map[string][]string
-	DefaultVisibility        string
-	RequiredPermissions      []string
-	StandaloneWorkspace      bool
+	ObjectKey             string
+	IdentityRelationField string
+	Cardinality           string
+	BusinessIdentity      ProjectBusinessIdentityBinding
+	BindingLifecycle      ProjectProfileBindingLifecycle
+	DefaultVisibility     string
+	RequiredPermissions   []string
 }
 
 type ProjectBusinessIdentityBinding struct {

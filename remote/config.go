@@ -24,18 +24,17 @@ type CircuitBreakerPolicy struct {
 type Config struct {
 	Endpoint string
 
-	WorkspaceID              string
-	Issuer                   string
-	Audience                 string
-	ServiceAccessToken       string
-	CapabilityContractSHA256 string
-	HTTPClient               *http.Client
-	UserAgent                string
-	RequestTimeout           time.Duration
-	Retry                    RetryPolicy
-	CircuitBreaker           CircuitBreakerPolicy
-	ContextHeaders           ContextHeaderProvider
-	Clock                    identity.Clock
+	WorkspaceID        string
+	Issuer             string
+	Audience           string
+	ServiceAccessToken string
+	HTTPClient         *http.Client
+	UserAgent          string
+	RequestTimeout     time.Duration
+	Retry              RetryPolicy
+	CircuitBreaker     CircuitBreakerPolicy
+	ContextHeaders     ContextHeaderProvider
+	Clock              identity.Clock
 }
 
 func normalizedConfig(config Config) Config {

@@ -4,22 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/domainry/domainry-foundation/modulecapability"
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
 type applicationBindingTestBase struct{}
 
-func (*applicationBindingTestBase) Descriptor() identity.Descriptor { return identity.Descriptor{} }
-func (*applicationBindingTestBase) CapabilitySummary(context.Context) (modulecapability.ModuleSummary, error) {
-	return modulecapability.ModuleSummary{}, nil
-}
-func (*applicationBindingTestBase) CapabilityCategory(context.Context, string) (modulecapability.CategoryDocument, error) {
-	return modulecapability.CategoryDocument{}, nil
-}
-func (*applicationBindingTestBase) ValidateCapabilityCandidate(context.Context, modulecapability.ValidationRequest) (modulecapability.ValidationResult, error) {
-	return modulecapability.ValidationResult{}, nil
-}
+func (*applicationBindingTestBase) Descriptor() identity.Descriptor            { return identity.Descriptor{} }
 func (*applicationBindingTestBase) Authentication() identity.Authentication    { return nil }
 func (*applicationBindingTestBase) Tokens() identity.TokenVerifier             { return nil }
 func (*applicationBindingTestBase) Authorization() identity.Authorization      { return nil }

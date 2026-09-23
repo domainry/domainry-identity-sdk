@@ -116,9 +116,9 @@ type WorkspaceAcceptanceFixtureProvisionerBinding interface {
 }
 
 const (
-	WorkspaceIdentityBootstrapContractVersion   = "domainry-workspace-identity-bootstrap-v3"
-	WorkspaceIdentityBootstrapContractCanonical = "domainry-workspace-identity-bootstrap-v3|request:invocation_id,workspace_id,company_id,company_code,company_name,first_store_id,first_store_code,first_store_name,initial_admin_user_id,initial_admin_login_id,initial_admin_name,initial_admin_password|roles:trusted_bound_catalog(provision_to_workspaces=true,audience=any_or_user_or_business_profile,assignment_mode!=system_managed),role_catalog_sha256|navigation:trusted_bound_file_catalog,source_owned_menu_definitions,authored_role_menu_sets,navigation_catalog_sha256|assignment:initial_admin=trusted_explicit_manual_any_or_user_role@company|result:receipt_with_role_and_navigation_policy_evidence|completion:committed,rolled_back|credential:trusted_request_password_post_commit_one_time_nonpersistent"
-	WorkspaceIdentityBootstrapContractHash      = "6e1e208dc7987957f5eb172dbe6ebfd011c38a19a7a0cea54d7458b70b1af66b"
+	WorkspaceIdentityBootstrapContractVersion   = "domainry-workspace-identity-bootstrap-v4"
+	WorkspaceIdentityBootstrapContractCanonical = "domainry-workspace-identity-bootstrap-v4|request:invocation_id,workspace_id,company_id,company_code,company_name,first_store_id,first_store_code,first_store_name,initial_admin_user_id,initial_admin_login_id,initial_admin_name,initial_admin_password|roles:trusted_bound_catalog(provision_to_workspaces=true,audience=any_or_user_or_business_profile,assignment_mode!=system_managed),role_catalog_sha256|assignment:initial_admin=trusted_explicit_manual_any_or_user_role@company|result:receipt_with_role_policy_evidence|completion:committed,rolled_back|credential:trusted_request_password_post_commit_one_time_nonpersistent"
+	WorkspaceIdentityBootstrapContractHash      = "a45006763a7f31393506426c8dd57d55a0dd2036426f0e43cd8ece49bcdd7c82"
 )
 
 // WorkspaceIdentityBootstrapRequest is a trusted, in-process-only graph
@@ -156,7 +156,6 @@ type WorkspaceIdentityBootstrapReceipt struct {
 	InitialAdminUserID                   string `json:"initial_admin_user_id"`
 	InitialAdminLoginID                  string `json:"initial_admin_login_id"`
 	RoleCatalogSHA256                    string `json:"role_catalog_sha256"`
-	NavigationCatalogSHA256              string `json:"navigation_catalog_sha256"`
 	InitialWorkspaceAdministratorRoleKey string `json:"initial_workspace_administrator_role_key"`
 	Replayed                             bool   `json:"replayed"`
 }

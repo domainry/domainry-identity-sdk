@@ -56,6 +56,7 @@ func (tokens *resolverTokens) Verify(context.Context, identity.VerifyTokenReques
 type resolverAuthentication struct {
 	session identity.SessionView
 	calls   int
+	err     error
 }
 
 func (*resolverAuthentication) Providers(context.Context, identity.ProviderQuery) ([]identity.Provider, error) {
@@ -84,7 +85,7 @@ func (*resolverAuthentication) LogoutSession(context.Context, identity.LogoutReq
 }
 func (authentication *resolverAuthentication) CurrentSession(context.Context, identity.CurrentSessionRequest) (identity.SessionView, error) {
 	authentication.calls++
-	return authentication.session, nil
+	return authentication.session, authentication.err
 }
 
 type resolverAuthorization struct {
@@ -115,15 +116,34 @@ func TestResolverCachesByTokenAndAuthorizationRevision(t *testing.T) {
 			t.Fatalf("principal=%#v", resolved)
 		}
 	}
-	if binding.tokens.calls != 2 || binding.auth.calls != 1 || binding.author.calls != 1 {
+	if binding.tokens.calls != 2 || binding.auth.calls != 2 || binding.author.calls != 1 {
 		t.Fatalf("token calls=%d session calls=%d bundle calls=%d", binding.tokens.calls, binding.auth.calls, binding.author.calls)
 	}
 	resolver.Invalidate("user-1", "workspace-1")
 	if _, err := resolver.Authenticate(t.Context(), "access"); err != nil {
 		t.Fatal(err)
 	}
-	if binding.auth.calls != 2 || binding.author.calls != 2 {
+	if binding.auth.calls != 3 || binding.author.calls != 2 {
 		t.Fatalf("invalidate did not evict: session=%d bundle=%d", binding.auth.calls, binding.author.calls)
+	}
+}
+
+func TestResolverRejectsRevokedSessionBeforeServingCachedPrincipal(t *testing.T) {
+	binding := newResolverBinding()
+	resolver, err := identityprincipal.NewResolver(binding, identityprincipal.Options{Clock: binding.clock, MaxCacheTTL: time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = resolver.Authenticate(t.Context(), "access"); err != nil {
+		t.Fatal(err)
+	}
+	revoked := errors.New("session revoked")
+	binding.auth.err = revoked
+	if _, err = resolver.Authenticate(t.Context(), "access"); !errors.Is(err, revoked) {
+		t.Fatalf("cached principal bypassed revoked session: %v", err)
+	}
+	if binding.auth.calls != 2 || binding.author.calls != 1 {
+		t.Fatalf("revocation calls: session=%d bundle=%d", binding.auth.calls, binding.author.calls)
 	}
 }
 
@@ -236,7 +256,7 @@ func TestResolverCacheReturnsDeeplyIsolatedPolicySnapshots(t *testing.T) {
 	if got := second.AccessBundle.Guardrails[0].Predicate.Value.(map[string]any)["state"].([]any)[0]; got != "original" {
 		t.Fatalf("guardrail cache was mutated: %v", got)
 	}
-	if binding.auth.calls != 1 || binding.author.calls != 1 {
+	if binding.auth.calls != 2 || binding.author.calls != 1 {
 		t.Fatalf("expected cache hit: session=%d bundle=%d", binding.auth.calls, binding.author.calls)
 	}
 }

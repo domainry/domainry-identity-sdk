@@ -27,7 +27,7 @@ func (gateway *Gateway) Login(w http.ResponseWriter, r *http.Request) {
 			gateway.writeError(w, err)
 			return
 		}
-		gateway.writeBrowserAuthenticationOutcome(w, outcome)
+		gateway.writeBrowserAuthenticationOutcome(w, workspaceID, outcome)
 		return
 	}
 	session, err := gateway.binding.Authentication().LoginWithPassword(r.Context(), request)
@@ -38,9 +38,9 @@ func (gateway *Gateway) Login(w http.ResponseWriter, r *http.Request) {
 	gateway.writeBrowserSession(w, session)
 }
 
-func (gateway *Gateway) writeBrowserAuthenticationOutcome(w http.ResponseWriter, outcome identity.AuthenticationOutcome) {
+func (gateway *Gateway) writeBrowserAuthenticationOutcome(w http.ResponseWriter, workspaceID identity.WorkspaceID, outcome identity.AuthenticationOutcome) {
 	if outcome.Status == identity.AuthenticationStatusChallengeRequired && outcome.Challenge != nil {
-		gateway.writeJSON(w, http.StatusOK, browserAuthenticationOutcome{Status: outcome.Status, Challenge: outcome.Challenge})
+		gateway.writeJSON(w, http.StatusOK, browserAuthenticationOutcome{Status: outcome.Status, WorkspaceID: workspaceID, Challenge: outcome.Challenge})
 		return
 	}
 	if outcome.Status == identity.AuthenticationStatusAuthenticated && outcome.Session != nil {

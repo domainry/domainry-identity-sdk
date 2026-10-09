@@ -12,8 +12,9 @@ import (
 // Browser response types omit refresh credentials; both browser and service
 // authentication contracts use Workspace as their sole isolation boundary.
 type browserAuthenticationOutcome struct {
-	Status    identity.AuthenticationStatus `json:"status"`
-	Challenge *identity.ProviderChallenge   `json:"challenge,omitempty"`
+	Status      identity.AuthenticationStatus `json:"status"`
+	WorkspaceID identity.WorkspaceID          `json:"workspace_id,omitempty"`
+	Challenge   *identity.ProviderChallenge   `json:"challenge,omitempty"`
 }
 
 type browserSession struct {

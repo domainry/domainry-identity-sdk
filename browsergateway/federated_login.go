@@ -114,7 +114,7 @@ func (gateway *Gateway) VerifyProvider(w http.ResponseWriter, r *http.Request) {
 			gateway.writeError(w, err)
 			return
 		}
-		gateway.writeBrowserAuthenticationOutcome(w, outcome)
+		gateway.writeBrowserAuthenticationOutcome(w, workspaceID, outcome)
 		return
 	}
 	session, err := gateway.binding.Authentication().VerifyOTP(r.Context(), request)

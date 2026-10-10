@@ -180,8 +180,10 @@ func principalFromResolution(token authentication.VerifiedToken, session authent
 		SupportOrgScopeIDs:    cloneStrings(bundle.Subject.SupportOrgScopeIDs),
 		ReportingScopeUserIDs: subjectIDsToStrings(bundle.Subject.ReportingScopeUserIDs),
 		User:                  session.User, Roles: append([]identity.Role(nil), session.Roles...), Permissions: uniqueSortedStrings(permissions),
-		MustChangePassword: session.MustChangePassword,
-		AccessBundle:       &bundle,
+		MustChangePassword:    session.MustChangePassword,
+		AuthenticatedProvider: strings.TrimSpace(token.AuthenticatedProvider),
+		ProviderSubject:       strings.TrimSpace(token.ProviderSubject),
+		AccessBundle:          &bundle,
 	}
 }
 

@@ -22,7 +22,7 @@ func newResolverBinding() *resolverBinding {
 	clock := &resolverClock{now: time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)}
 	return &resolverBinding{
 		clock:  clock,
-		tokens: &resolverTokens{claims: identity.VerifiedToken{SubjectID: "user-1", WorkspaceID: "workspace-1", SessionID: "session-1", AuthorizationRevision: "revision-1", TokenID: "token-1", IssuedAt: clock.now.Add(-time.Minute).Unix(), ExpiresAt: clock.now.Add(time.Hour).Unix()}},
+		tokens: &resolverTokens{claims: identity.VerifiedToken{SubjectID: "user-1", WorkspaceID: "workspace-1", SessionID: "session-1", AuthorizationRevision: "revision-1", AuthenticatedProvider: "wechat_mini_program", ProviderSubject: "openid-1", TokenID: "token-1", IssuedAt: clock.now.Add(-time.Minute).Unix(), ExpiresAt: clock.now.Add(time.Hour).Unix()}},
 		auth:   &resolverAuthentication{session: identity.SessionView{WorkspaceID: "workspace-1", SubjectID: "user-1", AuthorizationRevision: "revision-1", User: identity.User{ID: "user-1"}, Roles: []identity.Role{{Key: "admin"}}, Permissions: []string{"workspace.admin"}}},
 		author: &resolverAuthorization{bundle: identity.AccessBundle{ContractVersion: identity.CurrentPolicyBundleVersion, AuthorizationRevision: "revision-1", ExpiresAt: clock.now.Add(5 * time.Minute), Subject: identity.Subject{WorkspaceID: "workspace-1", SubjectID: "user-1", OrgID: "sales", OrgScopeIDs: []string{"sales", "store-a"}, ReportingScopeUserIDs: []identity.SubjectID{"user-1", "user-2"}}, FunctionGrants: []identity.FunctionGrant{{Resource: "orders", Action: "read", Effect: identity.EffectAllow}, {Resource: "workspace", Action: "admin", Effect: identity.EffectAllow}}, DataPolicies: []identity.DataPolicy{{Key: "orders.read", Resource: "orders", Action: "read", Effect: identity.EffectAllow, DataScopes: []identity.DataScope{identity.DataScopeAll}}, {Key: "workspace.admin", Resource: "workspace", Action: "admin", Effect: identity.EffectAllow, DataScopes: []identity.DataScope{identity.DataScopeAll}}}}},
 	}
@@ -112,7 +112,7 @@ func TestResolverCachesByTokenAndAuthorizationRevision(t *testing.T) {
 		if resolveErr != nil {
 			t.Fatal(resolveErr)
 		}
-		if !resolved.Known || !resolved.HasPermission("workspace.admin") || !resolved.HasPermission("orders.read") || !reflect.DeepEqual(resolved.OrgScopeIDs, []string{"sales", "store-a"}) || !reflect.DeepEqual(resolved.ReportingScopeUserIDs, []string{"user-1", "user-2"}) {
+		if !resolved.Known || !resolved.HasPermission("workspace.admin") || !resolved.HasPermission("orders.read") || resolved.AuthenticatedProvider != "wechat_mini_program" || resolved.ProviderSubject != "openid-1" || !reflect.DeepEqual(resolved.OrgScopeIDs, []string{"sales", "store-a"}) || !reflect.DeepEqual(resolved.ReportingScopeUserIDs, []string{"user-1", "user-2"}) {
 			t.Fatalf("principal=%#v", resolved)
 		}
 	}

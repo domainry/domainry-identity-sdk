@@ -8,7 +8,7 @@ import (
 	identitymodel "github.com/domainry/domainry-identity-sdk/identity"
 )
 
-const PrincipalContextContractVersion = "domainry-principal-context-v1"
+const PrincipalContextContractVersion = "domainry-principal-context-v2"
 
 // Principal contains authenticated, non-secret identity facts. Access tokens
 // are held by RequestIdentity and are never serialized with a Principal.
@@ -31,6 +31,13 @@ type Principal struct {
 	// when the bundle is absent.
 	Permissions        []string `json:"permissions"`
 	MustChangePassword bool     `json:"must_change_password"`
+	// AuthenticatedProvider and ProviderSubject identify the server-verified
+	// external account that established this session. They are deliberately
+	// excluded from JSON so browser presentation endpoints do not disclose a
+	// provider identifier; project business handlers may use them as immutable
+	// payer identity facts.
+	AuthenticatedProvider string `json:"-"`
+	ProviderSubject       string `json:"-"`
 	// AccessBundle is resolved policy state for in-process authorization. It is
 	// never serialized into tokens, logs, or domain records.
 	AccessBundle *AccessBundle `json:"-"`

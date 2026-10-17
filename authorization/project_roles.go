@@ -317,6 +317,7 @@ func (request ProjectRolePermissionBundleRequest) ValidateContract() error {
 type ProjectRolePermissionBundleReceipt struct {
 	RoleKey         string `json:"role_key"`
 	Added           int    `json:"added"`
+	Updated         int    `json:"updated"`
 	PermissionCount int    `json:"permission_count"`
 	SchemaVersion   string `json:"schema_version"`
 	SchemaHash      string `json:"schema_hash"`

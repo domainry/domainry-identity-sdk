@@ -477,6 +477,9 @@ type DataScope = authorization.DataScope
 type ProjectRoleCatalog = authorization.ProjectRoleCatalog
 type ProjectRoleCatalogReceipt = authorization.ProjectRoleCatalogReceipt
 type ProjectRoleCatalogPublisher = authorization.ProjectRoleCatalogPublisher
+type ProjectRolePermissionBundleRequest = authorization.ProjectRolePermissionBundleRequest
+type ProjectRolePermissionBundleReceipt = authorization.ProjectRolePermissionBundleReceipt
+type ProjectRolePermissionBundlePublisher = authorization.ProjectRolePermissionBundlePublisher
 
 // WorkspaceBootstrapProjectRoleCatalogSHA256 is the shared canonical digest
 // used by Runtime and Identity for the trusted Workspace bootstrap role policy.

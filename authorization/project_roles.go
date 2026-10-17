@@ -281,3 +281,50 @@ type ProjectRoleCatalogReceipt struct {
 type ProjectRoleCatalogPublisher interface {
 	PublishProjectRoles(context.Context, ProjectRoleCatalog) (ProjectRoleCatalogReceipt, error)
 }
+
+// ProjectRolePermissionBundleRequest lets an in-process product owner install
+// a fixed permission bundle into an existing role. Unlike administrator role
+// authoring, this trusted boundary may include bundled and internal
+// permissions, but it never accepts a browser-selected permission key.
+type ProjectRolePermissionBundleRequest struct {
+	Application    ApplicationRef          `json:"application"`
+	SourceOwner    string                  `json:"source_owner"`
+	RoleKey        string                  `json:"role_key"`
+	ActorID        SubjectID               `json:"actor_id"`
+	Permissions    []ProjectRolePermission `json:"permissions"`
+	BusinessReason string                  `json:"business_reason"`
+	OperationID    string                  `json:"operation_id"`
+}
+
+func (request ProjectRolePermissionBundleRequest) ValidateContract() error {
+	if !request.Application.WorkspaceID.Valid() || !request.Application.ApplicationKey.Valid() {
+		return &Error{Code: "identity.project_role_permission_bundle_scope_invalid"}
+	}
+	if !validSourceOwner(request.SourceOwner) || strings.TrimSpace(request.RoleKey) == "" || strings.TrimSpace(string(request.ActorID)) == "" || strings.TrimSpace(request.BusinessReason) == "" || strings.TrimSpace(request.OperationID) == "" {
+		return &Error{Code: "identity.project_role_permission_bundle_invalid"}
+	}
+	seen := make(map[string]bool, len(request.Permissions))
+	for _, permission := range request.Permissions {
+		key := strings.TrimSpace(permission.PermissionKey)
+		if key == "" || seen[key] || permission.Validate() != nil {
+			return &Error{Code: "identity.project_role_permission_bundle_invalid"}
+		}
+		seen[key] = true
+	}
+	return nil
+}
+
+type ProjectRolePermissionBundleReceipt struct {
+	RoleKey         string `json:"role_key"`
+	Added           int    `json:"added"`
+	PermissionCount int    `json:"permission_count"`
+	SchemaVersion   string `json:"schema_version"`
+	SchemaHash      string `json:"schema_hash"`
+}
+
+// ProjectRolePermissionBundlePublisher is available only on trusted,
+// in-process Identity bindings. It is deliberately separate from the direct
+// administrator authoring API exposed over HTTP.
+type ProjectRolePermissionBundlePublisher interface {
+	PublishProjectRolePermissionBundle(context.Context, ProjectRolePermissionBundleRequest) (ProjectRolePermissionBundleReceipt, error)
+}

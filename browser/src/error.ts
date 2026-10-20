@@ -8,7 +8,6 @@ export type IdentityHTTPErrorResponse = {
 export function parseIdentityHTTPErrorResponse(value: unknown): IdentityHTTPErrorResponse | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const record = value as Record<string, unknown>
-  if (!Object.keys(record).every((key) => ['code', 'message', 'params', 'request_id'].includes(key))) return null
   if (typeof record.code !== 'string' || !record.code.trim() || typeof record.message !== 'string' || !record.message.trim() || typeof record.request_id !== 'string') return null
   if (record.params !== undefined && (!record.params || typeof record.params !== 'object' || Array.isArray(record.params) || Object.values(record.params).some((item) => typeof item !== 'string'))) return null
   return {

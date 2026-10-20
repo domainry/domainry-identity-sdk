@@ -10,9 +10,13 @@ const session = {
   roles: [], default_role: '', permissions: [], must_change_password: false,
 }
 
-test('accepts only the canonical flat HTTP error response', async () => {
+test('requires canonical HTTP error fields and ignores additive fields', async () => {
   assert.equal(parseIdentityHTTPErrorResponse({ code: 'legacy.error', detail: 'old' }), null)
-  assert.equal(parseIdentityHTTPErrorResponse({ code: 'legacy.error', message: 'old', request_id: 'request', conflict: {} }), null)
+  assert.deepEqual(parseIdentityHTTPErrorResponse({
+    code: 'identity.account_changed', message: 'Account changed', request_id: 'request', future_field: {},
+  }), {
+    code: 'identity.account_changed', message: 'Account changed', request_id: 'request',
+  })
 
   const client = new IdentityClient({
     endpoint: 'https://runtime.example.test', applicationKey: 'runtime-app',

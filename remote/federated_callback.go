@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/domainry/domainry-foundation/telemetry"
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
@@ -22,11 +23,11 @@ func (c *client) completeFederatedLogin(ctx context.Context, provider string, va
 	}
 	requestURL := *c.baseURL
 	requestURL.Path = strings.TrimRight(c.baseURL.Path, "/") + "/auth/providers/" + url.PathEscape(provider) + "/callback"
+	requestContext = telemetry.WithHTTPClientOperation(requestContext, "identity.federated_callback")
 	request, err := http.NewRequestWithContext(requestContext, http.MethodPost, requestURL.String(), strings.NewReader(values.Encode()))
 	if err != nil {
 		return identity.FederatedLoginCompletion{}, err
 	}
-	copyIdentityHeaders(request.Header, c.contextHeadersFor(requestContext))
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("User-Agent", c.userAgent)

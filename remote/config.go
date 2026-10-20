@@ -1,14 +1,11 @@
 package remote
 
 import (
-	"context"
 	"net/http"
 	"time"
 
 	identity "github.com/domainry/domainry-identity-sdk"
 )
-
-type ContextHeaderProvider = func(context.Context) http.Header
 
 type RetryPolicy struct {
 	MaxAttempts    int
@@ -33,7 +30,6 @@ type Config struct {
 	RequestTimeout     time.Duration
 	Retry              RetryPolicy
 	CircuitBreaker     CircuitBreakerPolicy
-	ContextHeaders     ContextHeaderProvider
 	Clock              identity.Clock
 }
 

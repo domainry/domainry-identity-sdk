@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/domainry/domainry-foundation/telemetry"
 	identitysdk "github.com/domainry/domainry-identity-sdk"
 )
 
@@ -29,7 +30,6 @@ type client struct {
 	serviceAccessToken string
 	requestTimeout     time.Duration
 	retry              RetryPolicy
-	contextHeaders     ContextHeaderProvider
 	breaker            *availabilityCircuitBreaker
 }
 
@@ -57,8 +57,8 @@ func newClient(config Config) (*client, error) {
 	}
 	return &client{
 		baseURL: baseURL, workspaceID: strings.TrimSpace(config.WorkspaceID), applicationKey: strings.TrimSpace(config.Audience),
-		httpClient: httpClient, userAgent: userAgent, serviceAccessToken: strings.TrimSpace(config.ServiceAccessToken),
-		requestTimeout: config.RequestTimeout, retry: config.Retry, contextHeaders: config.ContextHeaders,
+		httpClient: telemetry.InstrumentHTTPClient(httpClient, "github.com/domainry/domainry-identity-sdk/remote"), userAgent: userAgent, serviceAccessToken: strings.TrimSpace(config.ServiceAccessToken),
+		requestTimeout: config.RequestTimeout, retry: config.Retry,
 		breaker: newAvailabilityCircuitBreaker(config.CircuitBreaker, config.Clock),
 	}, nil
 }
@@ -182,11 +182,11 @@ func (c *client) execute(ctx context.Context, method, endpoint, accessToken, con
 	if body != nil {
 		requestBody = bytes.NewReader(body)
 	}
+	ctx = telemetry.WithHTTPClientOperation(ctx, "identity.remote")
 	request, err := http.NewRequestWithContext(ctx, method, requestURL.String(), requestBody)
 	if err != nil {
 		return nil, nil, fmt.Errorf("build Identity request: %w", err)
 	}
-	copyIdentityHeaders(request.Header, c.contextHeadersFor(ctx))
 	copyIdentityHeaders(request.Header, headers)
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("User-Agent", c.userAgent)
@@ -216,13 +216,6 @@ func (c *client) execute(ctx context.Context, method, endpoint, accessToken, con
 		return response, nil, &identityResponseTooLargeError{}
 	}
 	return response, raw, nil
-}
-
-func (c *client) contextHeadersFor(ctx context.Context) http.Header {
-	if c.contextHeaders == nil {
-		return nil
-	}
-	return c.contextHeaders(ctx)
 }
 
 func boundedRequestBody(body io.Reader) ([]byte, error) {

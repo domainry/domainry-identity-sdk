@@ -10,7 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/domainry/domainry-foundation/requestcontext"
+	"github.com/domainry/domainry-foundation/telemetry"
 	identity "github.com/domainry/domainry-identity-sdk"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func TestRemoteClientRetriesOnlyReplaySafeRequests(t *testing.T) {
@@ -88,7 +93,7 @@ func TestRemoteClientCircuitBreakerUsesOneRecoveryProbe(t *testing.T) {
 
 func TestRemoteClientPropagatesSafeContextHeaders(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-Request-ID") != "request-1" || r.Header.Get("traceparent") != "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" {
+		if r.Header.Get(telemetry.RequestIDHeader) != "" || r.Header.Get("traceparent") == "" || r.Header.Get(telemetry.CorrelationIDHeader) != "correlation-1" {
 			t.Fatalf("trace headers=%v", r.Header)
 		}
 		if r.Header.Get("Authorization") != "Bearer access-token" || r.Header.Get("X-Workspace-ID") != "workspace-a" || r.Header.Get("Cookie") != "" {
@@ -97,22 +102,17 @@ func TestRemoteClientPropagatesSafeContextHeaders(t *testing.T) {
 		_, _ = w.Write([]byte(`{"session_id":"session-1","workspace_id":"workspace-a","subject_id":"user-1","authorization_revision":"revision-1","user":{"id":"user-1"}}`))
 	}))
 	t.Cleanup(server.Close)
-	client, err := newClient(Config{
-		Endpoint: server.URL, WorkspaceID: "workspace-a", Audience: "runtime-app", HTTPClient: server.Client(),
-		ContextHeaders: func(context.Context) http.Header {
-			return http.Header{
-				"X-Request-ID":   []string{"request-1"},
-				"traceparent":    []string{"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"},
-				"Authorization":  []string{"Bearer attacker"},
-				"X-Workspace-ID": []string{"other-workspace"},
-				"Cookie":         []string{"secret=attacker"},
-			}
-		},
-	})
+	client, err := newClient(Config{Endpoint: server.URL, WorkspaceID: "workspace-a", Audience: "runtime-app", HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	session, err := (authentication{client: client}).CurrentSession(t.Context(), identity.CurrentSessionRequest{AccessToken: "access-token"})
+	provider := sdktrace.NewTracerProvider()
+	previousProvider := otel.GetTracerProvider()
+	otel.SetTracerProvider(provider)
+	t.Cleanup(func() { _ = provider.Shutdown(context.Background()); otel.SetTracerProvider(previousProvider) })
+	parent := otel.GetTextMapPropagator().Extract(t.Context(), propagation.HeaderCarrier(http.Header{"traceparent": []string{"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}}))
+	parent = requestcontext.WithCorrelationID(parent, "correlation-1")
+	session, err := (authentication{client: client}).CurrentSession(parent, identity.CurrentSessionRequest{AccessToken: "access-token"})
 	if err != nil || session.SubjectID != "user-1" {
 		t.Fatalf("session=%+v err=%v", session, err)
 	}

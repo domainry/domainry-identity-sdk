@@ -263,30 +263,12 @@ func decodeError(response *http.Response, raw []byte) error {
 	payload := struct {
 		Code      string            `json:"code"`
 		Message   string            `json:"message"`
-		Detail    string            `json:"detail"`
 		RequestID string            `json:"request_id"`
 		Params    map[string]string `json:"params"`
-		Error     json.RawMessage   `json:"error"`
 	}{}
 	_ = json.Unmarshal(raw, &payload)
-	if len(payload.Error) > 0 && payload.Code == "" {
-		var nested struct {
-			Code    string            `json:"code"`
-			Message string            `json:"message"`
-			Params  map[string]string `json:"params"`
-		}
-		if json.Unmarshal(payload.Error, &nested) == nil {
-			payload.Code, payload.Message = nested.Code, nested.Message
-			if len(payload.Params) == 0 {
-				payload.Params = nested.Params
-			}
-		}
-	}
 	if payload.Code == "" {
 		payload.Code = "identity.request_failed"
-	}
-	if payload.Message == "" {
-		payload.Message = payload.Detail
 	}
 	if payload.RequestID == "" {
 		payload.RequestID = strings.TrimSpace(response.Header.Get("X-Request-ID"))

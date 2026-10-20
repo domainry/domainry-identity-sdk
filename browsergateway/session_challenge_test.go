@@ -11,8 +11,9 @@ import (
 
 func TestBrowserChallengeReturnsResolvedWorkspaceForVerification(t *testing.T) {
 	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/auth/login", nil)
 	gateway := &Gateway{}
-	gateway.writeBrowserAuthenticationOutcome(response, "workspace-resolved", identity.AuthenticationOutcome{
+	gateway.writeBrowserAuthenticationOutcome(response, request, "workspace-resolved", identity.AuthenticationOutcome{
 		Status: identity.AuthenticationStatusChallengeRequired,
 		Challenge: &identity.ProviderChallenge{
 			Provider: "domainry_totp", State: "state-1", Type: "otp", Purpose: "login_mfa", ExpiresAt: "2026-09-28T10:00:00Z",

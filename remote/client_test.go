@@ -197,7 +197,7 @@ func TestConfigurationAndRemoteErrors(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Request-ID", "request-1")
 		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte(`{"error":{"code":"auth.token_invalid","params":{"kind":"expired"}}}`))
+		_, _ = w.Write([]byte(`{"code":"auth.token_invalid","message":"Token is invalid","params":{"kind":"expired"},"request_id":"request-1"}`))
 	}))
 	_, err := (authentication{client: client}).CurrentSession(t.Context(), identity.CurrentSessionRequest{AccessToken: "expired-token"})
 	var identityError *identity.Error

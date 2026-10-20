@@ -24,30 +24,30 @@ func (gateway *Gateway) Login(w http.ResponseWriter, r *http.Request) {
 	if challengeBinding, ok := gateway.binding.(identity.ChallengeAuthenticationBinding); ok {
 		outcome, err := challengeBinding.ChallengeAuthentication().LoginWithPasswordOutcome(r.Context(), request)
 		if err != nil {
-			gateway.writeError(w, err)
+			gateway.writeError(w, r, err)
 			return
 		}
-		gateway.writeBrowserAuthenticationOutcome(w, workspaceID, outcome)
+		gateway.writeBrowserAuthenticationOutcome(w, r, workspaceID, outcome)
 		return
 	}
 	session, err := gateway.binding.Authentication().LoginWithPassword(r.Context(), request)
 	if err != nil {
-		gateway.writeError(w, err)
+		gateway.writeError(w, r, err)
 		return
 	}
-	gateway.writeBrowserSession(w, session)
+	gateway.writeBrowserSession(w, r, session)
 }
 
-func (gateway *Gateway) writeBrowserAuthenticationOutcome(w http.ResponseWriter, workspaceID identity.WorkspaceID, outcome identity.AuthenticationOutcome) {
+func (gateway *Gateway) writeBrowserAuthenticationOutcome(w http.ResponseWriter, r *http.Request, workspaceID identity.WorkspaceID, outcome identity.AuthenticationOutcome) {
 	if outcome.Status == identity.AuthenticationStatusChallengeRequired && outcome.Challenge != nil {
 		gateway.writeJSON(w, http.StatusOK, browserAuthenticationOutcome{Status: outcome.Status, WorkspaceID: workspaceID, Challenge: outcome.Challenge})
 		return
 	}
 	if outcome.Status == identity.AuthenticationStatusAuthenticated && outcome.Session != nil {
-		gateway.writeBrowserSession(w, *outcome.Session)
+		gateway.writeBrowserSession(w, r, *outcome.Session)
 		return
 	}
-	gateway.writeCode(w, http.StatusBadGateway, "identity.authentication_response_invalid")
+	gateway.writeCode(w, r, http.StatusBadGateway, "identity.authentication_response_invalid")
 }
 
 func (gateway *Gateway) Refresh(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +57,7 @@ func (gateway *Gateway) Refresh(w http.ResponseWriter, r *http.Request) {
 	}
 	refreshToken, ok := gateway.refreshToken(r)
 	if !ok {
-		gateway.writeCode(w, http.StatusUnauthorized, "auth.refresh_token_required")
+		gateway.writeCode(w, r, http.StatusUnauthorized, "auth.refresh_token_required")
 		return
 	}
 	workspaceID, ok := gateway.refreshSessionWorkspaceID(w, r, scope.WorkspaceID, refreshToken)
@@ -71,10 +71,10 @@ func (gateway *Gateway) Refresh(w http.ResponseWriter, r *http.Request) {
 		if invalidRefreshCredential(err) {
 			gateway.clearRefreshCookie(w)
 		}
-		gateway.writeError(w, err)
+		gateway.writeError(w, r, err)
 		return
 	}
-	gateway.writeBrowserSession(w, session)
+	gateway.writeBrowserSession(w, r, session)
 }
 
 func (gateway *Gateway) Logout(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +95,7 @@ func (gateway *Gateway) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 	gateway.clearRefreshCookie(w)
 	if logoutErr != nil {
-		gateway.writeError(w, logoutErr)
+		gateway.writeError(w, r, logoutErr)
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")
@@ -108,12 +108,12 @@ func (gateway *Gateway) Session(w http.ResponseWriter, r *http.Request) {
 	}
 	token := bearerToken(r.Header.Get("Authorization"))
 	if token == "" {
-		gateway.writeCode(w, http.StatusUnauthorized, "auth.token_required")
+		gateway.writeCode(w, r, http.StatusUnauthorized, "auth.token_required")
 		return
 	}
 	session, err := gateway.binding.Authentication().CurrentSession(r.Context(), identity.CurrentSessionRequest{AccessToken: token})
 	if err != nil {
-		gateway.writeError(w, err)
+		gateway.writeError(w, r, err)
 		return
 	}
 	if gateway.hasExplicitWorkspace(r, "") {
@@ -122,21 +122,21 @@ func (gateway *Gateway) Session(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if session.WorkspaceID != workspaceID {
-			gateway.writeCode(w, http.StatusBadRequest, "identity.workspace_scope_mismatch")
+			gateway.writeCode(w, r, http.StatusBadRequest, "identity.workspace_scope_mismatch")
 			return
 		}
 	}
 	gateway.writeJSON(w, http.StatusOK, newBrowserSessionView(session))
 }
 
-func (gateway *Gateway) writeBrowserSession(w http.ResponseWriter, session identity.AuthSession) {
+func (gateway *Gateway) writeBrowserSession(w http.ResponseWriter, r *http.Request, session identity.AuthSession) {
 	refreshToken := strings.TrimSpace(session.RefreshToken)
 	if refreshToken == "" {
 		// A successful session mutation must rotate or issue the browser refresh
 		// credential. Keeping a previous cookie would combine a new access token
 		// with stale session state and can make logout/revocation unpredictable.
 		gateway.clearRefreshCookie(w)
-		gateway.writeCode(w, http.StatusBadGateway, "identity.refresh_credential_missing")
+		gateway.writeCode(w, r, http.StatusBadGateway, "identity.refresh_credential_missing")
 		return
 	}
 	http.SetCookie(w, &http.Cookie{

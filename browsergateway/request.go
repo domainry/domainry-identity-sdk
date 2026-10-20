@@ -49,13 +49,13 @@ func (gateway *Gateway) workspaceID(w http.ResponseWriter, r *http.Request, body
 			continue
 		}
 		if resolved != "" && resolved != value {
-			gateway.writeCode(w, http.StatusBadRequest, "identity.workspace_scope_mismatch")
+			gateway.writeCode(w, r, http.StatusBadRequest, "identity.workspace_scope_mismatch")
 			return "", false
 		}
 		resolved = value
 	}
 	if resolved == "" && gateway.config.RequireExplicitWorkspace {
-		gateway.writeCode(w, http.StatusForbidden, "auth.invalid_credentials")
+		gateway.writeCode(w, r, http.StatusForbidden, "auth.invalid_credentials")
 		return "", false
 	}
 	if resolved == "" {
@@ -63,7 +63,7 @@ func (gateway *Gateway) workspaceID(w http.ResponseWriter, r *http.Request, body
 	}
 	workspaceID := identity.WorkspaceID(resolved)
 	if !workspaceID.Valid() {
-		gateway.writeCode(w, http.StatusBadRequest, "backend.workspace_scope_required")
+		gateway.writeCode(w, r, http.StatusBadRequest, "backend.workspace_scope_required")
 		return "", false
 	}
 	return workspaceID, true
@@ -81,11 +81,11 @@ func (gateway *Gateway) passwordLoginWorkspaceID(w http.ResponseWriter, r *http.
 	}
 	workspaceID, found, err := gateway.config.ResolvePasswordLoginWorkspace(r.Context(), strings.TrimSpace(login))
 	if err != nil {
-		gateway.writeError(w, err)
+		gateway.writeError(w, r, err)
 		return "", false
 	}
 	if !found || !workspaceID.Valid() {
-		gateway.writeCode(w, http.StatusForbidden, "auth.invalid_credentials")
+		gateway.writeCode(w, r, http.StatusForbidden, "auth.invalid_credentials")
 		return "", false
 	}
 	return workspaceID, true
@@ -103,12 +103,12 @@ func (gateway *Gateway) refreshSessionWorkspaceID(w http.ResponseWriter, r *http
 	}
 	workspaceID, found, err := gateway.config.ResolveRefreshSessionWorkspace(r.Context(), strings.TrimSpace(refreshToken))
 	if err != nil {
-		gateway.writeError(w, err)
+		gateway.writeError(w, r, err)
 		return "", false
 	}
 	if !found || !workspaceID.Valid() {
 		gateway.clearRefreshCookie(w)
-		gateway.writeCode(w, http.StatusUnauthorized, "auth.session_expired")
+		gateway.writeCode(w, r, http.StatusUnauthorized, "auth.session_expired")
 		return "", false
 	}
 	return workspaceID, true
@@ -121,13 +121,13 @@ func (gateway *Gateway) decodeJSON(w http.ResponseWriter, r *http.Request, targe
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, gateway.config.MaxRequestBodySize))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
-		gateway.writeCode(w, http.StatusBadRequest, "backend.invalid_json")
+		gateway.writeCode(w, r, http.StatusBadRequest, "backend.invalid_json")
 		return false
 	}
 	if err := decoder.Decode(&struct{}{}); errors.Is(err, io.EOF) {
 		return true
 	}
-	gateway.writeCode(w, http.StatusBadRequest, "backend.invalid_json")
+	gateway.writeCode(w, r, http.StatusBadRequest, "backend.invalid_json")
 	return false
 }
 
@@ -144,7 +144,7 @@ func (gateway *Gateway) rejectNonWorkspaceBoundary(w http.ResponseWriter, r *htt
 		}
 	}
 	if tenantQueryPresent || tenantHeaderPresent {
-		gateway.writeCode(w, http.StatusBadRequest, "identity.workspace_scope_only")
+		gateway.writeCode(w, r, http.StatusBadRequest, "identity.workspace_scope_only")
 		return true
 	}
 	return false

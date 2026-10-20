@@ -15,7 +15,7 @@ func (gateway *Gateway) Providers(w http.ResponseWriter, r *http.Request) {
 	}
 	providers, err := gateway.binding.Authentication().Providers(r.Context(), identity.ProviderQuery{WorkspaceID: workspaceID})
 	if err != nil {
-		gateway.writeError(w, err)
+		gateway.writeError(w, r, err)
 		return
 	}
 	gateway.writeJSON(w, http.StatusOK, providers)
@@ -34,7 +34,7 @@ func (gateway *Gateway) StartProvider(w http.ResponseWriter, r *http.Request) {
 		request.ReturnURL = strings.TrimSpace(r.URL.Query().Get("return_url"))
 	}
 	if request.ReturnURL != "" && !validReturnURL(request.ReturnURL) {
-		gateway.writeCode(w, http.StatusBadRequest, "identity.redirect_url_invalid")
+		gateway.writeCode(w, r, http.StatusBadRequest, "identity.redirect_url_invalid")
 		return
 	}
 	challenge, err := gateway.binding.Authentication().BeginFederatedLogin(r.Context(), identity.BeginFederatedLoginRequest{
@@ -42,7 +42,7 @@ func (gateway *Gateway) StartProvider(w http.ResponseWriter, r *http.Request) {
 		Provider: r.PathValue("provider"), ReturnURL: request.ReturnURL, Phone: request.Phone,
 	})
 	if err != nil {
-		gateway.writeError(w, err)
+		gateway.writeError(w, r, err)
 		return
 	}
 	gateway.writeJSON(w, http.StatusOK, challenge)
@@ -60,11 +60,11 @@ func (gateway *Gateway) ProviderCallback(w http.ResponseWriter, r *http.Request)
 	}
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
-			gateway.writeCode(w, http.StatusBadRequest, "auth.provider_callback_invalid")
+			gateway.writeCode(w, r, http.StatusBadRequest, "auth.provider_callback_invalid")
 			return
 		}
 		if _, present := r.PostForm["tenant_id"]; present {
-			gateway.writeCode(w, http.StatusBadRequest, "identity.workspace_scope_only")
+			gateway.writeCode(w, r, http.StatusBadRequest, "identity.workspace_scope_only")
 			return
 		}
 		for key, entries := range r.PostForm {
@@ -77,16 +77,16 @@ func (gateway *Gateway) ProviderCallback(w http.ResponseWriter, r *http.Request)
 		Provider: r.PathValue("provider"), Values: values,
 	})
 	if err != nil {
-		gateway.writeError(w, err)
+		gateway.writeError(w, r, err)
 		return
 	}
 	if !validReturnURL(completion.ReturnURL) {
-		gateway.writeCode(w, http.StatusBadGateway, "identity.provider_redirect_invalid")
+		gateway.writeCode(w, r, http.StatusBadGateway, "identity.provider_redirect_invalid")
 		return
 	}
 	redirect, err := url.Parse(completion.ReturnURL)
 	if err != nil || !redirect.IsAbs() {
-		gateway.writeCode(w, http.StatusBadGateway, "identity.provider_redirect_invalid")
+		gateway.writeCode(w, r, http.StatusBadGateway, "identity.provider_redirect_invalid")
 		return
 	}
 	query := redirect.Query()
@@ -111,18 +111,18 @@ func (gateway *Gateway) VerifyProvider(w http.ResponseWriter, r *http.Request) {
 	if challengeBinding, ok := gateway.binding.(identity.ChallengeAuthenticationBinding); ok {
 		outcome, err := challengeBinding.ChallengeAuthentication().VerifyOTPOutcome(r.Context(), request)
 		if err != nil {
-			gateway.writeError(w, err)
+			gateway.writeError(w, r, err)
 			return
 		}
-		gateway.writeBrowserAuthenticationOutcome(w, workspaceID, outcome)
+		gateway.writeBrowserAuthenticationOutcome(w, r, workspaceID, outcome)
 		return
 	}
 	session, err := gateway.binding.Authentication().VerifyOTP(r.Context(), request)
 	if err != nil {
-		gateway.writeError(w, err)
+		gateway.writeError(w, r, err)
 		return
 	}
-	gateway.writeBrowserSession(w, session)
+	gateway.writeBrowserSession(w, r, session)
 }
 
 func (gateway *Gateway) ExchangeAuthorizationCode(w http.ResponseWriter, r *http.Request) {
@@ -135,7 +135,7 @@ func (gateway *Gateway) ExchangeAuthorizationCode(w http.ResponseWriter, r *http
 		return
 	}
 	if !validReturnURL(browserRequest.ReturnURL) {
-		gateway.writeCode(w, http.StatusBadRequest, "identity.redirect_url_invalid")
+		gateway.writeCode(w, r, http.StatusBadRequest, "identity.redirect_url_invalid")
 		return
 	}
 	request := identity.ExchangeAuthorizationCodeRequest{
@@ -144,10 +144,10 @@ func (gateway *Gateway) ExchangeAuthorizationCode(w http.ResponseWriter, r *http
 	}
 	session, err := gateway.binding.Authentication().ExchangeAuthorizationCode(r.Context(), request)
 	if err != nil {
-		gateway.writeError(w, err)
+		gateway.writeError(w, r, err)
 		return
 	}
-	gateway.writeBrowserSession(w, session)
+	gateway.writeBrowserSession(w, r, session)
 }
 
 func validatedReturnURL(raw string) (*url.URL, bool) {

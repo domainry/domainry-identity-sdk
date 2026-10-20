@@ -1,4 +1,4 @@
-import { IdentityClientError } from './error.js'
+import { IdentityClientError, identityClientErrorFromResponse } from './error.js'
 import type {
   IdentityClientConfiguration,
   IdentityProvider,
@@ -184,11 +184,8 @@ export class IdentityClient {
       await this.refresh()
       response = await this.#send(path, init)
     }
-    const payload = response.status === 204 ? undefined : await response.json().catch(() => ({}))
-    if (!response.ok) {
-      throw new IdentityClientError(payload?.code || 'identity.request_failed', response.status, payload?.message, payload)
-    }
-    return payload as T
+    if (!response.ok) throw await identityClientErrorFromResponse(response)
+    return (response.status === 204 ? undefined : await response.json()) as T
   }
 
   #send(path: string, init: RequestInit): Promise<Response> {

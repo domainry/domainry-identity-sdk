@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { IdentityClient, IdentityClientError } from './dist/index.js'
+import { IdentityClient, IdentityClientError, parseIdentityHTTPErrorResponse } from './dist/index.js'
 
 const session = {
   session_id: 'session-1', workspace_id: 'workspace-primary', access_token: 'access-1',
@@ -9,6 +9,28 @@ const session = {
   user: { id: 'user-1', name: 'User', email: 'user@example.test', version: 1, status: 'active' },
   roles: [], default_role: '', permissions: [], must_change_password: false,
 }
+
+test('accepts only the canonical flat HTTP error response', async () => {
+  assert.equal(parseIdentityHTTPErrorResponse({ code: 'legacy.error', detail: 'old' }), null)
+  assert.equal(parseIdentityHTTPErrorResponse({ code: 'legacy.error', message: 'old', request_id: 'request', conflict: {} }), null)
+
+  const client = new IdentityClient({
+    endpoint: 'https://runtime.example.test', applicationKey: 'runtime-app',
+    fetch: async () => new Response(JSON.stringify({
+      code: 'identity.account_changed',
+      message: 'Account changed',
+      params: { revision: '7' },
+      request_id: 'request-7',
+    }), { status: 409, headers: { 'content-type': 'application/json' } }),
+  })
+  await assert.rejects(client.providers(), (error) => (
+    error instanceof IdentityClientError
+    && error.code === 'identity.account_changed'
+    && error.message === 'Account changed'
+    && error.params.revision === '7'
+    && error.requestID === 'request-7'
+  ))
+})
 
 test('keeps access credentials in memory and sends cookie-bound requests', async () => {
   const requests = []

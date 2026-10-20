@@ -2,12 +2,15 @@ package httpmiddleware
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/domainry/domainry-foundation/httpresponse"
+	"github.com/domainry/domainry-foundation/requestcontext"
 	identitysdk "github.com/domainry/domainry-identity-sdk"
 )
 
@@ -89,6 +92,29 @@ func TestAuthenticatePublishesIdentityAndRejectsCredentials(t *testing.T) {
 		if response.Code != http.StatusUnauthorized || !strings.Contains(response.Body.String(), "auth.token_required") {
 			t.Fatalf("header=%q status=%d body=%s", header, response.Code, response.Body.String())
 		}
+	}
+}
+
+func TestDefaultErrorWriterUsesCanonicalHTTPResponse(t *testing.T) {
+	middleware, err := New(&authenticatorStub{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/orders", nil)
+	request = request.WithContext(requestcontext.WithRequestID(request.Context(), "req-auth"))
+	response := httptest.NewRecorder()
+
+	middleware.RequirePermission("order.read", http.NotFoundHandler()).ServeHTTP(response, request)
+
+	var failure httpresponse.ErrorResponse
+	if err := json.Unmarshal(response.Body.Bytes(), &failure); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusUnauthorized || failure.Code != "auth.token_required" || failure.Message != "auth.token_required" || failure.RequestID != "req-auth" {
+		t.Fatalf("status=%d failure=%+v", response.Code, failure)
+	}
+	if strings.Contains(response.Body.String(), `"error"`) || strings.Contains(response.Body.String(), "message_key") {
+		t.Fatalf("legacy response fields leaked: %s", response.Body.String())
 	}
 }
 

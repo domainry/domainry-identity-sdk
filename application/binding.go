@@ -139,7 +139,7 @@ func (value *binding) resolveWorkspace(ctx context.Context, input identity.Works
 	if !input.Valid() {
 		return "", scopeError(http.StatusForbidden, "auth.invalid_credentials")
 	}
-	resolved, err := value.resolver.ResolveWorkspace(ctx, input)
+	resolved, err := value.scopedWorkspaceResolution(ctx, input)
 	if err != nil || !resolved.Valid() {
 		return "", scopeError(http.StatusForbidden, "auth.invalid_credentials")
 	}

@@ -1,11 +1,11 @@
 package httpmiddleware
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
 
+	"github.com/domainry/domainry-foundation/httpresponse"
 	identitysdk "github.com/domainry/domainry-identity-sdk"
 )
 
@@ -259,11 +259,6 @@ func authenticationError(err error) (int, string) {
 	return http.StatusUnauthorized, "auth.token_invalid"
 }
 
-func writeJSONError(w http.ResponseWriter, _ *http.Request, status int, code string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"code":  code,
-		"error": map[string]string{"code": code},
-	})
+func writeJSONError(w http.ResponseWriter, r *http.Request, status int, code string) {
+	httpresponse.WriteError(w, r, httpresponse.Failure{Status: status, Code: code})
 }

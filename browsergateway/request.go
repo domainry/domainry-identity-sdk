@@ -38,6 +38,10 @@ type browserAuthorizationCodeExchangeRequest struct {
 	ReturnURL   string               `json:"return_url"`
 }
 
+type browserExternalAccountLinkRequest struct {
+	ReturnURL string `json:"return_url"`
+}
+
 func (gateway *Gateway) workspaceID(w http.ResponseWriter, r *http.Request, body identity.WorkspaceID) (identity.WorkspaceID, bool) {
 	if gateway.rejectNonWorkspaceBoundary(w, r) {
 		return "", false

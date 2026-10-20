@@ -21,6 +21,9 @@ func browserGatewayRouteSpecs() []browserGatewayRouteSpec {
 	anonymous := actioncontract.Authorization{Strategy: actioncontract.AuthorizationAnonymous}
 	principal := actioncontract.Authorization{Strategy: actioncontract.AuthorizationAuthenticated}
 	return []browserGatewayRouteSpec{
+		{key: "identity.browser.external_accounts.list", capabilityKey: "identity.browser.external_accounts", capabilityLabel: "Browser external accounts", operationKey: "list", operationLabel: "List", label: "List the current subject external accounts", method: http.MethodGet, suffix: "/auth/external-accounts", handlerKey: "external_accounts", authorization: principal, risk: actioncontract.RiskLow},
+		{key: "identity.browser.external_accounts.link_start", capabilityKey: "identity.browser.external_accounts", capabilityLabel: "Browser external accounts", operationKey: "link_start", operationLabel: "Link", label: "Start a verified external-account link", method: http.MethodPost, suffix: "/auth/external-accounts/{provider}/link/start", handlerKey: "external_account_link_start", authorization: principal, risk: actioncontract.RiskHigh},
+		{key: "identity.browser.external_accounts.unbind", capabilityKey: "identity.browser.external_accounts", capabilityLabel: "Browser external accounts", operationKey: "unbind", operationLabel: "Unbind", label: "Unbind the current subject external account", method: http.MethodDelete, suffix: "/auth/external-accounts/{provider}/{accountID}", handlerKey: "external_account_unbind", authorization: principal, risk: actioncontract.RiskHigh},
 		{key: "identity.browser.credentials.totp", capabilityKey: "identity.browser.credentials", capabilityLabel: "Browser credentials", operationKey: "totp", operationLabel: "Manage verifier", label: "Manage the current subject TOTP authenticator", method: http.MethodPost, suffix: "/auth/totp", handlerKey: "totp", authorization: principal, risk: actioncontract.RiskHigh},
 		{key: "identity.browser.session.get", capabilityKey: "identity.browser.session", capabilityLabel: "Browser session", operationKey: "get", operationLabel: "Get", label: "Read the current browser session", method: http.MethodGet, suffix: "/auth/session", handlerKey: "session", authorization: principal, risk: actioncontract.RiskLow},
 		{key: "identity.browser.authorization_code.exchange", capabilityKey: "identity.browser.authorization_code", capabilityLabel: "Browser authorization code", operationKey: "exchange", operationLabel: "Exchange", label: "Exchange a browser authorization code", method: http.MethodPost, suffix: "/auth/code/exchange", handlerKey: "code_exchange", authorization: anonymous, risk: actioncontract.RiskMedium},
@@ -72,6 +75,12 @@ func ActionDefinitions(prefix string) ([]actioncontract.ActionDefinition, error)
 
 func (gateway *Gateway) routeHandler(handlerKey string) http.HandlerFunc {
 	switch handlerKey {
+	case "external_accounts":
+		return gateway.ExternalAccounts
+	case "external_account_link_start":
+		return gateway.StartExternalAccountLink
+	case "external_account_unbind":
+		return gateway.UnbindExternalAccount
 	case "totp":
 		return gateway.ManageTOTP
 	case "session":

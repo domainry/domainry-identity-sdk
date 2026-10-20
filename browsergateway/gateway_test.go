@@ -30,7 +30,7 @@ func TestBrowserGatewayRoutesProjectOneFrozenActionManifest(t *testing.T) {
 	if err := registry.Freeze(); err != nil {
 		t.Fatal(err)
 	}
-	if len(definitions) != 15 || len(patterns) != len(definitions) {
+	if len(definitions) != 18 || len(patterns) != len(definitions) {
 		t.Fatalf("definitions=%d patterns=%d", len(definitions), len(patterns))
 	}
 	for index, definition := range definitions {
@@ -46,6 +46,7 @@ func TestBrowserGatewayRoutesProjectOneFrozenActionManifest(t *testing.T) {
 type testBinding struct {
 	auth        *testAuthentication
 	credentials testCredentials
+	external    *testExternalAccounts
 }
 
 func (binding testBinding) Descriptor() identity.Descriptor         { return identity.Descriptor{} }
@@ -57,7 +58,25 @@ func (testBinding) Projection() identity.Projection                 { return nil
 func (testBinding) Applications() identity.ApplicationRegistry      { return nil }
 func (testBinding) Permissions() identity.PermissionRegistry        { return nil }
 func (binding testBinding) Credentials() identity.CredentialManager { return binding.credentials }
-func (testBinding) Close(context.Context) error                     { return nil }
+func (binding testBinding) ExternalAccounts() identity.ExternalAccountManager {
+	return binding.external
+}
+func (testBinding) Close(context.Context) error { return nil }
+
+type testExternalAccounts struct {
+	startRequest identity.StartExternalAccountLinkRequest
+}
+
+func (*testExternalAccounts) ListExternalAccounts(context.Context, identity.ListExternalAccountsRequest) ([]identity.ExternalAccount, error) {
+	return nil, nil
+}
+func (accounts *testExternalAccounts) StartExternalAccountLink(_ context.Context, request identity.StartExternalAccountLinkRequest) (identity.ProviderChallenge, error) {
+	accounts.startRequest = request
+	return identity.ProviderChallenge{Provider: request.Provider, State: "link-state"}, nil
+}
+func (*testExternalAccounts) UnbindExternalAccount(context.Context, identity.UnbindExternalAccountRequest) error {
+	return nil
+}
 
 type testAuthentication struct {
 	providerQuery   identity.ProviderQuery
@@ -137,7 +156,7 @@ func fakeAuthSession(refreshToken string) identity.AuthSession {
 
 func newTestGateway(t *testing.T, authentication *testAuthentication) *http.ServeMux {
 	t.Helper()
-	gateway, err := New(testBinding{auth: authentication}, Config{
+	gateway, err := New(testBinding{auth: authentication, external: &testExternalAccounts{}}, Config{
 		ApplicationKey:     "identity-admin",
 		DefaultWorkspaceID: "workspace-primary",
 		Cookie:             CookieConfig{Path: "/browser/auth", Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: time.Hour},
@@ -150,6 +169,38 @@ func newTestGateway(t *testing.T, authentication *testAuthentication) *http.Serv
 		t.Fatal(err)
 	}
 	return mux
+}
+
+func TestExternalAccountLinkUsesServerApplicationBinding(t *testing.T) {
+	authentication := &testAuthentication{}
+	external := &testExternalAccounts{}
+	gateway, err := New(testBinding{auth: authentication, external: external}, Config{
+		ApplicationKey: "identity-admin", DefaultWorkspaceID: "workspace-primary",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	if err := gateway.RegisterRoutes(mux, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/auth/external-accounts/feishu/link/start", strings.NewReader(`{"return_url":"http://localhost:3000/sso/callback"}`))
+	request.Header.Set("Authorization", "Bearer browser-access")
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if external.startRequest.ApplicationKey != "identity-admin" || external.startRequest.WorkspaceID != "workspace-primary" || external.startRequest.AccessToken != "browser-access" || external.startRequest.Provider != "feishu" {
+		t.Fatalf("start request=%#v", external.startRequest)
+	}
+
+	rejected := httptest.NewRecorder()
+	mux.ServeHTTP(rejected, httptest.NewRequest(http.MethodPost, "/auth/external-accounts/feishu/link/start", strings.NewReader(`{"application_key":"attacker","return_url":"http://localhost:3000/sso/callback"}`)))
+	if rejected.Code != http.StatusBadRequest || !strings.Contains(rejected.Body.String(), "backend.invalid_json") {
+		t.Fatalf("application key status=%d body=%s", rejected.Code, rejected.Body.String())
+	}
 }
 
 func TestGatewayRequiresAnInitializedWorkspace(t *testing.T) {

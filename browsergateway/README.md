@@ -19,6 +19,9 @@ federated authentication bodies accept only these fields:
 - `POST /auth/providers/{provider}/verify`: `workspace_id`, `state`, `code`
 - `POST /auth/code/exchange`: `workspace_id`, `code`,
   `return_url`
+- `POST /auth/external-accounts/{provider}/link/start`: `return_url`
+- `GET /auth/external-accounts` and
+  `DELETE /auth/external-accounts/{provider}/{accountID}`: no JSON body
 - `GET /auth/providers` and `GET /auth/session`: no JSON body
 
 Workspace selectors from `X-Workspace-ID`, `workspace_id` query parameters,

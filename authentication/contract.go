@@ -156,6 +156,49 @@ type SessionView struct {
 	MustChangePassword    bool                  `json:"must_change_password"`
 }
 
+// ExternalAccount is the browser-safe projection of one provider identity
+// linked to the current Identity subject.
+type ExternalAccount struct {
+	ID              string `json:"id"`
+	UserID          string `json:"user_id"`
+	Provider        string `json:"provider"`
+	ProviderSubject string `json:"provider_subject"`
+	Email           string `json:"email,omitempty"`
+	Phone           string `json:"phone,omitempty"`
+	DisplayName     string `json:"display_name,omitempty"`
+	AvatarURL       string `json:"avatar_url,omitempty"`
+	LinkedAt        string `json:"linked_at,omitempty"`
+}
+
+type ListExternalAccountsRequest struct {
+	WorkspaceID WorkspaceID `json:"workspace_id"`
+	AccessToken string      `json:"-"`
+}
+
+type StartExternalAccountLinkRequest struct {
+	WorkspaceID    WorkspaceID    `json:"workspace_id"`
+	ApplicationKey ApplicationKey `json:"application_key"`
+	AccessToken    string         `json:"-"`
+	Provider       string         `json:"provider"`
+	ReturnURL      string         `json:"return_url"`
+}
+
+type UnbindExternalAccountRequest struct {
+	WorkspaceID WorkspaceID `json:"workspace_id"`
+	AccessToken string      `json:"-"`
+	Provider    string      `json:"provider"`
+	AccountID   string      `json:"account_id"`
+}
+
+// ExternalAccountManager is an optional authenticated browser capability.
+// The browser gateway supplies ApplicationKey from its server-side binding;
+// JavaScript never selects an Identity application audience.
+type ExternalAccountManager interface {
+	ListExternalAccounts(context.Context, ListExternalAccountsRequest) ([]ExternalAccount, error)
+	StartExternalAccountLink(context.Context, StartExternalAccountLinkRequest) (ProviderChallenge, error)
+	UnbindExternalAccount(context.Context, UnbindExternalAccountRequest) error
+}
+
 type Authentication interface {
 	Providers(context.Context, ProviderQuery) ([]Provider, error)
 	LoginWithPassword(context.Context, PasswordLoginRequest) (AuthSession, error)

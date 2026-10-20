@@ -368,6 +368,11 @@ type LogoutRequest = authentication.LogoutRequest
 type CurrentSessionRequest = authentication.CurrentSessionRequest
 type ExchangeAuthorizationCodeRequest = authentication.ExchangeAuthorizationCodeRequest
 type SessionView = authentication.SessionView
+type ExternalAccount = authentication.ExternalAccount
+type ListExternalAccountsRequest = authentication.ListExternalAccountsRequest
+type StartExternalAccountLinkRequest = authentication.StartExternalAccountLinkRequest
+type UnbindExternalAccountRequest = authentication.UnbindExternalAccountRequest
+type ExternalAccountManager = authentication.ExternalAccountManager
 type Authentication = authentication.Authentication
 type ChallengeAuthentication = authentication.ChallengeAuthentication
 type ChangePasswordRequest = authentication.ChangePasswordRequest
@@ -397,6 +402,12 @@ type ApplicationServiceVerificationBinding interface {
 // without forcing legacy test/resource bindings to implement it.
 type ChallengeAuthenticationBinding interface {
 	ChallengeAuthentication() ChallengeAuthentication
+}
+
+// ExternalAccountBinding is optional so resource-only and remote bindings do
+// not need to implement browser account-linking behavior.
+type ExternalAccountBinding interface {
+	ExternalAccounts() ExternalAccountManager
 }
 
 // SecurityChallengeDeliveryBinder is implemented by an embedded Identity

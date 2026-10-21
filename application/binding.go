@@ -61,6 +61,13 @@ func (value *binding) Authentication() identity.Authentication {
 func (value *binding) ChallengeAuthentication() identity.ChallengeAuthentication {
 	return authentication{binding: value}
 }
+func (value *binding) ExternalAccounts() identity.ExternalAccountManager {
+	delegate, ok := value.delegate.(identity.ExternalAccountBinding)
+	if !ok || delegate.ExternalAccounts() == nil {
+		return nil
+	}
+	return externalAccounts{binding: value, delegate: delegate.ExternalAccounts()}
+}
 func (value *binding) ActionAssurance() identity.ActionAssurance {
 	return actionAssurance{binding: value}
 }
@@ -206,6 +213,9 @@ func (value *applicationServiceBinding) ChallengeAuthentication() identity.Chall
 func (value *applicationServiceBinding) ActionAssurance() identity.ActionAssurance {
 	return value.binding.ActionAssurance()
 }
+func (value *applicationServiceBinding) ExternalAccounts() identity.ExternalAccountManager {
+	return value.binding.ExternalAccounts()
+}
 func (value *applicationServiceBinding) WorkflowWorkloads() identity.WorkflowWorkloadIdentity {
 	return value.binding.WorkflowWorkloads()
 }
@@ -217,6 +227,9 @@ type applicationServiceVerificationBinding struct {
 
 func (value *applicationServiceVerificationBinding) ApplicationServiceVerifier() identity.ApplicationServiceTokenVerifier {
 	return applicationServiceVerifier{binding: value.binding}
+}
+func (value *applicationServiceVerificationBinding) ExternalAccounts() identity.ExternalAccountManager {
+	return value.binding.ExternalAccounts()
 }
 func (value *applicationServiceVerificationBinding) ChallengeAuthentication() identity.ChallengeAuthentication {
 	return value.binding.ChallengeAuthentication()

@@ -20,7 +20,7 @@ const (
 )
 
 type Error struct {
-	Class     ErrorClass        `json:"class"`
+	Class     ErrorClass        `json:"-"`
 	Code      string            `json:"code"`
 	Message   string            `json:"message,omitempty"`
 	RequestID string            `json:"request_id,omitempty"`

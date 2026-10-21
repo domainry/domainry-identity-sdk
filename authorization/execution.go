@@ -25,11 +25,11 @@ func DeriveExecutionAccess(bundle AccessBundle, grant ExecutionGrant, now time.T
 		return AccessBundle{}, err
 	}
 	if !grant.Resource.Valid() || !grant.Action.Valid() {
-		return AccessBundle{}, &Error{Code: "identity.execution_grant_invalid"}
+		return AccessBundle{}, &Error{Class: ErrorClassBadRequest, Code: "identity.execution_grant_invalid"}
 	}
 	sourceSpecified := grant.SourceResource != "" || grant.SourceAction != ""
 	if sourceSpecified && (!grant.SourceResource.Valid() || !grant.SourceAction.Valid()) {
-		return AccessBundle{}, &Error{Code: "identity.execution_source_invalid"}
+		return AccessBundle{}, &Error{Class: ErrorClassBadRequest, Code: "identity.execution_source_invalid"}
 	}
 
 	derived := cloneAccessBundle(bundle)
@@ -40,12 +40,12 @@ func DeriveExecutionAccess(bundle AccessBundle, grant ExecutionGrant, now time.T
 				continue
 			}
 			if existing.Effect == EffectDeny {
-				return AccessBundle{}, &Error{Code: "identity.execution_source_denied"}
+				return AccessBundle{}, &Error{Class: ErrorClassForbidden, Code: "identity.execution_source_denied"}
 			}
 			sourceAllowed = sourceAllowed || existing.Effect == EffectAllow
 		}
 		if !sourceAllowed {
-			return AccessBundle{}, &Error{Code: "identity.execution_source_not_granted"}
+			return AccessBundle{}, &Error{Class: ErrorClassForbidden, Code: "identity.execution_source_not_granted"}
 		}
 	}
 	functionAllowed := false
@@ -54,7 +54,7 @@ func DeriveExecutionAccess(bundle AccessBundle, grant ExecutionGrant, now time.T
 			continue
 		}
 		if existing.Effect == EffectDeny {
-			return AccessBundle{}, &Error{Code: "identity.execution_grant_denied"}
+			return AccessBundle{}, &Error{Class: ErrorClassForbidden, Code: "identity.execution_grant_denied"}
 		}
 		functionAllowed = functionAllowed || existing.Effect == EffectAllow
 	}

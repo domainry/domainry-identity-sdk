@@ -45,7 +45,7 @@ type Options struct {
 
 func NewResolver(binding Binding, options Options) (*Resolver, error) {
 	if binding == nil || binding.Tokens() == nil || binding.Authentication() == nil || binding.Authorization() == nil {
-		return nil, &identity.Error{Code: "identity.binding_incomplete", Message: "token, authentication, and authorization contracts are required"}
+		return nil, &identity.Error{Class: identity.ErrorClassInternal, Code: "identity.binding_incomplete", Message: "token, authentication, and authorization contracts are required"}
 	}
 	clock := options.Clock
 	if clock == nil {
@@ -65,7 +65,7 @@ func NewResolver(binding Binding, options Options) (*Resolver, error) {
 func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) (identity.Principal, error) {
 	accessToken = strings.TrimSpace(accessToken)
 	if accessToken == "" {
-		return identity.Principal{}, &identity.Error{Code: "auth.token_required"}
+		return identity.Principal{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "auth.token_required"}
 	}
 	verified, err := resolver.binding.Tokens().Verify(ctx, authentication.VerifyTokenRequest{AccessToken: accessToken})
 	if err != nil {
@@ -82,11 +82,11 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 	}
 	if session.SubjectID != "" && session.SubjectID != verified.SubjectID || session.WorkspaceID != "" && session.WorkspaceID != verified.WorkspaceID || strings.TrimSpace(session.User.ID) != "" && identity.SubjectID(session.User.ID) != verified.SubjectID {
 		resolver.Invalidate(verified.SubjectID, verified.WorkspaceID)
-		return identity.Principal{}, &identity.Error{Code: "identity.session_subject_mismatch"}
+		return identity.Principal{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "identity.session_subject_mismatch"}
 	}
 	if session.AuthorizationRevision != "" && identity.AuthorizationRevision(session.AuthorizationRevision) != verified.AuthorizationRevision {
 		resolver.Invalidate(verified.SubjectID, verified.WorkspaceID)
-		return identity.Principal{}, &identity.Error{Code: "identity.authorization_revision_stale"}
+		return identity.Principal{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "identity.authorization_revision_stale"}
 	}
 	cached, found, cacheErr := resolver.cache.Get(ctx, cacheKey, now)
 	if cacheErr != nil {
@@ -108,7 +108,7 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 		return identity.Principal{}, err
 	}
 	if bundle.Subject.SubjectID != verified.SubjectID || bundle.Subject.WorkspaceID != verified.WorkspaceID || bundle.AuthorizationRevision != verified.AuthorizationRevision {
-		return identity.Principal{}, &identity.Error{Code: "identity.access_bundle_subject_mismatch"}
+		return identity.Principal{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "identity.access_bundle_subject_mismatch"}
 	}
 	resolved := principalFromResolution(verified, session, bundle)
 	expiresAt := now.Add(resolver.maxTTL)

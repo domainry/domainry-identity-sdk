@@ -105,16 +105,16 @@ type ProjectDataPolicyRelationSegment struct {
 
 func (permission ProjectRolePermission) Validate() error {
 	if strings.TrimSpace(permission.PermissionKey) == "" {
-		return &Error{Code: "identity.project_role_permission_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.project_role_permission_invalid"}
 	}
 	if permission.DataPolicy == nil {
 		if !permission.DataScope.Valid() {
-			return &Error{Code: "identity.project_role_permission_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.project_role_permission_invalid"}
 		}
 		return nil
 	}
 	if permission.DataScope != "" {
-		return &Error{Code: "identity.project_role_permission_ambiguous"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.project_role_permission_ambiguous"}
 	}
 	if err := permission.DataPolicy.Validate(); err != nil {
 		return err
@@ -140,13 +140,13 @@ func NormalizeProjectDataPolicy(policy ProjectDataPolicy) (ProjectDataPolicy, er
 func validateProjectDataPolicy(policy ProjectDataPolicy, depth int, nodes *int) error {
 	*nodes = *nodes + 1
 	if depth > maximumProjectDataPolicyDepth || *nodes > maximumProjectDataPolicyNodes {
-		return &Error{Code: "identity.project_data_policy_limit_exceeded"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.project_data_policy_limit_exceeded"}
 	}
 	operator := strings.ToLower(strings.TrimSpace(policy.Operator))
 	switch operator {
 	case ProjectDataPolicyAnd, ProjectDataPolicyOr:
 		if len(policy.Children) < 2 || len(policy.Path) != 0 || strings.TrimSpace(policy.FieldKey) != "" || strings.TrimSpace(policy.SubjectClaim) != "" {
-			return &Error{Code: "identity.project_data_policy_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.project_data_policy_invalid"}
 		}
 		for _, child := range policy.Children {
 			if err := validateProjectDataPolicy(child, depth+1, nodes); err != nil {
@@ -156,24 +156,24 @@ func validateProjectDataPolicy(policy ProjectDataPolicy, depth int, nodes *int) 
 		return nil
 	case ProjectDataPolicyNot:
 		if len(policy.Children) != 1 || len(policy.Path) != 0 || strings.TrimSpace(policy.FieldKey) != "" || strings.TrimSpace(policy.SubjectClaim) != "" {
-			return &Error{Code: "identity.project_data_policy_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.project_data_policy_invalid"}
 		}
 		return validateProjectDataPolicy(policy.Children[0], depth+1, nodes)
 	case ProjectDataPolicyEq, ProjectDataPolicyIn:
 		if len(policy.Children) != 0 || strings.TrimSpace(policy.FieldKey) == "" || len(policy.Path) > 3 {
-			return &Error{Code: "identity.project_data_policy_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.project_data_policy_invalid"}
 		}
 	default:
-		return &Error{Code: "identity.project_data_policy_operator_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.project_data_policy_operator_invalid"}
 	}
 	for _, segment := range policy.Path {
 		if segment.Direction != RelationForward && segment.Direction != RelationReverse || strings.TrimSpace(segment.RelationFieldKey) == "" || strings.TrimSpace(segment.TargetObjectKey) == "" {
-			return &Error{Code: "identity.project_data_policy_relation_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.project_data_policy_relation_invalid"}
 		}
 	}
 	claim := strings.TrimSpace(policy.SubjectClaim)
 	if operator == ProjectDataPolicyEq && !projectScalarSubjectClaim(claim) || operator == ProjectDataPolicyIn && !projectCollectionSubjectClaim(claim) {
-		return &Error{Code: "identity.project_data_policy_claim_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.project_data_policy_claim_invalid"}
 	}
 	return nil
 }
@@ -298,16 +298,16 @@ type ProjectRolePermissionBundleRequest struct {
 
 func (request ProjectRolePermissionBundleRequest) ValidateContract() error {
 	if !request.Application.WorkspaceID.Valid() || !request.Application.ApplicationKey.Valid() {
-		return &Error{Code: "identity.project_role_permission_bundle_scope_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.project_role_permission_bundle_scope_invalid"}
 	}
 	if !validSourceOwner(request.SourceOwner) || strings.TrimSpace(request.RoleKey) == "" || strings.TrimSpace(string(request.ActorID)) == "" || strings.TrimSpace(request.BusinessReason) == "" || strings.TrimSpace(request.OperationID) == "" {
-		return &Error{Code: "identity.project_role_permission_bundle_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.project_role_permission_bundle_invalid"}
 	}
 	seen := make(map[string]bool, len(request.Permissions))
 	for _, permission := range request.Permissions {
 		key := strings.TrimSpace(permission.PermissionKey)
 		if key == "" || seen[key] || permission.Validate() != nil {
-			return &Error{Code: "identity.project_role_permission_bundle_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.project_role_permission_bundle_invalid"}
 		}
 		seen[key] = true
 	}

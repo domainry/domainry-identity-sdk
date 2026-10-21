@@ -11,3 +11,13 @@ type AuthorizationRevision = identity.AuthorizationRevision
 type Error = identity.Error
 type User = identity.User
 type Role = identity.Role
+
+const (
+	ErrorClassBadRequest  = identity.ErrorClassBadRequest
+	ErrorClassForbidden   = identity.ErrorClassForbidden
+	ErrorClassNotFound    = identity.ErrorClassNotFound
+	ErrorClassConflict    = identity.ErrorClassConflict
+	ErrorClassRateLimited = identity.ErrorClassRateLimited
+	ErrorClassUnavailable = identity.ErrorClassUnavailable
+	ErrorClassInternal    = identity.ErrorClassInternal
+)

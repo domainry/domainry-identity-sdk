@@ -127,7 +127,7 @@ func TestAuthenticateFailsClosedAndPreservesServiceOutage(t *testing.T) {
 	}{
 		{name: "invalid", stub: &authenticatorStub{err: errors.New("invalid")}, status: http.StatusUnauthorized, code: "auth.token_invalid"},
 		{name: "unknown", stub: &authenticatorStub{principal: identitysdk.Principal{}}, status: http.StatusUnauthorized, code: "auth.token_invalid"},
-		{name: "remote unavailable", stub: &authenticatorStub{err: &identitysdk.Error{StatusCode: 503, Code: "backend.unavailable"}}, status: http.StatusServiceUnavailable, code: "auth.service_unavailable"},
+		{name: "remote unavailable", stub: &authenticatorStub{err: &identitysdk.Error{Class: identitysdk.ErrorClassUnavailable, Code: "backend.unavailable"}}, status: http.StatusServiceUnavailable, code: "auth.service_unavailable"},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			middleware, _ := New(fixture.stub)

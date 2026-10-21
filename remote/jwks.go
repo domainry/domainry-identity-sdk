@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -36,7 +35,7 @@ type jwksVerifier struct {
 func newJWKSVerifier(config jwksVerifierConfig) (*jwksVerifier, error) {
 	issuer, audience := strings.TrimSpace(config.Issuer), strings.TrimSpace(config.Audience)
 	if issuer == "" || audience == "" || config.Fetch == nil {
-		return nil, &identity.Error{Code: "identity.jwks_configuration_invalid"}
+		return nil, &identity.Error{Class: identity.ErrorClassInternal, Code: "identity.jwks_configuration_invalid"}
 	}
 	if config.CacheTTL <= 0 {
 		config.CacheTTL = 5 * time.Minute
@@ -50,11 +49,11 @@ func newJWKSVerifier(config jwksVerifierConfig) (*jwksVerifier, error) {
 func (verifier *jwksVerifier) Verify(ctx context.Context, request identity.VerifyTokenRequest) (identity.VerifiedToken, error) {
 	token := strings.TrimSpace(request.AccessToken)
 	if token == "" || request.Issuer != "" && request.Issuer != verifier.issuer || request.Audience != "" && string(request.Audience) != verifier.audience {
-		return identity.VerifiedToken{}, &identity.Error{StatusCode: http.StatusUnauthorized, Code: "identity.token_invalid"}
+		return identity.VerifiedToken{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "identity.token_invalid"}
 	}
 	header, claims, signingInput, signature, err := decodeJWT(token)
 	if err != nil || header.Algorithm != "EdDSA" || header.Type != "JWT" || strings.TrimSpace(header.KeyID) == "" {
-		return identity.VerifiedToken{}, &identity.Error{StatusCode: http.StatusUnauthorized, Code: "identity.token_invalid", Cause: err}
+		return identity.VerifiedToken{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "identity.token_invalid", Cause: err}
 	}
 	key, ok := verifier.key(header.KeyID)
 	if !ok || verifier.cacheExpired() {
@@ -64,14 +63,14 @@ func (verifier *jwksVerifier) Verify(ctx context.Context, request identity.Verif
 		key, ok = verifier.key(header.KeyID)
 	}
 	if !ok || !ed25519.Verify(key, []byte(signingInput), signature) {
-		return identity.VerifiedToken{}, &identity.Error{StatusCode: http.StatusUnauthorized, Code: "identity.token_invalid"}
+		return identity.VerifiedToken{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "identity.token_invalid"}
 	}
 	if claims.Issuer != verifier.issuer || string(claims.Audience) != verifier.audience || !claims.SubjectID.Valid() || !claims.WorkspaceID.Valid() || !claims.SessionID.Valid() || !claims.AuthorizationRevision.Valid() || strings.TrimSpace(claims.TokenID) == "" {
-		return identity.VerifiedToken{}, &identity.Error{StatusCode: http.StatusUnauthorized, Code: "identity.token_claims_invalid"}
+		return identity.VerifiedToken{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "identity.token_claims_invalid"}
 	}
 	now := verifier.now().UTC().Unix()
 	if claims.ExpiresAt <= now || claims.IssuedAt > now+60 {
-		return identity.VerifiedToken{}, &identity.Error{StatusCode: http.StatusUnauthorized, Code: "identity.token_expired"}
+		return identity.VerifiedToken{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "identity.token_expired"}
 	}
 	return claims, nil
 }
@@ -145,21 +144,21 @@ func (verifier *jwksVerifier) refresh(ctx context.Context, requiredKeyID string)
 	}
 	var document jwksDocument
 	if err := verifier.fetch(ctx, &document); err != nil {
-		return &identity.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.jwks_unavailable", Cause: err}
+		return &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.jwks_unavailable", Cause: err}
 	}
 	keys := map[string]ed25519.PublicKey{}
 	for _, item := range document.Keys {
 		decoded, decodeErr := base64.RawURLEncoding.DecodeString(item.X)
 		if item.KeyType != "OKP" || item.Use != "sig" || item.Algorithm != "EdDSA" || item.Curve != "Ed25519" || strings.TrimSpace(item.KeyID) == "" || decodeErr != nil || len(decoded) != ed25519.PublicKeySize {
-			return &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.jwks_invalid", Cause: decodeErr}
+			return &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.jwks_invalid", Cause: decodeErr}
 		}
 		if _, duplicate := keys[item.KeyID]; duplicate {
-			return &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.jwks_invalid"}
+			return &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.jwks_invalid"}
 		}
 		keys[item.KeyID] = append(ed25519.PublicKey(nil), decoded...)
 	}
 	if len(keys) == 0 {
-		return &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.jwks_empty"}
+		return &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.jwks_empty"}
 	}
 	verifier.mu.Lock()
 	verifier.keys, verifier.expiresAt = keys, verifier.now().Add(verifier.cacheTTL)

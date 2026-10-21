@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"net/http"
 
 	identity "github.com/domainry/domainry-identity-sdk"
 )
@@ -14,7 +13,7 @@ type applicationServiceVerifier struct{ binding *binding }
 func (value applicationServices) delegate() (identity.ApplicationServiceAuthentication, error) {
 	capability, ok := value.binding.delegate.(identity.ApplicationServiceBinding)
 	if !ok || capability.ApplicationServices() == nil {
-		return nil, scopeError(http.StatusNotImplemented, "identity.application_service_authentication_unavailable")
+		return nil, scopeError(identity.ErrorClassUnavailable, "identity.application_service_authentication_unavailable")
 	}
 	return capability.ApplicationServices(), nil
 }
@@ -40,7 +39,7 @@ func verifyApplicationServiceToken(ctx context.Context, binding *binding, reques
 	if request.Audience == "" {
 		request.Audience = binding.application.ApplicationKey
 	} else if request.Audience != binding.application.ApplicationKey {
-		return identity.ApplicationServicePrincipal{}, scopeError(http.StatusForbidden, "identity.application_mismatch")
+		return identity.ApplicationServicePrincipal{}, scopeError(identity.ErrorClassForbidden, "identity.application_mismatch")
 	}
 	if capability, ok := binding.delegate.(identity.ApplicationServiceVerificationBinding); ok && capability.ApplicationServiceVerifier() != nil {
 		return capability.ApplicationServiceVerifier().Verify(ctx, request)
@@ -48,7 +47,7 @@ func verifyApplicationServiceToken(ctx context.Context, binding *binding, reques
 	if capability, ok := binding.delegate.(identity.ApplicationServiceBinding); ok && capability.ApplicationServices() != nil {
 		return capability.ApplicationServices().Verify(ctx, request)
 	}
-	return identity.ApplicationServicePrincipal{}, scopeError(http.StatusNotImplemented, "identity.application_service_verification_unavailable")
+	return identity.ApplicationServicePrincipal{}, scopeError(identity.ErrorClassUnavailable, "identity.application_service_verification_unavailable")
 }
 
 var _ identity.ApplicationServiceAuthentication = applicationServices{}

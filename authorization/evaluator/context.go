@@ -32,7 +32,7 @@ func ResolveValue(value any, evaluation EvaluationContext) (any, error) {
 	if strings.HasPrefix(text, "$subject.") {
 		resolved := resolveIdentitySubjectValue(text, evaluation.Subject)
 		if resolvedText, unresolved := resolved.(string); unresolved && resolvedText == text {
-			return nil, &identity.Error{Code: "identity.policy_subject_claim_unknown", Message: text}
+			return nil, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.policy_subject_claim_unknown", Message: text}
 		}
 		return resolved, nil
 	}
@@ -42,7 +42,7 @@ func ResolveValue(value any, evaluation EvaluationContext) (any, error) {
 	key := strings.TrimPrefix(text, "$context.")
 	key = strings.TrimPrefix(key, "claims.")
 	if strings.TrimSpace(key) == "" {
-		return nil, &identity.Error{Code: "identity.policy_business_claim_unknown", Message: text}
+		return nil, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.policy_business_claim_unknown", Message: text}
 	}
 	resolved, exists := evaluation.BusinessClaims[key]
 	if !exists || resolved == nil {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"github.com/domainry/domainry-foundation/requestcontext"
 	identity "github.com/domainry/domainry-identity-sdk"
-	"net/http"
 )
 
 func (value *binding) SystemSubjects() identity.SystemSubjects { return systemSubjects{value} }
@@ -19,7 +18,7 @@ func (value *applicationServiceVerificationBinding) SystemSubjects() identity.Sy
 func (value *binding) BindSubjectLifecyclePersistence() error {
 	binder, ok := value.delegate.(identity.SubjectLifecyclePersistenceBinding)
 	if !ok {
-		return scopeError(http.StatusNotImplemented, "identity.subject_lifecycle_persistence_unavailable")
+		return scopeError(identity.ErrorClassUnavailable, "identity.subject_lifecycle_persistence_unavailable")
 	}
 	return binder.BindSubjectLifecyclePersistence()
 }
@@ -36,14 +35,14 @@ type systemSubjects struct{ binding *binding }
 
 func (value systemSubjects) delegate(ctx context.Context, workspaceID string) (identity.SystemSubjects, error) {
 	if !identity.WorkspaceID(workspaceID).Valid() {
-		return nil, scopeError(http.StatusBadRequest, "identity.workspace_id_invalid")
+		return nil, scopeError(identity.ErrorClassBadRequest, "identity.workspace_id_invalid")
 	}
 	if _, err := value.binding.workspace(ctx, identity.WorkspaceID(workspaceID)); err != nil {
 		return nil, err
 	}
 	capability, ok := value.binding.delegate.(identity.SystemSubjectBinding)
 	if !ok || capability.SystemSubjects() == nil {
-		return nil, scopeError(http.StatusNotImplemented, "identity.subject_lifecycle_unavailable")
+		return nil, scopeError(identity.ErrorClassUnavailable, "identity.subject_lifecycle_unavailable")
 	}
 	return capability.SystemSubjects(), nil
 }

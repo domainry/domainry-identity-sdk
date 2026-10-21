@@ -82,9 +82,7 @@ func (gateway *Gateway) writeError(w http.ResponseWriter, r *http.Request, err e
 	params := map[string]string(nil)
 	var sdkError *identity.Error
 	if errors.As(err, &sdkError) {
-		if sdkError.StatusCode >= 400 && sdkError.StatusCode <= 599 {
-			status = sdkError.StatusCode
-		}
+		status = identityErrorHTTPStatus(sdkError.Class)
 		if strings.TrimSpace(sdkError.Code) != "" {
 			code = sdkError.Code
 		}
@@ -92,6 +90,25 @@ func (gateway *Gateway) writeError(w http.ResponseWriter, r *http.Request, err e
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	httpresponse.WriteError(w, r, httpresponse.Failure{Status: status, Code: code, Message: message, Params: params, Cause: err})
+}
+
+func identityErrorHTTPStatus(class identity.ErrorClass) int {
+	switch class {
+	case identity.ErrorClassBadRequest:
+		return http.StatusBadRequest
+	case identity.ErrorClassForbidden:
+		return http.StatusForbidden
+	case identity.ErrorClassNotFound:
+		return http.StatusNotFound
+	case identity.ErrorClassConflict:
+		return http.StatusConflict
+	case identity.ErrorClassRateLimited:
+		return http.StatusTooManyRequests
+	case identity.ErrorClassUnavailable:
+		return http.StatusServiceUnavailable
+	default:
+		return http.StatusInternalServerError
+	}
 }
 
 func (gateway *Gateway) writeCode(w http.ResponseWriter, r *http.Request, status int, code string) {

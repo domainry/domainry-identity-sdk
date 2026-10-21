@@ -201,7 +201,7 @@ func TestConfigurationAndRemoteErrors(t *testing.T) {
 	}))
 	_, err := (authentication{client: client}).CurrentSession(t.Context(), identity.CurrentSessionRequest{AccessToken: "expired-token"})
 	var identityError *identity.Error
-	if !errors.As(err, &identityError) || identityError.StatusCode != http.StatusForbidden || identityError.Code != "auth.token_invalid" || identityError.RequestID != "request-1" || identityError.Params["kind"] != "expired" {
+	if !errors.As(err, &identityError) || identityError.Class != identity.ErrorClassForbidden || identityError.Code != "auth.token_invalid" || identityError.RequestID != "request-1" || identityError.Params["kind"] != "expired" {
 		t.Fatalf("error = %#v", err)
 	}
 

@@ -375,8 +375,8 @@ func TestGatewayClearsInvalidRefreshButKeepsTransientCredential(t *testing.T) {
 		err        error
 		wantCookie bool
 	}{
-		{name: "invalid", err: &identity.Error{StatusCode: http.StatusUnauthorized, Code: "auth.session_expired"}, wantCookie: true},
-		{name: "transient", err: &identity.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.remote_unavailable"}, wantCookie: false},
+		{name: "invalid", err: &identity.Error{Class: identity.ErrorClassForbidden, Code: "auth.session_expired"}, wantCookie: true},
+		{name: "transient", err: &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.remote_unavailable"}, wantCookie: false},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			authentication := &testAuthentication{refreshError: testCase.err}
@@ -394,7 +394,7 @@ func TestGatewayClearsInvalidRefreshButKeepsTransientCredential(t *testing.T) {
 }
 
 func TestGatewayAlwaysClearsBrowserCookieOnLogout(t *testing.T) {
-	authentication := &testAuthentication{logoutError: &identity.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.remote_unavailable", Cause: errors.New("offline")}}
+	authentication := &testAuthentication{logoutError: &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.remote_unavailable", Cause: errors.New("offline")}}
 	mux := newTestGateway(t, authentication)
 	request := httptest.NewRequest(http.MethodPost, "/browser/auth/logout", strings.NewReader(`{}`))
 	request.AddCookie(&http.Cookie{Name: DefaultRefreshCookieName, Value: "cookie-refresh"})

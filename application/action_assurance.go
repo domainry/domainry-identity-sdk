@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"net/http"
 	"strings"
 
 	identity "github.com/domainry/domainry-identity-sdk"
@@ -13,7 +12,7 @@ type actionAssurance struct{ binding *binding }
 func (value actionAssurance) delegate() (identity.ActionAssurance, error) {
 	binding, ok := value.binding.delegate.(identity.ActionAssuranceBinding)
 	if !ok || binding.ActionAssurance() == nil {
-		return nil, scopeError(http.StatusNotImplemented, "identity.action_assurance_unavailable")
+		return nil, scopeError(identity.ErrorClassUnavailable, "identity.action_assurance_unavailable")
 	}
 	return binding.ActionAssurance(), nil
 }
@@ -67,7 +66,7 @@ func (value actionAssurance) ValidateActionAssuranceReceipt(ctx context.Context,
 
 func (value actionAssurance) validateReceipt(receipt identity.ActionAssuranceReceipt, workspaceID identity.WorkspaceID, subjectID identity.SubjectID) error {
 	if strings.TrimSpace(receipt.Token) == "" || receipt.WorkspaceID != workspaceID || !receipt.SubjectID.Valid() || subjectID != "" && receipt.SubjectID != subjectID || len(receipt.Methods) == 0 || strings.TrimSpace(receipt.ExpiresAt) == "" {
-		return scopeError(http.StatusBadGateway, "identity.action_assurance_receipt_invalid")
+		return scopeError(identity.ErrorClassUnavailable, "identity.action_assurance_receipt_invalid")
 	}
 	return nil
 }

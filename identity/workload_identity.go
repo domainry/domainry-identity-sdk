@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"net/http"
 	"sort"
 	"strings"
 )
@@ -108,7 +107,7 @@ func WorkflowWorkloadReleaseID(digest string) string {
 
 func (request ApplyWorkflowWorkloadBindingsRequest) Validate() error {
 	if !request.Application.WorkspaceID.Valid() || !request.Application.ApplicationKey.Valid() || strings.TrimSpace(request.ReleaseID) == "" || strings.TrimSpace(request.ReleaseDigest) == "" {
-		return &Error{StatusCode: http.StatusBadRequest, Code: "identity.workflow_workload_release_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.workflow_workload_release_invalid"}
 	}
 	seen := make(map[string]struct{}, len(request.Bindings))
 	for index := range request.Bindings {
@@ -117,20 +116,20 @@ func (request ApplyWorkflowWorkloadBindingsRequest) Validate() error {
 		binding.DefinitionVersionID = strings.TrimSpace(binding.DefinitionVersionID)
 		binding.RoleKey = strings.TrimSpace(binding.RoleKey)
 		if binding.WorkflowKey == "" || binding.DefinitionVersionID == "" || binding.DefinitionVersion <= 0 || binding.RoleKey == "" || len(binding.ActionKeys) == 0 {
-			return &Error{StatusCode: http.StatusBadRequest, Code: "identity.workflow_workload_binding_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.workflow_workload_binding_invalid"}
 		}
 		if _, duplicate := seen[binding.WorkflowKey]; duplicate {
-			return &Error{StatusCode: http.StatusBadRequest, Code: "identity.workflow_workload_binding_duplicate"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.workflow_workload_binding_duplicate"}
 		}
 		seen[binding.WorkflowKey] = struct{}{}
 		actions := make(map[string]struct{}, len(binding.ActionKeys))
 		for _, actionKey := range binding.ActionKeys {
 			actionKey = strings.TrimSpace(actionKey)
 			if actionKey == "" {
-				return &Error{StatusCode: http.StatusBadRequest, Code: "identity.workflow_workload_action_invalid"}
+				return &Error{Class: ErrorClassBadRequest, Code: "identity.workflow_workload_action_invalid"}
 			}
 			if _, duplicate := actions[actionKey]; duplicate {
-				return &Error{StatusCode: http.StatusBadRequest, Code: "identity.workflow_workload_action_duplicate"}
+				return &Error{Class: ErrorClassBadRequest, Code: "identity.workflow_workload_action_duplicate"}
 			}
 			actions[actionKey] = struct{}{}
 		}
@@ -145,17 +144,17 @@ func (request ApplyWorkflowWorkloadBindingsRequest) Validate() error {
 	})
 	digest, err := WorkflowWorkloadReleaseDigest(request.Bindings)
 	if err != nil {
-		return &Error{StatusCode: http.StatusBadRequest, Code: "identity.workflow_workload_release_invalid", Cause: err}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.workflow_workload_release_invalid", Cause: err}
 	}
 	if strings.TrimSpace(request.ReleaseDigest) != digest || strings.TrimSpace(request.ReleaseID) != WorkflowWorkloadReleaseID(digest) {
-		return &Error{StatusCode: http.StatusConflict, Code: "identity.workflow_workload_release_digest_mismatch"}
+		return &Error{Class: ErrorClassConflict, Code: "identity.workflow_workload_release_digest_mismatch"}
 	}
 	return nil
 }
 
 func (request GetWorkflowWorkloadBindingRequest) Validate() error {
 	if !request.Application.WorkspaceID.Valid() || !request.Application.ApplicationKey.Valid() || strings.TrimSpace(request.WorkflowKey) == "" || strings.TrimSpace(request.DefinitionVersionID) == "" || strings.TrimSpace(request.ReleaseDigest) == "" {
-		return &Error{StatusCode: http.StatusBadRequest, Code: "identity.workflow_workload_lookup_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.workflow_workload_lookup_invalid"}
 	}
 	return nil
 }

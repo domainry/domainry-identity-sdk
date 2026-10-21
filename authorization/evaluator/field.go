@@ -60,7 +60,7 @@ func EvaluateField(bundle identity.AccessBundle, request FieldRequest, matches P
 	field := strings.TrimSpace(request.Field)
 	action := identity.Action(strings.ToLower(strings.TrimSpace(string(request.Action))))
 	if !resource.Valid() || field == "" || !action.Valid() {
-		return FieldDecision{}, &identity.Error{Code: "identity.field_request_invalid"}
+		return FieldDecision{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.field_request_invalid"}
 	}
 
 	for _, guardrail := range bundle.Guardrails {
@@ -71,7 +71,7 @@ func EvaluateField(bundle identity.AccessBundle, request FieldRequest, matches P
 		var err error
 		if guardrail.Predicate != nil {
 			if matches == nil {
-				return FieldDecision{}, &identity.Error{Code: "identity.policy_predicate_matcher_required"}
+				return FieldDecision{}, &identity.Error{Class: identity.ErrorClassInternal, Code: "identity.policy_predicate_matcher_required"}
 			}
 			matched, err = matches(*guardrail.Predicate)
 		}
@@ -116,7 +116,7 @@ func EvaluateField(bundle identity.AccessBundle, request FieldRequest, matches P
 		var err error
 		if rule.Predicate != nil {
 			if matches == nil {
-				return FieldDecision{}, &identity.Error{Code: "identity.policy_predicate_matcher_required"}
+				return FieldDecision{}, &identity.Error{Class: identity.ErrorClassInternal, Code: "identity.policy_predicate_matcher_required"}
 			}
 			matched, err = matches(*rule.Predicate)
 		}

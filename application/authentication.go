@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"net/http"
 
 	identity "github.com/domainry/domainry-identity-sdk"
 )
@@ -172,7 +171,7 @@ func (value authentication) CurrentSession(ctx context.Context, request identity
 		return identity.SessionView{}, err
 	}
 	if session.WorkspaceID != verified.WorkspaceID || session.SubjectID != verified.SubjectID || session.SessionID != verified.SessionID {
-		return identity.SessionView{}, scopeError(http.StatusBadGateway, "identity.session_scope_invalid")
+		return identity.SessionView{}, scopeError(identity.ErrorClassUnavailable, "identity.session_scope_invalid")
 	}
 	return session, nil
 }

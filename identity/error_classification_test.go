@@ -8,24 +8,24 @@ import (
 
 func TestErrorClassificationContract(t *testing.T) {
 	tests := []struct {
-		status int
-		kind   apperror.ErrorKind
-		code   string
+		class ErrorClass
+		kind  apperror.ErrorKind
+		code  string
 	}{
-		{400, apperror.KindBadRequest, "identity.validation_failed"},
-		{403, apperror.KindForbidden, "identity.permission_denied"},
-		{404, apperror.KindNotFound, "identity.subject_not_found"},
-		{409, apperror.KindConflict, "identity.write_fence_rejected"},
-		{429, apperror.KindRateLimited, "identity.rate_limited"},
-		{503, apperror.KindUnavailable, "identity.database_unavailable"},
+		{ErrorClassBadRequest, apperror.KindBadRequest, "identity.validation_failed"},
+		{ErrorClassForbidden, apperror.KindForbidden, "identity.permission_denied"},
+		{ErrorClassNotFound, apperror.KindNotFound, "identity.subject_not_found"},
+		{ErrorClassConflict, apperror.KindConflict, "identity.write_fence_rejected"},
+		{ErrorClassRateLimited, apperror.KindRateLimited, "identity.rate_limited"},
+		{ErrorClassUnavailable, apperror.KindUnavailable, "identity.database_unavailable"},
 	}
 	for _, test := range tests {
-		err := &Error{StatusCode: test.status, Code: test.code, Params: map[string]string{"field": "id"}}
+		err := &Error{Class: test.class, Code: test.code, Params: map[string]string{"field": "id"}}
 		if got := apperror.KindOf(err); got != test.kind {
-			t.Fatalf("status=%d kind=%q", test.status, got)
+			t.Fatalf("class=%q kind=%q", test.class, got)
 		}
 		if got := apperror.CodeOf(err); got != test.code || apperror.ParamsOf(err)["field"] != "id" {
-			t.Fatalf("status=%d code=%q params=%#v", test.status, got, apperror.ParamsOf(err))
+			t.Fatalf("class=%q code=%q params=%#v", test.class, got, apperror.ParamsOf(err))
 		}
 	}
 }

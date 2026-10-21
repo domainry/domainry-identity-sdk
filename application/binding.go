@@ -4,7 +4,6 @@ package application
 
 import (
 	"context"
-	"net/http"
 	"strings"
 
 	"github.com/domainry/domainry-foundation/requestcontext"
@@ -21,7 +20,7 @@ func Bind(delegate identity.Binding, application identity.ApplicationRef) (ident
 // The ordinary Bind contract remains strictly single-workspace.
 func BindWithWorkspaceResolver(delegate identity.Binding, application identity.ApplicationRef, resolver identity.WorkspaceResolver) (identity.Binding, error) {
 	if resolver == nil {
-		return nil, scopeError(http.StatusBadRequest, "identity.workspace_resolver_required")
+		return nil, scopeError(identity.ErrorClassBadRequest, "identity.workspace_resolver_required")
 	}
 	return bind(delegate, application, resolver)
 }
@@ -30,11 +29,11 @@ func bind(delegate identity.Binding, application identity.ApplicationRef, resolv
 	application.WorkspaceID = identity.WorkspaceID(strings.TrimSpace(string(application.WorkspaceID)))
 	application.ApplicationKey = identity.ApplicationKey(strings.TrimSpace(string(application.ApplicationKey)))
 	if delegate == nil || !application.WorkspaceID.Valid() || !application.ApplicationKey.Valid() {
-		return nil, scopeError(http.StatusBadRequest, "identity.application_scope_invalid")
+		return nil, scopeError(identity.ErrorClassBadRequest, "identity.application_scope_invalid")
 	}
 	descriptor := delegate.Descriptor()
 	if audience := strings.TrimSpace(descriptor.Audience); audience != "" && audience != string(application.ApplicationKey) {
-		return nil, scopeError(http.StatusForbidden, "identity.application_scope_mismatch")
+		return nil, scopeError(identity.ErrorClassForbidden, "identity.application_scope_mismatch")
 	}
 	descriptor.Audience = string(application.ApplicationKey)
 	scoped := &binding{delegate: delegate, application: application, descriptor: descriptor, resolver: resolver}
@@ -102,7 +101,7 @@ func (value *binding) workspace(ctx context.Context, input identity.WorkspaceID)
 			return "", err
 		}
 		if resolved != input {
-			return "", scopeError(http.StatusForbidden, "auth.workspace_mismatch")
+			return "", scopeError(identity.ErrorClassForbidden, "auth.workspace_mismatch")
 		}
 		return resolved, nil
 	}
@@ -110,7 +109,7 @@ func (value *binding) workspace(ctx context.Context, input identity.WorkspaceID)
 		return value.application.WorkspaceID, nil
 	}
 	if input != value.application.WorkspaceID {
-		return "", scopeError(http.StatusForbidden, "auth.workspace_mismatch")
+		return "", scopeError(identity.ErrorClassForbidden, "auth.workspace_mismatch")
 	}
 	return input, nil
 }
@@ -121,7 +120,7 @@ func (value *binding) applicationKey(input identity.ApplicationKey) (identity.Ap
 		return value.application.ApplicationKey, nil
 	}
 	if input != value.application.ApplicationKey {
-		return "", scopeError(http.StatusForbidden, "identity.application_mismatch")
+		return "", scopeError(identity.ErrorClassForbidden, "identity.application_mismatch")
 	}
 	return input, nil
 }
@@ -144,11 +143,11 @@ func (value *binding) resolveWorkspace(ctx context.Context, input identity.Works
 		return value.workspace(ctx, input)
 	}
 	if !input.Valid() {
-		return "", scopeError(http.StatusForbidden, "auth.invalid_credentials")
+		return "", scopeError(identity.ErrorClassForbidden, "auth.invalid_credentials")
 	}
 	resolved, err := value.scopedWorkspaceResolution(ctx, input)
 	if err != nil || !resolved.Valid() {
-		return "", scopeError(http.StatusForbidden, "auth.invalid_credentials")
+		return "", scopeError(identity.ErrorClassForbidden, "auth.invalid_credentials")
 	}
 	return resolved, nil
 }
@@ -161,14 +160,14 @@ func (value *binding) verifyAccessToken(ctx context.Context, accessToken string)
 
 func (value *binding) verifySession(ctx context.Context, session identity.AuthSession, expected identity.WorkspaceID) error {
 	if identity.WorkspaceID(strings.TrimSpace(session.WorkspaceID)) != expected || strings.TrimSpace(session.AccessToken) == "" {
-		return scopeError(http.StatusBadGateway, "identity.session_scope_invalid")
+		return scopeError(identity.ErrorClassUnavailable, "identity.session_scope_invalid")
 	}
 	verified, err := value.verifyAccessToken(ctx, session.AccessToken)
 	if err != nil {
 		return err
 	}
 	if verified.WorkspaceID != expected || verified.Audience != value.application.ApplicationKey {
-		return scopeError(http.StatusBadGateway, "identity.session_scope_invalid")
+		return scopeError(identity.ErrorClassUnavailable, "identity.session_scope_invalid")
 	}
 	return nil
 }
@@ -177,21 +176,21 @@ func (value *binding) verifyAuthenticationOutcome(ctx context.Context, outcome i
 	switch outcome.Status {
 	case identity.AuthenticationStatusAuthenticated:
 		if outcome.Session == nil {
-			return scopeError(http.StatusBadGateway, "identity.authentication_response_invalid")
+			return scopeError(identity.ErrorClassUnavailable, "identity.authentication_response_invalid")
 		}
 		return value.verifySession(ctx, *outcome.Session, expected)
 	case identity.AuthenticationStatusChallengeRequired:
 		if outcome.Challenge == nil || strings.TrimSpace(outcome.Challenge.State) == "" {
-			return scopeError(http.StatusBadGateway, "identity.authentication_response_invalid")
+			return scopeError(identity.ErrorClassUnavailable, "identity.authentication_response_invalid")
 		}
 		return nil
 	default:
-		return scopeError(http.StatusBadGateway, "identity.authentication_response_invalid")
+		return scopeError(identity.ErrorClassUnavailable, "identity.authentication_response_invalid")
 	}
 }
 
-func scopeError(status int, code string) error {
-	return &identity.Error{StatusCode: status, Code: code}
+func scopeError(class identity.ErrorClass, code string) error {
+	return &identity.Error{Class: class, Code: code}
 }
 
 var _ identity.Binding = (*binding)(nil)

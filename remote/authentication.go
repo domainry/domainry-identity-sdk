@@ -39,7 +39,7 @@ func (adapter authentication) LoginWithPasswordOutcome(ctx context.Context, requ
 	}
 	request.ApplicationKey, request.Login = identity.ApplicationKey(applicationKey), strings.TrimSpace(request.Login)
 	if request.Login == "" || request.Password == "" {
-		return identity.AuthenticationOutcome{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "auth.login_request_invalid"}
+		return identity.AuthenticationOutcome{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "auth.login_request_invalid"}
 	}
 	var raw json.RawMessage
 	if err := adapter.client.doJSON(ctx, http.MethodPost, "/auth/login", "", request, &raw); err != nil {
@@ -60,7 +60,7 @@ func (adapter authentication) BeginFederatedLogin(ctx context.Context, request i
 	}
 	request.ApplicationKey = identity.ApplicationKey(applicationKey)
 	if request.Provider == "" {
-		return identity.ProviderChallenge{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "auth.provider_request_invalid"}
+		return identity.ProviderChallenge{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "auth.provider_request_invalid"}
 	}
 	var challenge identity.ProviderChallenge
 	endpoint := "/auth/providers/" + url.PathEscape(request.Provider) + "/start"
@@ -73,7 +73,7 @@ func (adapter authentication) BeginFederatedLogin(ctx context.Context, request i
 func (adapter authentication) CompleteFederatedLogin(ctx context.Context, request identity.CompleteFederatedLoginRequest) (identity.FederatedLoginCompletion, error) {
 	request.Provider = strings.TrimSpace(request.Provider)
 	if request.Provider == "" || len(request.Values) == 0 {
-		return identity.FederatedLoginCompletion{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "auth.provider_callback_request_invalid"}
+		return identity.FederatedLoginCompletion{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "auth.provider_callback_request_invalid"}
 	}
 	values := url.Values{}
 	for key, value := range request.Values {
@@ -111,7 +111,7 @@ func (adapter authentication) VerifyOTPOutcome(ctx context.Context, request iden
 	request.Provider, request.State, request.Code = strings.TrimSpace(request.Provider), strings.TrimSpace(request.State), strings.TrimSpace(request.Code)
 	request.WorkspaceID = identity.WorkspaceID(adapter.client.resolveWorkspace(string(request.WorkspaceID)))
 	if request.Provider == "" || request.State == "" || request.Code == "" {
-		return identity.AuthenticationOutcome{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "auth.provider_verify_request_invalid"}
+		return identity.AuthenticationOutcome{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "auth.provider_verify_request_invalid"}
 	}
 	var raw json.RawMessage
 	endpoint := "/auth/providers/" + url.PathEscape(request.Provider) + "/verify"
@@ -124,7 +124,7 @@ func (adapter authentication) VerifyOTPOutcome(ctx context.Context, request iden
 func decodeAuthenticationOutcome(raw []byte) (identity.AuthenticationOutcome, error) {
 	var outcome identity.AuthenticationOutcome
 	if err := json.Unmarshal(raw, &outcome); err != nil {
-		return identity.AuthenticationOutcome{}, &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.authentication_response_invalid", Cause: err}
+		return identity.AuthenticationOutcome{}, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.authentication_response_invalid", Cause: err}
 	}
 	if outcome.Status == identity.AuthenticationStatusAuthenticated && outcome.Session != nil && strings.TrimSpace(outcome.Session.AccessToken) != "" {
 		return outcome, nil
@@ -138,7 +138,7 @@ func decodeAuthenticationOutcome(raw []byte) (identity.AuthenticationOutcome, er
 	if err := json.Unmarshal(raw, &session); err == nil && strings.TrimSpace(session.AccessToken) != "" {
 		return identity.AuthenticationOutcome{Status: identity.AuthenticationStatusAuthenticated, Session: &session}, nil
 	}
-	return identity.AuthenticationOutcome{}, &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.authentication_response_invalid"}
+	return identity.AuthenticationOutcome{}, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.authentication_response_invalid"}
 }
 
 func authenticatedSession(outcome identity.AuthenticationOutcome, err error) (identity.AuthSession, error) {
@@ -149,9 +149,9 @@ func authenticatedSession(outcome identity.AuthenticationOutcome, err error) (id
 		return *outcome.Session, nil
 	}
 	if outcome.Status == identity.AuthenticationStatusChallengeRequired && outcome.Challenge != nil {
-		return identity.AuthSession{}, &identity.Error{StatusCode: http.StatusConflict, Code: "auth.challenge_required", Params: map[string]string{"provider": outcome.Challenge.Provider, "state": outcome.Challenge.State}}
+		return identity.AuthSession{}, &identity.Error{Class: identity.ErrorClassConflict, Code: "auth.challenge_required", Params: map[string]string{"provider": outcome.Challenge.Provider, "state": outcome.Challenge.State}}
 	}
-	return identity.AuthSession{}, &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.authentication_response_invalid"}
+	return identity.AuthSession{}, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.authentication_response_invalid"}
 }
 
 func (adapter authentication) RefreshSession(ctx context.Context, request identity.RefreshRequest) (identity.AuthSession, error) {
@@ -186,14 +186,14 @@ func (adapter authentication) LogoutSession(ctx context.Context, request identit
 
 func (adapter authentication) CurrentSession(ctx context.Context, request identity.CurrentSessionRequest) (identity.SessionView, error) {
 	if strings.TrimSpace(request.AccessToken) == "" {
-		return identity.SessionView{}, &identity.Error{StatusCode: http.StatusUnauthorized, Code: "auth.token_required"}
+		return identity.SessionView{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "auth.token_required"}
 	}
 	var session identity.SessionView
 	if err := adapter.client.doJSON(ctx, http.MethodGet, "/auth/session", request.AccessToken, nil, &session); err != nil {
 		return identity.SessionView{}, err
 	}
 	if !session.WorkspaceID.Valid() || !session.SubjectID.Valid() || !session.SessionID.Valid() || !session.AuthorizationRevision.Valid() || strings.TrimSpace(session.User.ID) == "" {
-		return identity.SessionView{}, &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.session_response_invalid"}
+		return identity.SessionView{}, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.session_response_invalid"}
 	}
 	return session, nil
 }
@@ -204,7 +204,7 @@ func (adapter authentication) requireWorkspace(workspaceID identity.WorkspaceID)
 		resolved = adapter.client.resolveWorkspace("")
 	}
 	if resolved == "" || adapter.client.workspaceID != "" && resolved != adapter.client.workspaceID {
-		return &identity.Error{StatusCode: http.StatusForbidden, Code: "auth.workspace_mismatch"}
+		return &identity.Error{Class: identity.ErrorClassForbidden, Code: "auth.workspace_mismatch"}
 	}
 	return nil
 }

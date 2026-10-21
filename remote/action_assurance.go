@@ -16,7 +16,7 @@ func (adapter actionAssurance) BeginActionAssurance(ctx context.Context, request
 	}
 	request.WorkspaceID = identity.WorkspaceID(adapter.client.resolveWorkspace(string(request.WorkspaceID)))
 	if strings.TrimSpace(request.AccessToken) == "" {
-		return identity.ProviderChallenge{}, &identity.Error{StatusCode: http.StatusUnauthorized, Code: "auth.token_required"}
+		return identity.ProviderChallenge{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "auth.token_required"}
 	}
 	var challenge identity.ProviderChallenge
 	err := adapter.client.doJSON(ctx, http.MethodPost, "/auth/action-assurance/challenges", request.AccessToken, request, &challenge)
@@ -30,7 +30,7 @@ func (adapter actionAssurance) VerifyActionAssurance(ctx context.Context, reques
 	request.WorkspaceID = identity.WorkspaceID(adapter.client.resolveWorkspace(string(request.WorkspaceID)))
 	request.Provider, request.State, request.Code = strings.TrimSpace(request.Provider), strings.TrimSpace(request.State), strings.TrimSpace(request.Code)
 	if strings.TrimSpace(request.AccessToken) == "" || request.Provider == "" || request.State == "" || request.Code == "" {
-		return identity.ActionAssuranceReceipt{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "auth.action_assurance_verify_request_invalid"}
+		return identity.ActionAssuranceReceipt{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "auth.action_assurance_verify_request_invalid"}
 	}
 	var receipt identity.ActionAssuranceReceipt
 	err := adapter.client.doJSON(ctx, http.MethodPost, "/auth/action-assurance/challenges/verify", request.AccessToken, request, &receipt)
@@ -43,7 +43,7 @@ func (adapter actionAssurance) ValidateActionAssuranceReceipt(ctx context.Contex
 	}
 	request.WorkspaceID = identity.WorkspaceID(adapter.client.resolveWorkspace(string(request.WorkspaceID)))
 	if strings.TrimSpace(request.AccessToken) == "" || strings.TrimSpace(request.Token) == "" || !request.SubjectID.Valid() {
-		return identity.ActionAssuranceReceipt{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "auth.action_assurance_receipt_request_invalid"}
+		return identity.ActionAssuranceReceipt{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "auth.action_assurance_receipt_request_invalid"}
 	}
 	var receipt identity.ActionAssuranceReceipt
 	err := adapter.client.doJSON(ctx, http.MethodPost, "/auth/action-assurance/receipts/validate", request.AccessToken, request, &receipt)

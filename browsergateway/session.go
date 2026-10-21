@@ -168,5 +168,5 @@ func invalidRefreshCredential(err error) bool {
 	if !errors.As(err, &sdkError) {
 		return false
 	}
-	return sdkError.StatusCode == http.StatusBadRequest || sdkError.StatusCode == http.StatusUnauthorized || sdkError.StatusCode == http.StatusForbidden
+	return sdkError.Class == identity.ErrorClassBadRequest || sdkError.Class == identity.ErrorClassForbidden
 }

@@ -221,6 +221,17 @@ const (
 )
 
 type Error = identitymodel.Error
+type ErrorClass = identitymodel.ErrorClass
+
+const (
+	ErrorClassBadRequest  = identitymodel.ErrorClassBadRequest
+	ErrorClassForbidden   = identitymodel.ErrorClassForbidden
+	ErrorClassNotFound    = identitymodel.ErrorClassNotFound
+	ErrorClassConflict    = identitymodel.ErrorClassConflict
+	ErrorClassRateLimited = identitymodel.ErrorClassRateLimited
+	ErrorClassUnavailable = identitymodel.ErrorClassUnavailable
+	ErrorClassInternal    = identitymodel.ErrorClassInternal
+)
 
 type WorkspaceID = identitymodel.WorkspaceID
 type SubjectID = identitymodel.SubjectID

@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"net/http"
 
 	identity "github.com/domainry/domainry-identity-sdk"
 )
@@ -12,7 +11,7 @@ type workflowWorkloads struct{ binding *binding }
 func (value workflowWorkloads) delegate() (identity.WorkflowWorkloadIdentity, error) {
 	capability, ok := value.binding.delegate.(identity.WorkflowWorkloadIdentityBinding)
 	if !ok || capability.WorkflowWorkloads() == nil {
-		return nil, scopeError(http.StatusNotImplemented, "identity.workflow_workload_unavailable")
+		return nil, scopeError(identity.ErrorClassUnavailable, "identity.workflow_workload_unavailable")
 	}
 	return capability.WorkflowWorkloads(), nil
 }

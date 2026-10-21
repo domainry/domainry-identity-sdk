@@ -28,7 +28,7 @@ func (adapter applicationServices) Exchange(ctx context.Context, request identit
 
 func (adapter applicationServices) Verify(ctx context.Context, request identity.VerifyApplicationServiceTokenRequest) (identity.ApplicationServicePrincipal, error) {
 	if strings.TrimSpace(request.AccessToken) == "" || !request.Audience.Valid() || !request.Grant.Valid() {
-		return identity.ApplicationServicePrincipal{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.application_service_verify_invalid"}
+		return identity.ApplicationServicePrincipal{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.application_service_verify_invalid"}
 	}
 	var principal identity.ApplicationServicePrincipal
 	headers := http.Header{}

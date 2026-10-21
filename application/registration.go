@@ -36,7 +36,7 @@ func (value permissions) CurrentSourceSnapshot(ctx context.Context, input identi
 	input.Application = application
 	reader, ok := value.binding.delegate.Permissions().(identity.PermissionSnapshotReader)
 	if !ok {
-		return identity.PermissionSourceSnapshot{}, &identity.Error{Code: "identity.permission_snapshot_reader_unavailable"}
+		return identity.PermissionSourceSnapshot{}, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.permission_snapshot_reader_unavailable"}
 	}
 	return reader.CurrentSourceSnapshot(ctx, input)
 }

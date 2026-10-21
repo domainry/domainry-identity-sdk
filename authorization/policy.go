@@ -12,45 +12,45 @@ import (
 
 func (bundle AccessBundle) Validate(now time.Time) error {
 	if bundle.ContractVersion != CurrentPolicyBundleVersion {
-		return &Error{Code: "identity.access_bundle_version_unsupported"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.access_bundle_version_unsupported"}
 	}
 	if !bundle.AuthorizationRevision.Valid() || !bundle.Subject.WorkspaceID.Valid() || !bundle.Subject.SubjectID.Valid() {
-		return &Error{Code: "identity.access_bundle_identity_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.access_bundle_identity_invalid"}
 	}
 	if !uniqueNonBlank(bundle.Subject.OrgScopeIDs) || !uniqueSubjectIDs(bundle.Subject.ReportingScopeUserIDs) {
-		return &Error{Code: "identity.access_bundle_scope_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.access_bundle_scope_invalid"}
 	}
 	if bundle.ExpiresAt.IsZero() || !bundle.ExpiresAt.After(now) {
-		return &Error{Code: "identity.access_bundle_expired"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.access_bundle_expired"}
 	}
 	functionKeys := map[string]struct{}{}
 	for _, grant := range bundle.FunctionGrants {
 		if !grant.Resource.Valid() || !grant.Action.Valid() || grant.Resource == "*" || grant.Action == "*" || !grant.Effect.Valid() {
-			return &Error{Code: "identity.function_grant_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.function_grant_invalid"}
 		}
 		key := string(grant.Resource) + "\x00" + string(grant.Action) + "\x00" + string(grant.Effect)
 		if _, duplicate := functionKeys[key]; duplicate {
-			return &Error{Code: "identity.function_grant_duplicate"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.function_grant_duplicate"}
 		}
 		functionKeys[key] = struct{}{}
 	}
 	dataKeys := map[string]struct{}{}
 	for _, policy := range bundle.DataPolicies {
 		if strings.TrimSpace(policy.Key) == "" || !policy.Resource.Valid() || policy.Resource == "*" || !policy.Action.Valid() || !policy.Effect.Valid() {
-			return &Error{Code: "identity.data_policy_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.data_policy_invalid"}
 		}
 		seenScopes := map[DataScope]struct{}{}
 		for _, scope := range policy.DataScopes {
 			if !scope.Valid() {
-				return &Error{Code: "identity.data_policy_scope_invalid"}
+				return &Error{Class: ErrorClassBadRequest, Code: "identity.data_policy_scope_invalid"}
 			}
 			if _, duplicate := seenScopes[scope]; duplicate {
-				return &Error{Code: "identity.data_policy_scope_duplicate"}
+				return &Error{Class: ErrorClassBadRequest, Code: "identity.data_policy_scope_duplicate"}
 			}
 			seenScopes[scope] = struct{}{}
 		}
 		if _, duplicate := dataKeys[policy.Key]; duplicate {
-			return &Error{Code: "identity.data_policy_duplicate"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.data_policy_duplicate"}
 		}
 		dataKeys[policy.Key] = struct{}{}
 		unrestricted := containsDataScope(policy.DataScopes, DataScopeAll)
@@ -58,7 +58,7 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 			// `all` is the absence of a data-scope predicate. It must never be
 			// serialized or translated as an always-true WHERE condition.
 			if policy.Effect != EffectAllow || len(policy.DataScopes) != 1 || !policy.Predicate.IsZero() {
-				return &Error{Code: "identity.data_policy_scope_invalid"}
+				return &Error{Class: ErrorClassBadRequest, Code: "identity.data_policy_scope_invalid"}
 			}
 		} else if err := policy.Predicate.Validate(); err != nil {
 			return err
@@ -67,24 +67,24 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 	fieldKeys := map[string]struct{}{}
 	for _, policy := range bundle.FieldPolicies {
 		if !policy.Resource.Valid() || strings.TrimSpace(policy.Field) == "" {
-			return &Error{Code: "identity.field_policy_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.field_policy_invalid"}
 		}
 		key := string(policy.Resource) + "\x00" + policy.Field
 		if _, duplicate := fieldKeys[key]; duplicate {
-			return &Error{Code: "identity.field_policy_duplicate"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.field_policy_duplicate"}
 		}
 		fieldKeys[key] = struct{}{}
 		ruleKeys := map[string]struct{}{}
 		priorities := map[int]struct{}{}
 		for _, rule := range policy.Rules {
 			if strings.TrimSpace(rule.Key) == "" || !rule.Effect.Valid() || !uniqueActions(rule.Actions) {
-				return &Error{Code: "identity.field_rule_invalid"}
+				return &Error{Class: ErrorClassBadRequest, Code: "identity.field_rule_invalid"}
 			}
 			if _, duplicate := ruleKeys[rule.Key]; duplicate {
-				return &Error{Code: "identity.field_rule_duplicate"}
+				return &Error{Class: ErrorClassBadRequest, Code: "identity.field_rule_duplicate"}
 			}
 			if _, duplicate := priorities[rule.Priority]; duplicate {
-				return &Error{Code: "identity.field_rule_priority_duplicate"}
+				return &Error{Class: ErrorClassBadRequest, Code: "identity.field_rule_priority_duplicate"}
 			}
 			ruleKeys[rule.Key] = struct{}{}
 			priorities[rule.Priority] = struct{}{}
@@ -101,43 +101,43 @@ func (bundle AccessBundle) Validate(now time.Time) error {
 	referenceKeys := map[string]struct{}{}
 	for _, policy := range bundle.ReferencePolicies {
 		if !policy.SourceResource.Valid() || strings.TrimSpace(policy.Reference) == "" || !policy.TargetResource.Valid() || !uniqueNonBlank(policy.DisplayFields) {
-			return &Error{Code: "identity.reference_policy_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.reference_policy_invalid"}
 		}
 		key := string(policy.SourceResource) + "\x00" + policy.Reference
 		if _, duplicate := referenceKeys[key]; duplicate {
-			return &Error{Code: "identity.reference_policy_duplicate"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.reference_policy_duplicate"}
 		}
 		referenceKeys[key] = struct{}{}
 	}
 	exportKeys := map[ResourceType]struct{}{}
 	for _, policy := range bundle.ExportPolicies {
 		if !policy.Resource.Valid() || policy.Mode != ExportModeDeny && policy.Mode != ExportModeAllowList || !uniqueNonBlank(policy.Fields) {
-			return &Error{Code: "identity.export_policy_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.export_policy_invalid"}
 		}
 		if policy.Mode == ExportModeDeny && len(policy.Fields) != 0 {
-			return &Error{Code: "identity.export_policy_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.export_policy_invalid"}
 		}
 		if _, duplicate := exportKeys[policy.Resource]; duplicate {
-			return &Error{Code: "identity.export_policy_duplicate"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.export_policy_duplicate"}
 		}
 		exportKeys[policy.Resource] = struct{}{}
 	}
 	guardrailKeys := map[string]struct{}{}
 	for _, guardrail := range bundle.Guardrails {
 		if strings.TrimSpace(guardrail.Key) == "" || !guardrail.Effect.Valid() || guardrail.Effect != EffectDeny {
-			return &Error{Code: "identity.guardrail_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.guardrail_invalid"}
 		}
 		if guardrail.Resource == "" && (guardrail.Action != "" || strings.TrimSpace(guardrail.Field) != "" || guardrail.Predicate != nil) {
 			// An action or record predicate has no unambiguous meaning without a
 			// resource type. Reject it instead of letting a catalog adapter drop a
 			// deny rule while constraining the bundle.
-			return &Error{Code: "identity.guardrail_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.guardrail_invalid"}
 		}
 		if strings.TrimSpace(guardrail.Field) != "" && guardrail.Action == "" {
-			return &Error{Code: "identity.guardrail_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.guardrail_invalid"}
 		}
 		if _, duplicate := guardrailKeys[guardrail.Key]; duplicate {
-			return &Error{Code: "identity.guardrail_duplicate"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.guardrail_duplicate"}
 		}
 		guardrailKeys[guardrail.Key] = struct{}{}
 		if guardrail.Predicate != nil {
@@ -163,24 +163,24 @@ func (effect FieldEffect) Valid() bool {
 func (rule FieldRule) validateMaskStrategy() error {
 	if rule.Effect != FieldEffectMask {
 		if rule.MaskStrategy != nil {
-			return &Error{Code: "identity.field_rule_mask_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.field_rule_mask_invalid"}
 		}
 		return nil
 	}
 	if rule.MaskStrategy == nil {
-		return &Error{Code: "identity.field_rule_mask_required"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.field_rule_mask_required"}
 	}
 	switch rule.MaskStrategy.Type {
 	case MaskTypePhone, MaskTypeIDNumber, MaskTypeEmail, MaskTypeYearOnly:
 		if rule.MaskStrategy.LastN != 0 {
-			return &Error{Code: "identity.field_rule_mask_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.field_rule_mask_invalid"}
 		}
 	case MaskTypeLastN:
 		if rule.MaskStrategy.LastN < 1 || rule.MaskStrategy.LastN > 32 {
-			return &Error{Code: "identity.field_rule_mask_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.field_rule_mask_invalid"}
 		}
 	default:
-		return &Error{Code: "identity.field_rule_mask_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.field_rule_mask_invalid"}
 	}
 	return nil
 }
@@ -207,7 +207,7 @@ func (predicate Predicate) Validate() error {
 	if strings.TrimSpace(predicate.Fact) != "" || predicate.Operator != "" {
 		branches++
 		if strings.TrimSpace(predicate.Fact) == "" || !predicate.Operator.Valid() {
-			return &Error{Code: "identity.policy_predicate_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.policy_predicate_invalid"}
 		}
 	}
 	if len(predicate.All) > 0 {
@@ -220,15 +220,15 @@ func (predicate Predicate) Validate() error {
 		branches++
 	}
 	if branches != 1 {
-		return &Error{Code: "identity.policy_predicate_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.policy_predicate_invalid"}
 	}
 	if len(predicate.Path) > 0 {
 		if len(predicate.Path) > 3 || len(predicate.All) > 0 || len(predicate.Any) > 0 || predicate.Not != nil {
-			return &Error{Code: "identity.policy_relation_path_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.policy_relation_path_invalid"}
 		}
 		for _, segment := range predicate.Path {
 			if segment.Direction != RelationForward && segment.Direction != RelationReverse || strings.TrimSpace(segment.Reference) == "" || !segment.TargetResource.Valid() {
-				return &Error{Code: "identity.policy_relation_path_invalid"}
+				return &Error{Class: ErrorClassBadRequest, Code: "identity.policy_relation_path_invalid"}
 			}
 		}
 	}

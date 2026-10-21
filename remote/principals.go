@@ -17,7 +17,7 @@ func (adapter principalResolver) Resolve(ctx context.Context, request identity.P
 	request.RoleKey = strings.TrimSpace(request.RoleKey)
 	request.SessionRoleKey = strings.TrimSpace(request.SessionRoleKey)
 	if request.SessionRoleKey != "" && (request.RoleKey != "" || request.Workload != nil) {
-		return identity.PrincipalResolution{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.principal_role_selection_invalid"}
+		return identity.PrincipalResolution{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.principal_role_selection_invalid"}
 	}
 	if request.Workload != nil {
 		request.Workload.WorkflowKey = strings.TrimSpace(request.Workload.WorkflowKey)
@@ -26,7 +26,7 @@ func (adapter principalResolver) Resolve(ctx context.Context, request identity.P
 		request.Workload.ReleaseDigest = strings.TrimSpace(request.Workload.ReleaseDigest)
 	}
 	if !request.SubjectID.Valid() {
-		return identity.PrincipalResolution{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.subject_id_invalid"}
+		return identity.PrincipalResolution{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.subject_id_invalid"}
 	}
 	var resolution identity.PrincipalResolution
 	if err := adapter.client.doJSON(ctx, http.MethodPost, "/identity/principal/resolve", adapter.client.serviceAccessToken, request, &resolution); err != nil {
@@ -35,12 +35,12 @@ func (adapter principalResolver) Resolve(ctx context.Context, request identity.P
 	workspaceID := identity.WorkspaceID(adapter.client.resolveWorkspace(""))
 	if resolution.Principal.WorkspaceID != string(workspaceID) || resolution.Principal.UserID != string(request.SubjectID) ||
 		resolution.AccessBundle.Subject.WorkspaceID != workspaceID || resolution.AccessBundle.Subject.SubjectID != request.SubjectID {
-		return identity.PrincipalResolution{}, &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.principal_response_invalid"}
+		return identity.PrincipalResolution{}, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.principal_response_invalid"}
 	}
 	if !resolution.Principal.Known || resolution.Principal.AuthorizationRevision == "" ||
 		resolution.Principal.AuthorizationRevision != string(resolution.AccessBundle.AuthorizationRevision) ||
 		request.SessionRoleKey != "" && resolution.Principal.RoleKey != request.SessionRoleKey {
-		return identity.PrincipalResolution{}, &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.principal_authorization_invalid"}
+		return identity.PrincipalResolution{}, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.principal_authorization_invalid"}
 	}
 	resolution.Principal.AccessBundle = &resolution.AccessBundle
 	return resolution, nil

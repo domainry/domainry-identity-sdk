@@ -22,7 +22,7 @@ func CompileRecordFilter(bundle identity.AccessBundle, resource identity.Resourc
 		return RecordFilter{}, err
 	}
 	if !resource.Valid() || !action.Valid() {
-		return RecordFilter{}, &identity.Error{Code: "identity.access_request_invalid"}
+		return RecordFilter{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.access_request_invalid"}
 	}
 	functionAllowed := false
 	for _, grant := range bundle.FunctionGrants {
@@ -59,7 +59,7 @@ func CompileRecordFilter(bundle identity.AccessBundle, resource identity.Resourc
 			}
 			filter.Allow = append(filter.Allow, policy.Predicate)
 		} else {
-			return RecordFilter{}, &identity.Error{Code: "identity.policy_effect_unsupported"}
+			return RecordFilter{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.policy_effect_unsupported"}
 		}
 	}
 	return filter, nil
@@ -87,7 +87,7 @@ func CompileSQL(filter RecordFilter, subject identity.Subject, resolve ColumnRes
 
 func CompileSQLWithContext(filter RecordFilter, evaluation EvaluationContext, resolve ColumnResolver) (SQLFilter, error) {
 	if resolve == nil {
-		return SQLFilter{}, &identity.Error{Code: "identity.policy_column_resolver_required"}
+		return SQLFilter{}, &identity.Error{Class: identity.ErrorClassInternal, Code: "identity.policy_column_resolver_required"}
 	}
 	allow, allowArgs := "", []any{}
 	if !filter.Unrestricted {
@@ -102,7 +102,7 @@ func CompileSQLWithContext(filter RecordFilter, evaluation EvaluationContext, re
 		return SQLFilter{}, err
 	}
 	if !filter.Unrestricted && allow == "" && len(filter.Allow) > 0 {
-		return SQLFilter{}, &identity.Error{Code: "identity.policy_translation_failed"}
+		return SQLFilter{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.policy_translation_failed"}
 	}
 	// No explicit allow policy means no visible records. Function grants are
 	// deliberately not inputs to the SQL compiler and cannot become all rows.
@@ -143,7 +143,7 @@ func compilePredicate(predicate identity.Predicate, evaluation EvaluationContext
 		return "", nil, err
 	}
 	if len(predicate.Path) > 0 {
-		return "", nil, &identity.Error{Code: "identity.policy_relation_resolver_required"}
+		return "", nil, &identity.Error{Class: identity.ErrorClassInternal, Code: "identity.policy_relation_resolver_required"}
 	}
 	if len(predicate.All) > 0 {
 		clause, args, err := compileGroup(predicate.All, evaluation, resolve, " AND ")
@@ -159,7 +159,7 @@ func compilePredicate(predicate identity.Predicate, evaluation EvaluationContext
 	}
 	column, ok := resolve(predicate.Fact)
 	if !ok || strings.TrimSpace(column) == "" {
-		return "", nil, &identity.Error{Code: "identity.policy_fact_untranslatable", Message: predicate.Fact}
+		return "", nil, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.policy_fact_untranslatable", Message: predicate.Fact}
 	}
 	expected, err := ResolveValue(predicate.Value, evaluation)
 	if err != nil {
@@ -176,13 +176,13 @@ func compilePredicate(predicate identity.Predicate, evaluation EvaluationContext
 	case identity.OperatorPrefix:
 		value, ok := expected.(string)
 		if !ok {
-			return "", nil, &identity.Error{Code: "identity.policy_value_invalid"}
+			return "", nil, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.policy_value_invalid"}
 		}
 		return column + " LIKE ? ESCAPE '\\'", []any{escapeLike(value) + "%"}, nil
 	case identity.OperatorExists:
 		want, ok := expected.(bool)
 		if !ok {
-			return "", nil, &identity.Error{Code: "identity.policy_value_invalid"}
+			return "", nil, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.policy_value_invalid"}
 		}
 		if want {
 			return column + " IS NOT NULL", nil, nil
@@ -191,7 +191,7 @@ func compilePredicate(predicate identity.Predicate, evaluation EvaluationContext
 	case identity.OperatorIn, identity.OperatorNotIn:
 		values, ok := anySlice(expected)
 		if !ok || len(values) == 0 {
-			return "", nil, &identity.Error{Code: "identity.policy_value_invalid"}
+			return "", nil, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.policy_value_invalid"}
 		}
 		marks := strings.TrimSuffix(strings.Repeat("?,", len(values)), ",")
 		op := " IN "
@@ -200,7 +200,7 @@ func compilePredicate(predicate identity.Predicate, evaluation EvaluationContext
 		}
 		return column + op + "(" + marks + ")", values, nil
 	default:
-		return "", nil, &identity.Error{Code: "identity.policy_operator_untranslatable", Message: fmt.Sprint(predicate.Operator)}
+		return "", nil, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.policy_operator_untranslatable", Message: fmt.Sprint(predicate.Operator)}
 	}
 }
 

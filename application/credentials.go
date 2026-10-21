@@ -50,7 +50,7 @@ func (value credentials) ManageTOTP(ctx context.Context, request identity.TOTPRe
 	}
 	manager, ok := value.binding.delegate.Credentials().(identity.TOTPManager)
 	if !ok {
-		return identity.TOTPResult{}, &identity.Error{Code: "auth.totp_unavailable"}
+		return identity.TOTPResult{}, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "auth.totp_unavailable"}
 	}
 	return manager.ManageTOTP(ctx, request)
 }

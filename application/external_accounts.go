@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"net/http"
 
 	identity "github.com/domainry/domainry-identity-sdk"
 )
@@ -53,7 +52,7 @@ func (value externalAccounts) workspaceForAccessToken(ctx context.Context, reque
 		return "", err
 	}
 	if verified.WorkspaceID != workspaceID {
-		return "", scopeError(http.StatusForbidden, "auth.workspace_mismatch")
+		return "", scopeError(identity.ErrorClassForbidden, "auth.workspace_mismatch")
 	}
 	return workspaceID, nil
 }

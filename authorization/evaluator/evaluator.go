@@ -33,7 +33,7 @@ func AuditDenialRequired(bundle identity.AccessBundle, resource identity.Resourc
 		return false, err
 	}
 	if !resource.Valid() || !action.Valid() {
-		return false, &identity.Error{Code: "identity.access_request_invalid"}
+		return false, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.access_request_invalid"}
 	}
 	for _, policy := range bundle.DataPolicies {
 		if resourceMatches(policy.Resource, resource) && policy.Action == action && policy.AuditDenial {
@@ -56,7 +56,7 @@ func EvaluateWithContext(bundle identity.AccessBundle, request identity.AccessRe
 	}
 	resource, action := identity.ResourceType(strings.TrimSpace(request.ObjectKey)), identity.Action(strings.TrimSpace(request.Action))
 	if !resource.Valid() || !action.Valid() {
-		return Decision{Code: "access_request_invalid"}, &identity.Error{Code: "identity.access_request_invalid"}
+		return Decision{Code: "access_request_invalid"}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.access_request_invalid"}
 	}
 	functionAllowed := false
 	for _, grant := range bundle.FunctionGrants {
@@ -141,7 +141,7 @@ func EvaluatePredicateWithContext(predicate identity.Predicate, facts identity.R
 		return false, err
 	}
 	if len(predicate.Path) > 0 {
-		return false, &identity.Error{Code: "identity.policy_relation_resolver_required"}
+		return false, &identity.Error{Class: identity.ErrorClassInternal, Code: "identity.policy_relation_resolver_required"}
 	}
 	if len(predicate.All) > 0 {
 		for _, child := range predicate.All {
@@ -180,7 +180,7 @@ func EvaluatePredicateWithContext(predicate identity.Predicate, facts identity.R
 	case identity.OperatorExists:
 		want, ok := expected.(bool)
 		if !ok {
-			return false, &identity.Error{Code: "identity.policy_value_invalid"}
+			return false, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.policy_value_invalid"}
 		}
 		return exists == want, nil
 	case identity.OperatorEqual:
@@ -190,7 +190,7 @@ func EvaluatePredicateWithContext(predicate identity.Predicate, facts identity.R
 	case identity.OperatorIn, identity.OperatorNotIn:
 		match, ok := contains(expected, actual)
 		if !ok {
-			return false, &identity.Error{Code: "identity.policy_value_invalid"}
+			return false, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.policy_value_invalid"}
 		}
 		if predicate.Operator == identity.OperatorNotIn {
 			match = !match
@@ -201,7 +201,7 @@ func EvaluatePredicateWithContext(predicate identity.Predicate, facts identity.R
 		right, rightOK := expected.(string)
 		return exists && leftOK && rightOK && strings.HasPrefix(left, right), nil
 	default:
-		return false, &identity.Error{Code: "identity.policy_operator_unsupported"}
+		return false, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.policy_operator_unsupported"}
 	}
 }
 

@@ -12,7 +12,7 @@ type authorization struct{ client *client }
 
 func (adapter authorization) ResolveAccess(ctx context.Context, request identity.AccessBundleRequest) (identity.AccessBundle, error) {
 	if !request.Identity.Principal.Known || strings.TrimSpace(request.Identity.AccessToken) == "" {
-		return identity.AccessBundle{}, &identity.Error{StatusCode: http.StatusUnauthorized, Code: "auth.token_required"}
+		return identity.AccessBundle{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "auth.token_required"}
 	}
 	payload := map[string]string{"resource_type": string(request.ResourceType), "action": string(request.Action)}
 	var bundle identity.AccessBundle
@@ -27,14 +27,14 @@ func (adapter authorization) ResolveAccess(ctx context.Context, request identity
 
 func (adapter authorization) Reauthorize(ctx context.Context, request identity.DecisionRequest) (identity.AccessDecision, error) {
 	if !request.Identity.Principal.Known || strings.TrimSpace(request.Identity.AccessToken) == "" {
-		return identity.AccessDecision{}, &identity.Error{StatusCode: http.StatusUnauthorized, Code: "auth.token_required"}
+		return identity.AccessDecision{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "auth.token_required"}
 	}
 	request.Access.ObjectKey = strings.TrimSpace(request.Access.ObjectKey)
 	request.Access.Action = strings.TrimSpace(request.Access.Action)
 	request.Access.FieldKey = strings.TrimSpace(request.Access.FieldKey)
 	request.Access.RecordID = strings.TrimSpace(request.Access.RecordID)
 	if request.Access.ObjectKey == "" || request.Access.Action == "" {
-		return identity.AccessDecision{}, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.access_request_invalid"}
+		return identity.AccessDecision{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.access_request_invalid"}
 	}
 	payload := struct {
 		Access identity.AccessRequest `json:"access"`

@@ -15,10 +15,10 @@ func NewFactory(config Config) *Factory { return &Factory{config: config} }
 
 func (factory *Factory) Open(ctx context.Context, application identity.ApplicationRef) (identity.Binding, error) {
 	if ctx == nil {
-		return nil, &identity.Error{Code: "identity.context_required"}
+		return nil, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.context_required"}
 	}
 	if err := ctx.Err(); err != nil {
-		return nil, &identity.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.context_unavailable", Cause: err}
+		return nil, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.context_unavailable", Cause: err}
 	}
 	config := factory.config
 	config, application, err := remoteApplication(config, application)
@@ -31,7 +31,7 @@ func (factory *Factory) Open(ctx context.Context, application identity.Applicati
 	}
 	issuer, audience := strings.TrimSpace(config.Issuer), strings.TrimSpace(config.Audience)
 	if issuer == "" || audience == "" {
-		return nil, &identity.Error{Code: "identity.remote_trust_required", Message: "issuer and audience are required"}
+		return nil, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.remote_trust_required", Message: "issuer and audience are required"}
 	}
 	var discovery identity.Descriptor
 	if err := client.doJSON(ctx, http.MethodGet, "/identity/discovery", "", nil, &discovery); err != nil {
@@ -64,16 +64,16 @@ func remoteApplication(config Config, application identity.ApplicationRef) (Conf
 	}
 	if application.WorkspaceID.Valid() || application.ApplicationKey.Valid() {
 		if !application.WorkspaceID.Valid() || !application.ApplicationKey.Valid() {
-			return Config{}, identity.ApplicationRef{}, &identity.Error{Code: "identity.application_scope_invalid"}
+			return Config{}, identity.ApplicationRef{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.application_scope_invalid"}
 		}
 		if configured.WorkspaceID != "" && configured.WorkspaceID != application.WorkspaceID || configured.ApplicationKey != "" && configured.ApplicationKey != application.ApplicationKey {
-			return Config{}, identity.ApplicationRef{}, &identity.Error{Code: "identity.application_scope_mismatch"}
+			return Config{}, identity.ApplicationRef{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "identity.application_scope_mismatch"}
 		}
 	} else {
 		application = configured
 	}
 	if !application.WorkspaceID.Valid() || !application.ApplicationKey.Valid() {
-		return Config{}, identity.ApplicationRef{}, &identity.Error{Code: "identity.application_scope_invalid"}
+		return Config{}, identity.ApplicationRef{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.application_scope_invalid"}
 	}
 	config.WorkspaceID, config.Audience = string(application.WorkspaceID), string(application.ApplicationKey)
 	return config, application, nil
@@ -81,10 +81,10 @@ func remoteApplication(config Config, application identity.ApplicationRef) (Conf
 
 func validateDiscovery(descriptor identity.Descriptor, expectedIssuer string) error {
 	if descriptor.ProtocolVersion != identity.CurrentProtocolVersion || descriptor.BundleVersion != identity.CurrentPolicyBundleVersion || descriptor.AuthorizationVersion != identity.CurrentAuthorizationContractVersion || descriptor.Mode != identity.DeploymentModeSaaS {
-		return &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.protocol_incompatible"}
+		return &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.protocol_incompatible"}
 	}
 	if strings.TrimSpace(descriptor.Issuer) != strings.TrimSpace(expectedIssuer) {
-		return &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.issuer_mismatch"}
+		return &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.issuer_mismatch"}
 	}
 	required := map[string]bool{"authentication": false, "challenge_authentication": false, "action_assurance": false, "token_verification": false, "authorization": false, "principal_resolution": false, "workflow_workload_identity": false, "identity_projection": false, "application_registration": false, "permission_reconciliation": false}
 	for _, capability := range descriptor.Capabilities {
@@ -94,7 +94,7 @@ func validateDiscovery(descriptor identity.Descriptor, expectedIssuer string) er
 	}
 	for _, available := range required {
 		if !available {
-			return &identity.Error{StatusCode: http.StatusBadGateway, Code: "identity.capability_incomplete"}
+			return &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.capability_incomplete"}
 		}
 	}
 	return nil

@@ -17,13 +17,13 @@ func (value systemSubjects) invoke(ctx context.Context, operation string, reques
 		return nil, err
 	}
 	if request.WorkspaceID != value.client.workspaceID || !identity.WorkspaceID(request.WorkspaceID).Valid() {
-		return nil, &identity.Error{StatusCode: http.StatusForbidden, Code: "auth.workspace_mismatch"}
+		return nil, &identity.Error{Class: identity.ErrorClassForbidden, Code: "auth.workspace_mismatch"}
 	}
 	if strings.TrimSpace(request.SubjectID) == "" {
-		return nil, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.subject_id_invalid"}
+		return nil, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.subject_id_invalid"}
 	}
 	if operation == "erase" && strings.TrimSpace(request.RequestID) == "" {
-		return nil, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.subject_request_id_required"}
+		return nil, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.subject_request_id_required"}
 	}
 	var output json.RawMessage
 	err := value.client.doJSON(ctx, http.MethodPost, "/identity/system/subjects/"+operation, value.client.serviceAccessToken, request, &output)

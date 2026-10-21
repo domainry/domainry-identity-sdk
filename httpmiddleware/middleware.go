@@ -110,7 +110,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 			if err != nil {
 				status, code := authenticationError(err)
 				var identityError *identitysdk.Error
-				if errors.As(err, &identityError) && identityError.StatusCode == http.StatusForbidden {
+				if errors.As(err, &identityError) && identityError.Class == identitysdk.ErrorClassForbidden {
 					status = http.StatusForbidden
 				}
 				m.writeError(w, r, status, code)
@@ -249,7 +249,7 @@ func BearerToken(r *http.Request) (string, bool) {
 func authenticationError(err error) (int, string) {
 	var identityError *identitysdk.Error
 	if errors.As(err, &identityError) {
-		if identityError.StatusCode >= 500 {
+		if identityError.Class == identitysdk.ErrorClassUnavailable || identityError.Class == identitysdk.ErrorClassInternal {
 			return http.StatusServiceUnavailable, "auth.service_unavailable"
 		}
 		if identityError.Code != "" {

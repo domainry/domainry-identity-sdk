@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"net/http"
 	"sync"
 
 	identity "github.com/domainry/domainry-identity-sdk"
@@ -51,7 +50,7 @@ func BeginWorkspaceReadScope(ctx context.Context) (context.Context, func() error
 		for key, previous := range values {
 			fresh, err := key.binding.resolver.ResolveWorkspace(ctx, key.input)
 			if err != nil || !fresh.Valid() || fresh != previous {
-				return scopeError(http.StatusForbidden, "auth.invalid_credentials")
+				return scopeError(identity.ErrorClassForbidden, "auth.invalid_credentials")
 			}
 		}
 		return ctx.Err()

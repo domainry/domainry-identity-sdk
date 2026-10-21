@@ -15,7 +15,7 @@ func (adapter projectionClient) FindUser(ctx context.Context, request identity.U
 		return identity.User{}, false, err
 	}
 	if !request.UserID.Valid() {
-		return identity.User{}, false, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.user_id_invalid"}
+		return identity.User{}, false, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.user_id_invalid"}
 	}
 	var response struct {
 		User  identity.User `json:"user"`
@@ -33,7 +33,7 @@ func (adapter projectionClient) FindOrganizationUnit(ctx context.Context, reques
 	}
 	request.OrgID = strings.TrimSpace(request.OrgID)
 	if request.OrgID == "" {
-		return identity.OrganizationUnit{}, false, &identity.Error{StatusCode: http.StatusBadRequest, Code: "identity.org_id_invalid"}
+		return identity.OrganizationUnit{}, false, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.org_id_invalid"}
 	}
 	var response struct {
 		OrganizationUnit identity.OrganizationUnit `json:"organization_unit"`
@@ -83,7 +83,7 @@ func (adapter projectionClient) ListUserRoleAssignments(ctx context.Context, req
 
 func (adapter projectionClient) requireCredential() error {
 	if adapter.client == nil || strings.TrimSpace(adapter.client.serviceAccessToken) == "" {
-		return &identity.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.service_credential_required"}
+		return &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.service_credential_required"}
 	}
 	workspaceID := identity.WorkspaceID(adapter.client.resolveWorkspace(""))
 	if err := (authentication{client: adapter.client}).requireWorkspace(workspaceID); err != nil {

@@ -39,7 +39,7 @@ func (value projection) ResolveDisplayNames(ctx context.Context, input identity.
 	}
 	resolver, ok := value.binding.delegate.Projection().(identity.DisplayNameProjection)
 	if !ok {
-		return identity.DisplayNameResult{}, &identity.Error{Code: "identity.display_name_projection_unavailable"}
+		return identity.DisplayNameResult{}, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.display_name_projection_unavailable"}
 	}
 	return resolver.ResolveDisplayNames(ctx, input)
 }

@@ -36,13 +36,13 @@ type ApplicationRegistry interface {
 
 func (registration ApplicationRegistration) ValidateContract() error {
 	if !registration.Application.WorkspaceID.Valid() || !registration.Application.ApplicationKey.Valid() {
-		return &Error{Code: "identity.application_registration_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.application_registration_invalid"}
 	}
 	for _, raw := range registration.RedirectURLs {
 		value := strings.TrimSpace(raw)
 		parsed, err := url.Parse(value)
 		if err != nil || !parsed.IsAbs() || parsed.Fragment != "" || parsed.User != nil || parsed.Host == "" || parsed.Scheme != "https" && parsed.Scheme != "http" {
-			return &Error{Code: "identity.application_redirect_url_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.application_redirect_url_invalid"}
 		}
 	}
 	return nil

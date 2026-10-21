@@ -69,7 +69,7 @@ func (c *client) resolveApplication(value string) (string, error) {
 		value = c.applicationKey
 	}
 	if value == "" || c != nil && c.applicationKey != "" && value != c.applicationKey {
-		return "", &identitysdk.Error{StatusCode: http.StatusForbidden, Code: "identity.application_mismatch"}
+		return "", &identitysdk.Error{Class: identitysdk.ErrorClassForbidden, Code: "identity.application_mismatch"}
 	}
 	return value, nil
 }
@@ -117,10 +117,10 @@ func (c *client) do(ctx context.Context, method, endpoint, accessToken, contentT
 
 func (c *client) doWithHeaders(ctx context.Context, method, endpoint, accessToken, contentType string, body io.Reader, output any, headers http.Header) error {
 	if c == nil || c.baseURL == nil || c.httpClient == nil {
-		return &identitysdk.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.client_unavailable"}
+		return &identitysdk.Error{Class: identitysdk.ErrorClassUnavailable, Code: "identity.client_unavailable"}
 	}
 	if ctx == nil {
-		return &identitysdk.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.context_required"}
+		return &identitysdk.Error{Class: identitysdk.ErrorClassUnavailable, Code: "identity.context_required"}
 	}
 	requestBody, err := boundedRequestBody(body)
 	if err != nil {
@@ -135,7 +135,7 @@ func (c *client) doWithHeaders(ctx context.Context, method, endpoint, accessToke
 	var lastError error
 	for attempt := 1; attempt <= attempts; attempt++ {
 		if c.breaker != nil && !c.breaker.Allow() {
-			return &identitysdk.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.circuit_open"}
+			return &identitysdk.Error{Class: identitysdk.ErrorClassUnavailable, Code: "identity.circuit_open"}
 		}
 		response, raw, requestErr := c.execute(requestContext, method, endpoint, accessToken, contentType, requestBody, headers)
 		availabilityFailure := requestErr != nil || response != nil && response.StatusCode >= http.StatusInternalServerError
@@ -146,7 +146,7 @@ func (c *client) doWithHeaders(ctx context.Context, method, endpoint, accessToke
 			lastError = identityExecutionError(requestErr)
 			if attempt < attempts && retryableTransportError(requestContext, requestErr) {
 				if waitErr := waitForRetry(requestContext, c.retryDelay(attempt, nil)); waitErr != nil {
-					return &identitysdk.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.remote_unavailable", Cause: waitErr}
+					return &identitysdk.Error{Class: identitysdk.ErrorClassUnavailable, Code: "identity.remote_unavailable", Cause: waitErr}
 				}
 				continue
 			}
@@ -154,7 +154,7 @@ func (c *client) doWithHeaders(ctx context.Context, method, endpoint, accessToke
 		}
 		if attempt < attempts && retryableStatus(response.StatusCode) {
 			if waitErr := waitForRetry(requestContext, c.retryDelay(attempt, response)); waitErr != nil {
-				return &identitysdk.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.remote_unavailable", Cause: waitErr}
+				return &identitysdk.Error{Class: identitysdk.ErrorClassUnavailable, Code: "identity.remote_unavailable", Cause: waitErr}
 			}
 			continue
 		}
@@ -166,13 +166,13 @@ func (c *client) doWithHeaders(ctx context.Context, method, endpoint, accessToke
 func identityExecutionError(err error) error {
 	var readError *identityResponseReadError
 	if errors.As(err, &readError) {
-		return &identitysdk.Error{StatusCode: http.StatusBadGateway, Code: "identity.response_read_failed", Cause: err}
+		return &identitysdk.Error{Class: identitysdk.ErrorClassUnavailable, Code: "identity.response_read_failed", Cause: err}
 	}
 	var tooLarge *identityResponseTooLargeError
 	if errors.As(err, &tooLarge) {
-		return &identitysdk.Error{StatusCode: http.StatusBadGateway, Code: "identity.response_too_large", Cause: err}
+		return &identitysdk.Error{Class: identitysdk.ErrorClassUnavailable, Code: "identity.response_too_large", Cause: err}
 	}
-	return &identitysdk.Error{StatusCode: http.StatusServiceUnavailable, Code: "identity.remote_unavailable", Cause: err}
+	return &identitysdk.Error{Class: identitysdk.ErrorClassUnavailable, Code: "identity.remote_unavailable", Cause: err}
 }
 
 func (c *client) execute(ctx context.Context, method, endpoint, accessToken, contentType string, body []byte, headers http.Header) (*http.Response, []byte, error) {
@@ -224,17 +224,17 @@ func boundedRequestBody(body io.Reader) ([]byte, error) {
 	}
 	raw, err := io.ReadAll(io.LimitReader(body, maxRequestBytes+1))
 	if err != nil {
-		return nil, &identitysdk.Error{StatusCode: http.StatusBadRequest, Code: "identity.request_read_failed", Cause: err}
+		return nil, &identitysdk.Error{Class: identitysdk.ErrorClassBadRequest, Code: "identity.request_read_failed", Cause: err}
 	}
 	if len(raw) > maxRequestBytes {
-		return nil, &identitysdk.Error{StatusCode: http.StatusRequestEntityTooLarge, Code: "identity.request_too_large"}
+		return nil, &identitysdk.Error{Class: identitysdk.ErrorClassBadRequest, Code: "identity.request_too_large"}
 	}
 	return raw, nil
 }
 
 func decodeIdentityResponse(response *http.Response, raw []byte, output any) error {
 	if response == nil {
-		return &identitysdk.Error{StatusCode: http.StatusBadGateway, Code: "identity.response_missing"}
+		return &identitysdk.Error{Class: identitysdk.ErrorClassUnavailable, Code: "identity.response_missing"}
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return decodeError(response, raw)
@@ -243,7 +243,7 @@ func decodeIdentityResponse(response *http.Response, raw []byte, output any) err
 		return nil
 	}
 	if err := json.Unmarshal(raw, output); err != nil {
-		return &identitysdk.Error{StatusCode: http.StatusBadGateway, Code: "identity.response_invalid", Cause: err}
+		return &identitysdk.Error{Class: identitysdk.ErrorClassUnavailable, Code: "identity.response_invalid", Cause: err}
 	}
 	return nil
 }
@@ -274,7 +274,26 @@ func decodeError(response *http.Response, raw []byte) error {
 		payload.RequestID = strings.TrimSpace(response.Header.Get("X-Request-ID"))
 	}
 	return &identitysdk.Error{
-		StatusCode: response.StatusCode, Code: payload.Code, Message: payload.Message,
+		Class: identityErrorClassFromHTTPStatus(response.StatusCode), Code: payload.Code, Message: payload.Message,
 		RequestID: payload.RequestID, Params: payload.Params,
+	}
+}
+
+func identityErrorClassFromHTTPStatus(status int) identitysdk.ErrorClass {
+	switch status {
+	case http.StatusBadRequest, http.StatusRequestEntityTooLarge, http.StatusUnprocessableEntity:
+		return identitysdk.ErrorClassBadRequest
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return identitysdk.ErrorClassForbidden
+	case http.StatusNotFound:
+		return identitysdk.ErrorClassNotFound
+	case http.StatusConflict, http.StatusPreconditionFailed, http.StatusLocked:
+		return identitysdk.ErrorClassConflict
+	case http.StatusTooManyRequests:
+		return identitysdk.ErrorClassRateLimited
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusNotImplemented:
+		return identitysdk.ErrorClassUnavailable
+	default:
+		return identitysdk.ErrorClassInternal
 	}
 }

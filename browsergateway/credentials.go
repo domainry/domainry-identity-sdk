@@ -68,7 +68,7 @@ func (gateway *Gateway) ManageTOTP(w http.ResponseWriter, r *http.Request) {
 	request.AccessToken = bearerToken(r.Header.Get("Authorization"))
 	manager, ok := gateway.binding.Credentials().(identity.TOTPManager)
 	if !ok {
-		gateway.writeError(w, r, &identity.Error{Code: "auth.totp_unavailable"})
+		gateway.writeError(w, r, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "auth.totp_unavailable"})
 		return
 	}
 	result, err := manager.ManageTOTP(r.Context(), request)

@@ -10,7 +10,7 @@ import (
 func (gateway *Gateway) externalAccountManager(w http.ResponseWriter, r *http.Request) (identity.ExternalAccountManager, identity.WorkspaceID, bool) {
 	binding, ok := gateway.binding.(identity.ExternalAccountBinding)
 	if !ok || binding.ExternalAccounts() == nil {
-		gateway.writeError(w, r, &identity.Error{StatusCode: http.StatusServiceUnavailable, Code: "auth.external_account_link_unavailable"})
+		gateway.writeError(w, r, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "auth.external_account_link_unavailable"})
 		return nil, "", false
 	}
 	workspaceID, ok := gateway.workspaceID(w, r, "")

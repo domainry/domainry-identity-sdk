@@ -46,10 +46,10 @@ type PermissionSourceSnapshotRequest struct {
 
 func (request PermissionSourceSnapshotRequest) ValidateContract() error {
 	if !request.Application.WorkspaceID.Valid() || !request.Application.ApplicationKey.Valid() {
-		return &Error{Code: "identity.permission_snapshot_scope_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_snapshot_scope_invalid"}
 	}
 	if !validSourceOwner(request.SourceOwner) {
-		return &Error{Code: "identity.permission_source_owner_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_source_owner_invalid"}
 	}
 	return nil
 }
@@ -69,12 +69,12 @@ func (snapshot PermissionSourceSnapshot) ValidateFor(request PermissionSourceSna
 	if snapshot.WorkspaceID != request.Application.WorkspaceID ||
 		strings.TrimSpace(snapshot.SourceOwner) != strings.TrimSpace(request.SourceOwner) ||
 		hash != "" && !validPermissionSnapshotHash(hash) || hash == "" && len(snapshot.Definitions) != 0 {
-		return &Error{Code: "identity.permission_source_snapshot_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_source_snapshot_invalid"}
 	}
 	if hash != "" {
 		computed, err := PermissionSnapshotHash(request.SourceOwner, snapshot.Definitions)
 		if err != nil || computed != hash {
-			return &Error{Code: "identity.permission_source_snapshot_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_source_snapshot_invalid"}
 		}
 	}
 	return nil
@@ -94,7 +94,7 @@ func (receipt PermissionReconcileReceipt) ValidateFor(request PermissionReconcil
 		strings.TrimSpace(receipt.SnapshotHash) != request.SnapshotHash ||
 		receipt.DefinitionCount != len(request.Definitions) || !previousMatches ||
 		receipt.Inserted < 0 || receipt.Updated < 0 || receipt.Retired < 0 || receipt.Unchanged < 0 {
-		return &Error{Code: "identity.permission_reconcile_receipt_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_reconcile_receipt_invalid"}
 	}
 	return nil
 }
@@ -129,13 +129,13 @@ func NewPermissionReconcileRequest(application ApplicationRef, sourceOwner, prev
 
 func (request PermissionReconcileRequest) ValidateContract() error {
 	if !request.Application.WorkspaceID.Valid() || !request.Application.ApplicationKey.Valid() {
-		return &Error{Code: "identity.permission_reconcile_scope_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_reconcile_scope_invalid"}
 	}
 	if !validSourceOwner(request.SourceOwner) {
-		return &Error{Code: "identity.permission_source_owner_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_source_owner_invalid"}
 	}
 	if previous := strings.TrimSpace(request.PreviousSnapshotHash); previous != "" && !validPermissionSnapshotHash(previous) {
-		return &Error{Code: "identity.permission_previous_snapshot_hash_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_previous_snapshot_hash_invalid"}
 	}
 	seen := make(map[string]struct{}, len(request.Definitions))
 	for _, definition := range request.Definitions {
@@ -143,16 +143,16 @@ func (request PermissionReconcileRequest) ValidateContract() error {
 		resourceKey := strings.TrimSpace(definition.ResourceKey)
 		operationKey := strings.TrimSpace(definition.OperationKey)
 		if key == "" || resourceKey == "" || operationKey == "" || strings.TrimSpace(definition.Label) == "" || strings.TrimSpace(definition.Category) == "" || strings.TrimSpace(definition.SourceKind) == "" || key != resourceKey+"."+operationKey {
-			return &Error{Code: "identity.permission_definition_invalid"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_definition_invalid"}
 		}
 		if _, duplicate := seen[key]; duplicate {
-			return &Error{Code: "identity.permission_definition_duplicate"}
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_definition_duplicate"}
 		}
 		seen[key] = struct{}{}
 	}
 	snapshotHash, err := PermissionSnapshotHash(request.SourceOwner, request.Definitions)
 	if err != nil || strings.TrimSpace(request.SnapshotHash) != snapshotHash {
-		return &Error{Code: "identity.permission_snapshot_hash_invalid"}
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_snapshot_hash_invalid"}
 	}
 	return nil
 }
@@ -172,7 +172,7 @@ func validPermissionSnapshotHash(value string) bool {
 func PermissionSnapshotHash(sourceOwner string, definitions []PermissionDefinition) (string, error) {
 	sourceOwner = strings.TrimSpace(sourceOwner)
 	if !validSourceOwner(sourceOwner) {
-		return "", &Error{Code: "identity.permission_source_owner_invalid"}
+		return "", &Error{Class: ErrorClassBadRequest, Code: "identity.permission_source_owner_invalid"}
 	}
 	type snapshotEntry struct {
 		PermissionKey  string `json:"permission_key"`
@@ -199,10 +199,10 @@ func PermissionSnapshotHash(sourceOwner string, definitions []PermissionDefiniti
 			Category: strings.TrimSpace(definition.Category), SourceKind: strings.TrimSpace(definition.SourceKind), SourceOwner: sourceOwner,
 		}
 		if canonical.PermissionKey == "" || canonical.ResourceKey == "" || canonical.OperationKey == "" || canonical.Label == "" || canonical.Category == "" || canonical.SourceKind == "" || canonical.PermissionKey != canonical.ResourceKey+"."+canonical.OperationKey {
-			return "", &Error{Code: "identity.permission_definition_invalid"}
+			return "", &Error{Class: ErrorClassBadRequest, Code: "identity.permission_definition_invalid"}
 		}
 		if _, duplicate := seen[key]; duplicate {
-			return "", &Error{Code: "identity.permission_definition_duplicate"}
+			return "", &Error{Class: ErrorClassBadRequest, Code: "identity.permission_definition_duplicate"}
 		}
 		seen[key] = struct{}{}
 		rawDefinition, err := json.Marshal(canonical)

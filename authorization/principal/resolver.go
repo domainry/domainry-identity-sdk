@@ -72,7 +72,6 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 		return identity.Principal{}, err
 	}
 	now := resolver.clock.Now()
-	cacheKey := resolverCacheKey(verified)
 	// A bounded signature proves token integrity, not current account status.
 	// Revalidate the source session before using cached PII or authorization.
 	session, err := resolver.binding.Authentication().CurrentSession(ctx, authentication.CurrentSessionRequest{AccessToken: accessToken})
@@ -88,6 +87,7 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 		resolver.Invalidate(verified.SubjectID, verified.WorkspaceID)
 		return identity.Principal{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "identity.authorization_revision_stale"}
 	}
+	cacheKey := resolverCacheKey(verified, session.ScopeRevision)
 	cached, found, cacheErr := resolver.cache.Get(ctx, cacheKey, now)
 	if cacheErr != nil {
 		resolver.handleCacheError(cacheErr)
@@ -136,8 +136,8 @@ func (resolver *Resolver) handleCacheError(err error) {
 	}
 }
 
-func resolverCacheKey(token authentication.VerifiedToken) CacheKey {
-	return CacheKey{WorkspaceID: token.WorkspaceID, SubjectID: token.SubjectID, AuthorizationRevision: token.AuthorizationRevision, TokenID: token.TokenID}
+func resolverCacheKey(token authentication.VerifiedToken, scopeRevision string) CacheKey {
+	return CacheKey{WorkspaceID: token.WorkspaceID, SubjectID: token.SubjectID, AuthorizationRevision: token.AuthorizationRevision, ScopeRevision: scopeRevision, TokenID: token.TokenID}
 }
 
 func cachedPrincipalValid(entry CacheEntry, token authentication.VerifiedToken, now time.Time) bool {

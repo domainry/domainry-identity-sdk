@@ -149,6 +149,7 @@ type SessionView struct {
 	WorkspaceID           WorkspaceID           `json:"workspace_id"`
 	SubjectID             SubjectID             `json:"subject_id"`
 	AuthorizationRevision AuthorizationRevision `json:"authorization_revision,omitempty"`
+	ScopeRevision         string                `json:"scope_revision,omitempty"`
 	User                  User                  `json:"user"`
 	Roles                 []Role                `json:"roles"`
 	DefaultRole           string                `json:"default_role,omitempty"`

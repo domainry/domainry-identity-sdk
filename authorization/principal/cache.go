@@ -12,12 +12,13 @@ import (
 // snapshot may be reused without consulting the authoritative Identity binding.
 const DefaultMaxCacheTTL = 5 * time.Minute
 
-// CacheKey isolates cached principals by workspace scope, subject, authorization
-// revision, and token ID. Access tokens are deliberately never cache keys.
+// CacheKey isolates cached principals by workspace, subject, bearer authorization
+// revision, live scope revision, and token ID. Access tokens are never cache keys.
 type CacheKey struct {
 	WorkspaceID           identity.WorkspaceID
 	SubjectID             identity.SubjectID
 	AuthorizationRevision identity.AuthorizationRevision
+	ScopeRevision         string
 	TokenID               string
 }
 

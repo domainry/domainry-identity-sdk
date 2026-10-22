@@ -128,6 +128,28 @@ func TestResolverCachesByTokenAndAuthorizationRevision(t *testing.T) {
 	}
 }
 
+func TestResolverRefreshesScopeCacheWithoutRevokingTheToken(t *testing.T) {
+	binding := newResolverBinding()
+	binding.auth.session.ScopeRevision = "scope-before"
+	resolver, err := identityprincipal.NewResolver(binding, identityprincipal.Options{Clock: binding.clock, MaxCacheTTL: time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := resolver.Authenticate(t.Context(), "access")
+	if err != nil || !reflect.DeepEqual(before.OrgScopeIDs, []string{"sales", "store-a"}) {
+		t.Fatalf("initial principal=%#v err=%v", before, err)
+	}
+	binding.auth.session.ScopeRevision = "scope-after"
+	binding.author.bundle.Subject.OrgScopeIDs = []string{"sales"}
+	after, err := resolver.Authenticate(t.Context(), "access")
+	if err != nil || !reflect.DeepEqual(after.OrgScopeIDs, []string{"sales"}) {
+		t.Fatalf("changed scope must be re-resolved without rejecting the token: principal=%#v err=%v", after, err)
+	}
+	if binding.author.calls != 2 || binding.auth.calls != 2 {
+		t.Fatalf("scope change reused cached authority: session=%d bundle=%d", binding.auth.calls, binding.author.calls)
+	}
+}
+
 func TestResolverRejectsRevokedSessionBeforeServingCachedPrincipal(t *testing.T) {
 	binding := newResolverBinding()
 	resolver, err := identityprincipal.NewResolver(binding, identityprincipal.Options{Clock: binding.clock, MaxCacheTTL: time.Minute})

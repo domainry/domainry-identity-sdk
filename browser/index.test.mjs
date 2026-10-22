@@ -6,7 +6,7 @@ import { IdentityClient, IdentityClientError, parseIdentityHTTPErrorResponse } f
 const session = {
   session_id: 'session-1', workspace_id: 'workspace-primary', access_token: 'access-1',
   token_type: 'Bearer', expires_at: '2026-08-27T00:00:00Z',
-  user: { id: 'user-1', name: 'User', email: 'user@example.test', version: 1, status: 'active' },
+  user: { id: 1, user_id: 'user-1', name: 'User', email: 'user@example.test', version: 1, status: 'active' },
   roles: [], default_role: '', permissions: [], must_change_password: false,
 }
 

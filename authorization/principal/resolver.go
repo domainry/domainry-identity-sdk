@@ -80,7 +80,7 @@ func (resolver *Resolver) Authenticate(ctx context.Context, accessToken string) 
 		resolver.Invalidate(verified.SubjectID, verified.WorkspaceID)
 		return identity.Principal{}, err
 	}
-	if session.SubjectID != "" && session.SubjectID != verified.SubjectID || session.WorkspaceID != "" && session.WorkspaceID != verified.WorkspaceID || strings.TrimSpace(session.User.ID) != "" && identity.SubjectID(session.User.ID) != verified.SubjectID {
+	if session.SubjectID != "" && session.SubjectID != verified.SubjectID || session.WorkspaceID != "" && session.WorkspaceID != verified.WorkspaceID || strings.TrimSpace(session.User.UserID) != "" && identity.SubjectID(session.User.UserID) != verified.SubjectID {
 		resolver.Invalidate(verified.SubjectID, verified.WorkspaceID)
 		return identity.Principal{}, &identity.Error{Class: identity.ErrorClassForbidden, Code: "identity.session_subject_mismatch"}
 	}

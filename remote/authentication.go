@@ -192,7 +192,7 @@ func (adapter authentication) CurrentSession(ctx context.Context, request identi
 	if err := adapter.client.doJSON(ctx, http.MethodGet, "/auth/session", request.AccessToken, nil, &session); err != nil {
 		return identity.SessionView{}, err
 	}
-	if !session.WorkspaceID.Valid() || !session.SubjectID.Valid() || !session.SessionID.Valid() || !session.AuthorizationRevision.Valid() || strings.TrimSpace(session.User.ID) == "" {
+	if !session.WorkspaceID.Valid() || !session.SubjectID.Valid() || !session.SessionID.Valid() || !session.AuthorizationRevision.Valid() || strings.TrimSpace(session.User.UserID) == "" {
 		return identity.SessionView{}, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.session_response_invalid"}
 	}
 	return session, nil

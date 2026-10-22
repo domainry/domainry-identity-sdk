@@ -74,7 +74,8 @@ type DeliveryRequest struct {
 // facts. Version is the delivery aggregate's optimistic-concurrency evidence;
 // V1 creates start at version 1.
 type DeliveredOrganizationUnit struct {
-	ID                   string   `json:"id"`
+	ID                   int64    `json:"id"`
+	OrganizationUnitID   string   `json:"organization_unit_id"`
 	Code                 string   `json:"code"`
 	Name                 string   `json:"name"`
 	NodeType             NodeType `json:"node_type"`

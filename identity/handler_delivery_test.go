@@ -9,7 +9,7 @@ import (
 func TestHandlerContractsDoNotSerializeBearerOrDerivedAuthority(t *testing.T) {
 	request := HandlerDeliveryRequest{
 		ContractVersion: HandlerDeliveryContractVersionV1, AccessToken: "secret-bearer", IdempotencyKey: "delivery-1",
-		User: HandlerUserMutation{Operation: HandlerUserCreate, LoginMode: HandlerLoginPassword, User: User{ID: "user-1"}}, RoleKeys: []string{"member"},
+		User: HandlerUserMutation{Operation: HandlerUserCreate, LoginMode: HandlerLoginPassword, User: User{UserID: "user-1"}}, RoleKeys: []string{"member"},
 	}
 	payload, err := json.Marshal(request)
 	if err != nil {

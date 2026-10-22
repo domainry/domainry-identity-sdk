@@ -159,15 +159,16 @@ type SessionView struct {
 // ExternalAccount is the browser-safe projection of one provider identity
 // linked to the current Identity subject.
 type ExternalAccount struct {
-	ID              string `json:"id"`
-	UserID          string `json:"user_id"`
-	Provider        string `json:"provider"`
-	ProviderSubject string `json:"provider_subject"`
-	Email           string `json:"email,omitempty"`
-	Phone           string `json:"phone,omitempty"`
-	DisplayName     string `json:"display_name,omitempty"`
-	AvatarURL       string `json:"avatar_url,omitempty"`
-	LinkedAt        string `json:"linked_at,omitempty"`
+	ID                int64  `json:"id"`
+	ExternalAccountID string `json:"external_account_id"`
+	UserID            string `json:"user_id"`
+	Provider          string `json:"provider"`
+	ProviderSubject   string `json:"provider_subject"`
+	Email             string `json:"email,omitempty"`
+	Phone             string `json:"phone,omitempty"`
+	DisplayName       string `json:"display_name,omitempty"`
+	AvatarURL         string `json:"avatar_url,omitempty"`
+	LinkedAt          string `json:"linked_at,omitempty"`
 }
 
 type ListExternalAccountsRequest struct {

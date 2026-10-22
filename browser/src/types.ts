@@ -29,8 +29,8 @@ export interface IdentitySession {
   access_token: string
   token_type: string
   expires_at: string
-  user: { id: string; name: string; email: string; locale?: string; version: number; status: string }
-  roles: Array<{ id: string; key: string; label: string }>
+  user: { id: number; user_id: string; name: string; email: string; locale?: string; version: number; status: string }
+  roles: Array<{ id: number; role_id: string; key: string; label: string }>
   default_role: string
   permissions: string[]
   must_change_password: boolean

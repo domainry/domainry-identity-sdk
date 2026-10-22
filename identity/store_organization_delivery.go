@@ -57,7 +57,8 @@ type StoreOrganizationDeliveryRequest struct {
 }
 
 type StoreOrganization struct {
-	ID                   string   `json:"id"`
+	ID                   int64    `json:"id"`
+	OrganizationUnitID   string   `json:"organization_unit_id"`
 	Code                 string   `json:"code"`
 	Name                 string   `json:"name"`
 	Status               string   `json:"status"`

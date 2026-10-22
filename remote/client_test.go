@@ -46,7 +46,7 @@ func TestAuthenticationAndOnlineAuthorization(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/auth/session":
-			_, _ = w.Write([]byte(`{"session_id":"session-1","workspace_id":"workspace-a","subject_id":"user-1","authorization_revision":"revision-1","user":{"id":"user-1","name":"Ada","status":"active"},"roles":[{"id":"role-1","key":"admin","label":"Admin"}],"default_role":"admin","permissions":["order.write","order.read"],"must_change_password":false}`))
+			_, _ = w.Write([]byte(`{"session_id":"session-1","workspace_id":"workspace-a","subject_id":"user-1","authorization_revision":"revision-1","user":{"user_id":"user-1","name":"Ada","status":"active"},"roles":[{"role_id":"role-1","key":"admin","label":"Admin"}],"default_role":"admin","permissions":["order.write","order.read"],"must_change_password":false}`))
 		case "/identity/reauthorize":
 			var request struct {
 				Access identity.AccessRequest `json:"access"`
@@ -98,9 +98,9 @@ func TestPasswordAndProviderFlows(t *testing.T) {
 			if request.WorkspaceID != "workspace-a" || request.ApplicationKey != "runtime-app" || request.Login != "admin@example.com" || request.Password != "password" {
 				t.Fatalf("login request = %#v", request)
 			}
-			_, _ = w.Write([]byte(`{"workspace_id":"workspace-a","access_token":"access-1","refresh_token":"refresh-1","token_type":"Bearer","user":{"id":"user-1"}}`))
+			_, _ = w.Write([]byte(`{"workspace_id":"workspace-a","access_token":"access-1","refresh_token":"refresh-1","token_type":"Bearer","user":{"user_id":"user-1"}}`))
 		case "/auth/refresh":
-			_, _ = w.Write([]byte(`{"workspace_id":"workspace-a","access_token":"access-2","refresh_token":"refresh-2","token_type":"Bearer","user":{"id":"user-1"}}`))
+			_, _ = w.Write([]byte(`{"workspace_id":"workspace-a","access_token":"access-2","refresh_token":"refresh-2","token_type":"Bearer","user":{"user_id":"user-1"}}`))
 		case "/auth/logout":
 			w.WriteHeader(http.StatusNoContent)
 		case "/auth/providers":
@@ -113,7 +113,7 @@ func TestPasswordAndProviderFlows(t *testing.T) {
 			}
 			_, _ = w.Write([]byte(`{"provider":"oidc","state":"state-1","nonce":"nonce-1","auth_url":"https://login.example/authorize","expires_at":"2026-01-01T00:00:00Z"}`))
 		case "/auth/providers/otp/verify":
-			_, _ = w.Write([]byte(`{"workspace_id":"workspace-a","access_token":"otp-access","refresh_token":"otp-refresh","token_type":"Bearer","user":{"id":"user-1"}}`))
+			_, _ = w.Write([]byte(`{"workspace_id":"workspace-a","access_token":"otp-access","refresh_token":"otp-refresh","token_type":"Bearer","user":{"user_id":"user-1"}}`))
 		case "/auth/providers/oidc/callback":
 			if err := r.ParseForm(); err != nil || r.Form.Get("state") != "state-1" || r.Form.Get("code") != "code-1" {
 				t.Fatalf("callback form=%v err=%v", r.Form, err)
@@ -169,7 +169,7 @@ func TestCredentialMutationsPropagateIdempotencyKeys(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/auth/change-password" {
-			_, _ = w.Write([]byte(`{"workspace_id":"workspace-a","access_token":"rotated","refresh_token":"refresh","token_type":"Bearer","user":{"id":"user-1"}}`))
+			_, _ = w.Write([]byte(`{"workspace_id":"workspace-a","access_token":"rotated","refresh_token":"refresh","token_type":"Bearer","user":{"user_id":"user-1"}}`))
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

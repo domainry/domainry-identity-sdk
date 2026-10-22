@@ -95,11 +95,11 @@ func Run(t *testing.T, fixture Fixture) {
 		t.Fatalf("reauthorization without resource facts must fail closed: decision=%+v err=%v", denied, err)
 	}
 	user, found, err := fixture.Binding.Projection().FindUser(ctx, identity.UserLookup{UserID: verified.SubjectID})
-	if err != nil || !found || user.ID != string(verified.SubjectID) {
+	if err != nil || !found || user.UserID != string(verified.SubjectID) {
 		t.Fatalf("projection user=%+v found=%v err=%v", user, found, err)
 	}
 	users, err := fixture.Binding.Projection().ListUsers(ctx, identity.ProjectionQuery{})
-	if err != nil || !containsUser(users, user.ID) {
+	if err != nil || !containsUser(users, user.UserID) {
 		t.Fatalf("projection users=%+v err=%v", users, err)
 	}
 	roles, err := fixture.Binding.Projection().ListRoles(ctx, identity.ProjectionQuery{})
@@ -125,7 +125,7 @@ func Run(t *testing.T, fixture Fixture) {
 
 func containsUser(values []identity.User, expectedID string) bool {
 	for _, value := range values {
-		if value.ID == expectedID {
+		if value.UserID == expectedID {
 			return true
 		}
 	}

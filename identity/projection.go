@@ -63,7 +63,8 @@ type UserRoleAssignmentQuery struct {
 // User contains only projection attributes safe for application projections. It
 // never carries credentials, external-provider tokens, MFA, or session data.
 type User struct {
-	ID            string `json:"id"`
+	ID            int64  `json:"id"`
+	UserID        string `json:"user_id"`
 	Name          string `json:"name"`
 	GivenName     string `json:"given_name,omitempty"`
 	MiddleName    string `json:"middle_name,omitempty"`
@@ -93,20 +94,22 @@ type User struct {
 }
 
 type OrganizationUnit struct {
-	ID          string   `json:"id"`
-	Code        string   `json:"code"`
-	Name        string   `json:"name"`
-	NodeType    string   `json:"node_type"`
-	ParentID    *string  `json:"parent_id,omitempty"`
-	Path        string   `json:"path,omitempty"`
-	AncestorIDs []string `json:"ancestor_ids,omitempty"`
-	Depth       int      `json:"depth,omitempty"`
-	SortOrder   int      `json:"sort_order,omitempty"`
-	Status      string   `json:"status,omitempty"`
+	ID                 int64    `json:"id"`
+	OrganizationUnitID string   `json:"organization_unit_id"`
+	Code               string   `json:"code"`
+	Name               string   `json:"name"`
+	NodeType           string   `json:"node_type"`
+	ParentID           *string  `json:"parent_id,omitempty"`
+	Path               string   `json:"path,omitempty"`
+	AncestorIDs        []string `json:"ancestor_ids,omitempty"`
+	Depth              int      `json:"depth,omitempty"`
+	SortOrder          int      `json:"sort_order,omitempty"`
+	Status             string   `json:"status,omitempty"`
 }
 
 type Role struct {
-	ID          string `json:"id"`
+	ID          int64  `json:"id"`
+	RoleID      string `json:"role_id"`
 	Key         string `json:"key"`
 	Label       string `json:"label"`
 	Description string `json:"description,omitempty"`

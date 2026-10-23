@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/domainry/domainry-foundation/requestcontext"
 	"github.com/domainry/domainry-foundation/telemetry"
 	identity "github.com/domainry/domainry-identity-sdk"
 	"go.opentelemetry.io/otel"
@@ -93,7 +92,7 @@ func TestRemoteClientCircuitBreakerUsesOneRecoveryProbe(t *testing.T) {
 
 func TestRemoteClientPropagatesSafeContextHeaders(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get(telemetry.RequestIDHeader) != "" || r.Header.Get("traceparent") == "" || r.Header.Get(telemetry.CorrelationIDHeader) != "correlation-1" {
+		if r.Header.Get(telemetry.RequestIDHeader) != "4bf92f3577b34da6a3ce929d0e0e4736" || r.Header.Get("traceparent") == "" || r.Header.Get("X-Correlation-ID") != "" {
 			t.Fatalf("trace headers=%v", r.Header)
 		}
 		if r.Header.Get("Authorization") != "Bearer access-token" || r.Header.Get("X-Workspace-ID") != "workspace-a" || r.Header.Get("Cookie") != "" {
@@ -108,10 +107,17 @@ func TestRemoteClientPropagatesSafeContextHeaders(t *testing.T) {
 	}
 	provider := sdktrace.NewTracerProvider()
 	previousProvider := otel.GetTracerProvider()
+	previousPropagator := otel.GetTextMapPropagator()
 	otel.SetTracerProvider(provider)
-	t.Cleanup(func() { _ = provider.Shutdown(context.Background()); otel.SetTracerProvider(previousProvider) })
-	parent := otel.GetTextMapPropagator().Extract(t.Context(), propagation.HeaderCarrier(http.Header{"traceparent": []string{"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}}))
-	parent = requestcontext.WithCorrelationID(parent, "correlation-1")
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	t.Cleanup(func() {
+		_ = provider.Shutdown(context.Background())
+		otel.SetTracerProvider(previousProvider)
+		otel.SetTextMapPropagator(previousPropagator)
+	})
+	headers := http.Header{}
+	headers.Set("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
+	parent := otel.GetTextMapPropagator().Extract(t.Context(), propagation.HeaderCarrier(headers))
 	session, err := (authentication{client: client}).CurrentSession(parent, identity.CurrentSessionRequest{AccessToken: "access-token"})
 	if err != nil || session.SubjectID != "user-1" {
 		t.Fatalf("session=%+v err=%v", session, err)

@@ -91,8 +91,9 @@ Missing facts fail closed.
 The remote adapter applies a total request deadline, bounded payload sizes,
 safe retries, and a circuit breaker. Authentication and session mutations are
 not retried; credential mutations are retried only when the caller supplies an
-idempotency key. `ContextHeaders` may propagate request, correlation, and W3C
-trace headers, but cannot override authorization, cookies, or workspace scope.
+idempotency key. `ContextHeaders` propagates W3C trace headers, but does not
+forward the request/trace ID and cannot override authorization, cookies,
+or workspace scope.
 `remote.Factory.Open` first reads `/identity/discovery` and rejects an
 incompatible protocol, policy bundle, Catalog version, issuer, deployment mode,
 or required capability before it exposes a Binding.

@@ -25,7 +25,12 @@ func browserGatewayRouteSpecs() []browserGatewayRouteSpec {
 		{key: "identity.browser.external_accounts.link_start", capabilityKey: "identity.browser.external_accounts", capabilityLabel: "Browser external accounts", operationKey: "link_start", operationLabel: "Link", label: "Start a verified external-account link", method: http.MethodPost, suffix: "/auth/external-accounts/{provider}/link/start", handlerKey: "external_account_link_start", authorization: principal, risk: actioncontract.RiskHigh},
 		{key: "identity.browser.external_accounts.unbind", capabilityKey: "identity.browser.external_accounts", capabilityLabel: "Browser external accounts", operationKey: "unbind", operationLabel: "Unbind", label: "Unbind the current subject external account", method: http.MethodDelete, suffix: "/auth/external-accounts/{provider}/{accountID}", handlerKey: "external_account_unbind", authorization: principal, risk: actioncontract.RiskHigh},
 		{key: "identity.browser.credentials.totp", capabilityKey: "identity.browser.credentials", capabilityLabel: "Browser credentials", operationKey: "totp", operationLabel: "Manage verifier", label: "Manage the current subject TOTP authenticator", method: http.MethodPost, suffix: "/auth/totp", handlerKey: "totp", authorization: principal, risk: actioncontract.RiskHigh},
-		{key: "identity.browser.session.get", capabilityKey: "identity.browser.session", capabilityLabel: "Browser session", operationKey: "get", operationLabel: "Get", label: "Read the current browser session", method: http.MethodGet, suffix: "/auth/session", handlerKey: "session", authorization: principal, risk: actioncontract.RiskLow},
+		// Session is self-authenticating: Gateway.Session requires a Bearer token
+		// and resolves it through Identity. An authenticated outer action would
+		// incorrectly force the host application's audience before that resolver
+		// can validate a token issued for another registered application.
+		{key: "identity.browser.session.get", capabilityKey: "identity.browser.session", capabilityLabel: "Browser session", operationKey: "get", operationLabel: "Get", label: "Validate the bearer and read the current browser session", method: http.MethodGet, suffix: "/auth/session", handlerKey: "session", authorization: anonymous, risk: actioncontract.RiskLow},
+		{key: "identity.browser.authorization_code.authorize", capabilityKey: "identity.browser.authorization_code", capabilityLabel: "Browser authorization code", operationKey: "authorize", operationLabel: "Authorize", label: "Issue an application-scoped browser authorization code", method: http.MethodGet, suffix: "/auth/authorize", handlerKey: "authorize", authorization: anonymous, risk: actioncontract.RiskMedium},
 		{key: "identity.browser.authorization_code.exchange", capabilityKey: "identity.browser.authorization_code", capabilityLabel: "Browser authorization code", operationKey: "exchange", operationLabel: "Exchange", label: "Exchange a browser authorization code", method: http.MethodPost, suffix: "/auth/code/exchange", handlerKey: "code_exchange", authorization: anonymous, risk: actioncontract.RiskMedium},
 		{key: "identity.browser.authentication.login", capabilityKey: "identity.browser.authentication", capabilityLabel: "Browser authentication", operationKey: "login", operationLabel: "Login", label: "Create a browser session with credentials", method: http.MethodPost, suffix: "/auth/login", handlerKey: "login", authorization: anonymous, risk: actioncontract.RiskMedium},
 		{key: "identity.browser.authentication.refresh", capabilityKey: "identity.browser.authentication", capabilityLabel: "Browser authentication", operationKey: "refresh", operationLabel: "Refresh", label: "Rotate a browser refresh credential", method: http.MethodPost, suffix: "/auth/refresh", handlerKey: "refresh", authorization: anonymous, risk: actioncontract.RiskMedium},
@@ -85,6 +90,8 @@ func (gateway *Gateway) routeHandler(handlerKey string) http.HandlerFunc {
 		return gateway.ManageTOTP
 	case "session":
 		return gateway.Session
+	case "authorize":
+		return gateway.AuthorizeBrowserApplication
 	case "code_exchange":
 		return gateway.ExchangeAuthorizationCode
 	case "login":

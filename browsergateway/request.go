@@ -33,9 +33,10 @@ type browserVerifyOTPRequest struct {
 }
 
 type browserAuthorizationCodeExchangeRequest struct {
-	WorkspaceID identity.WorkspaceID `json:"workspace_id,omitempty"`
-	Code        string               `json:"code"`
-	ReturnURL   string               `json:"return_url"`
+	WorkspaceID  identity.WorkspaceID `json:"workspace_id,omitempty"`
+	Code         string               `json:"code"`
+	ReturnURL    string               `json:"return_url"`
+	CodeVerifier string               `json:"code_verifier,omitempty"`
 }
 
 type browserExternalAccountLinkRequest struct {

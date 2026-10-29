@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -30,7 +31,7 @@ func TestBrowserGatewayRoutesProjectOneFrozenActionManifest(t *testing.T) {
 	if err := registry.Freeze(); err != nil {
 		t.Fatal(err)
 	}
-	if len(definitions) != 18 || len(patterns) != len(definitions) {
+	if len(definitions) != 19 || len(patterns) != len(definitions) {
 		t.Fatalf("definitions=%d patterns=%d", len(definitions), len(patterns))
 	}
 	for index, definition := range definitions {
@@ -41,12 +42,18 @@ func TestBrowserGatewayRoutesProjectOneFrozenActionManifest(t *testing.T) {
 			t.Fatalf("action %q did not resolve", definition.Key)
 		}
 	}
+	for _, definition := range definitions {
+		if definition.Key == "identity.browser.session.get" && definition.Authorization.Strategy != actioncontract.AuthorizationAnonymous {
+			t.Fatalf("session validation boundary must authenticate its bearer inside the handler: %+v", definition)
+		}
+	}
 }
 
 type testBinding struct {
 	auth        *testAuthentication
 	credentials testCredentials
 	external    *testExternalAccounts
+	ssoRequest  *identity.BrowserAuthorizationRequest
 }
 
 func (binding testBinding) Descriptor() identity.Descriptor         { return identity.Descriptor{} }
@@ -60,6 +67,12 @@ func (testBinding) Permissions() identity.PermissionRegistry        { return nil
 func (binding testBinding) Credentials() identity.CredentialManager { return binding.credentials }
 func (binding testBinding) ExternalAccounts() identity.ExternalAccountManager {
 	return binding.external
+}
+func (binding testBinding) AuthorizeBrowserApplication(_ context.Context, request identity.BrowserAuthorizationRequest) (identity.BrowserAuthorizationResult, error) {
+	if binding.ssoRequest != nil {
+		*binding.ssoRequest = request
+	}
+	return identity.BrowserAuthorizationResult{AuthorizationCode: "one-time-code", ReturnURL: request.ReturnURL, State: request.State}, nil
 }
 func (testBinding) Close(context.Context) error { return nil }
 
@@ -270,6 +283,38 @@ func TestGatewayKeepsRefreshCredentialInHTTPOnlyCookie(t *testing.T) {
 	}
 	if authentication.loginRequest.ApplicationKey != "identity-admin" || authentication.loginRequest.WorkspaceID != "workspace-primary" {
 		t.Fatalf("login request=%#v", authentication.loginRequest)
+	}
+}
+
+func TestGatewayAuthorizesRegisteredApplicationFromExistingCookie(t *testing.T) {
+	var captured identity.BrowserAuthorizationRequest
+	gateway, err := New(testBinding{auth: &testAuthentication{}, ssoRequest: &captured}, Config{
+		ApplicationKey: "identity-admin", DefaultWorkspaceID: "workspace-primary",
+		Cookie: CookieConfig{Path: "/auth", Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: time.Hour},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	if err := gateway.RegisterRoutes(mux, ""); err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/auth/authorize?client_id=verdent-knowledge&redirect_uri=http%3A%2F%2F127.0.0.1%3A8080%2Fauth%2Fcallback&state=state-1&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGH012345678&code_challenge_method=S256", nil)
+	request.AddCookie(&http.Cookie{Name: DefaultRefreshCookieName, Value: "enterprise-refresh"})
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusSeeOther {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	location, err := url.Parse(response.Header().Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if location.Query().Get("code") != "one-time-code" || location.Query().Get("state") != "state-1" {
+		t.Fatalf("location=%q", location.String())
+	}
+	if captured.SourceApplicationKey != "identity-admin" || captured.TargetApplicationKey != "verdent-knowledge" || captured.RefreshToken != "enterprise-refresh" || captured.CodeChallengeMethod != "S256" {
+		t.Fatalf("request=%#v", captured)
 	}
 }
 
@@ -533,8 +578,8 @@ func TestGatewayFederatedRequestsDoNotPropagateLegacyTenantScope(t *testing.T) {
 	assertBrowserBodyOmitsLegacyCredentials(t, verify.Body.Bytes())
 
 	exchange := httptest.NewRecorder()
-	mux.ServeHTTP(exchange, httptest.NewRequest(http.MethodPost, "/browser/auth/code/exchange", strings.NewReader(`{"code":"code-1","return_url":"https://app.example.test/callback"}`)))
-	if exchange.Code != http.StatusOK || authentication.exchangeRequest.WorkspaceID != "workspace-primary" || authentication.exchangeRequest.ApplicationKey != "identity-admin" {
+	mux.ServeHTTP(exchange, httptest.NewRequest(http.MethodPost, "/browser/auth/code/exchange", strings.NewReader(`{"code":"code-1","return_url":"https://app.example.test/callback","code_verifier":"browser-pkce-verifier"}`)))
+	if exchange.Code != http.StatusOK || authentication.exchangeRequest.WorkspaceID != "workspace-primary" || authentication.exchangeRequest.ApplicationKey != "identity-admin" || authentication.exchangeRequest.CodeVerifier != "browser-pkce-verifier" {
 		t.Fatalf("exchange status=%d request=%#v body=%s", exchange.Code, authentication.exchangeRequest, exchange.Body.String())
 	}
 	assertBrowserBodyOmitsLegacyCredentials(t, exchange.Body.Bytes())

@@ -141,6 +141,36 @@ type ExchangeAuthorizationCodeRequest struct {
 	Code           string         `json:"code"`
 	ApplicationKey ApplicationKey `json:"application_key"`
 	ReturnURL      string         `json:"return_url"`
+	CodeVerifier   string         `json:"code_verifier,omitempty"`
+}
+
+// BrowserAuthorizationRequest starts an application-to-application SSO handoff
+// from an existing browser refresh session. The source application is supplied
+// by the server-side browser gateway; the browser selects only the registered
+// target application and redirect URL.
+type BrowserAuthorizationRequest struct {
+	SourceApplicationKey ApplicationKey `json:"source_application_key"`
+	TargetApplicationKey ApplicationKey `json:"target_application_key"`
+	RefreshToken         string         `json:"-"`
+	ReturnURL            string         `json:"return_url"`
+	State                string         `json:"state"`
+	CodeChallenge        string         `json:"code_challenge"`
+	CodeChallengeMethod  string         `json:"code_challenge_method"`
+}
+
+type BrowserAuthorizationResult struct {
+	AuthorizationCode string `json:"authorization_code"`
+	ReturnURL         string `json:"return_url"`
+	State             string `json:"state"`
+}
+
+// BrowserSingleSignOn is implemented by an Identity authority that can turn
+// one application's authenticated browser session into a one-time code for a
+// different registered application. It is intentionally optional on Binding:
+// resource applications and remote clients must not become authorization
+// servers merely because they consume Identity.
+type BrowserSingleSignOn interface {
+	AuthorizeBrowserApplication(context.Context, BrowserAuthorizationRequest) (BrowserAuthorizationResult, error)
 }
 
 type SessionView struct {

@@ -103,7 +103,7 @@ func (adapter authentication) ExchangeAuthorizationCode(ctx context.Context, req
 	}
 	request.ApplicationKey = identity.ApplicationKey(applicationKey)
 	var session identity.AuthSession
-	err = adapter.client.doJSON(ctx, http.MethodPost, "/auth/code/exchange", "", request, &session)
+	err = adapter.client.doJSON(ctx, http.MethodPost, "/identity/auth/code/exchange", "", request, &session)
 	return session, err
 }
 

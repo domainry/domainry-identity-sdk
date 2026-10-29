@@ -8,6 +8,55 @@ import (
 	identity "github.com/domainry/domainry-identity-sdk"
 )
 
+func (gateway *Gateway) AuthorizeBrowserApplication(w http.ResponseWriter, r *http.Request) {
+	refreshToken, ok := gateway.refreshToken(r)
+	if !ok {
+		gateway.writeCode(w, r, http.StatusUnauthorized, "auth.refresh_token_required")
+		return
+	}
+	target := identity.ApplicationKey(strings.TrimSpace(r.URL.Query().Get("client_id")))
+	returnURL := strings.TrimSpace(r.URL.Query().Get("redirect_uri"))
+	state := strings.TrimSpace(r.URL.Query().Get("state"))
+	codeChallenge := strings.TrimSpace(r.URL.Query().Get("code_challenge"))
+	codeChallengeMethod := strings.TrimSpace(r.URL.Query().Get("code_challenge_method"))
+	if !target.Valid() || !validReturnURL(returnURL) || state == "" || codeChallenge == "" || codeChallengeMethod != "S256" {
+		gateway.writeCode(w, r, http.StatusBadRequest, "auth.authorization_code_request_invalid")
+		return
+	}
+	authority, ok := gateway.binding.(identity.BrowserSingleSignOn)
+	if !ok {
+		gateway.writeCode(w, r, http.StatusNotImplemented, "identity.browser_sso_unavailable")
+		return
+	}
+	result, err := authority.AuthorizeBrowserApplication(r.Context(), identity.BrowserAuthorizationRequest{
+		SourceApplicationKey: gateway.config.ApplicationKey,
+		TargetApplicationKey: target,
+		RefreshToken:         refreshToken,
+		ReturnURL:            returnURL,
+		State:                state,
+		CodeChallenge:        codeChallenge,
+		CodeChallengeMethod:  codeChallengeMethod,
+	})
+	if err != nil {
+		if invalidRefreshCredential(err) {
+			gateway.clearRefreshCookie(w)
+		}
+		gateway.writeError(w, r, err)
+		return
+	}
+	redirect, valid := validatedReturnURL(result.ReturnURL)
+	if !valid {
+		gateway.writeCode(w, r, http.StatusBadGateway, "identity.redirect_url_invalid")
+		return
+	}
+	query := redirect.Query()
+	query.Set("code", result.AuthorizationCode)
+	query.Set("state", result.State)
+	redirect.RawQuery = query.Encode()
+	w.Header().Set("Cache-Control", "no-store")
+	http.Redirect(w, r, redirect.String(), http.StatusSeeOther)
+}
+
 func (gateway *Gateway) Providers(w http.ResponseWriter, r *http.Request) {
 	workspaceID, ok := gateway.workspaceID(w, r, "")
 	if !ok {
@@ -140,7 +189,7 @@ func (gateway *Gateway) ExchangeAuthorizationCode(w http.ResponseWriter, r *http
 	}
 	request := identity.ExchangeAuthorizationCodeRequest{
 		WorkspaceID: workspaceID, Code: browserRequest.Code,
-		ApplicationKey: gateway.config.ApplicationKey, ReturnURL: browserRequest.ReturnURL,
+		ApplicationKey: gateway.config.ApplicationKey, ReturnURL: browserRequest.ReturnURL, CodeVerifier: browserRequest.CodeVerifier,
 	}
 	session, err := gateway.binding.Authentication().ExchangeAuthorizationCode(r.Context(), request)
 	if err != nil {

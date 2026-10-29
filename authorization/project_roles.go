@@ -11,24 +11,25 @@ import (
 // application-owned role. Policy collections remain canonical JSON so the SDK
 // does not take ownership of an application's metadata model.
 type ProjectRoleDefinition struct {
-	Key                   string                  `json:"key"`
-	Name                  string                  `json:"name"`
-	Permissions           []ProjectRolePermission `json:"permissions,omitempty"`
-	FieldPermissions      json.RawMessage         `json:"field_permissions,omitempty"`
-	ReferencePermissions  json.RawMessage         `json:"reference_permissions,omitempty"`
-	ExportRules           json.RawMessage         `json:"export_rules,omitempty"`
-	Audience              string                  `json:"audience,omitempty"`
-	RequiredBindingKey    string                  `json:"required_binding_key,omitempty"`
-	AssignmentMode        string                  `json:"assignment_mode,omitempty"`
-	RiskLevel             string                  `json:"risk_level,omitempty"`
-	ConflictRoleKeys      []string                `json:"conflict_role_keys,omitempty"`
-	GrantableRoleKeys     []string                `json:"grantable_role_keys,omitempty"`
-	PermissionSetKeys     []string                `json:"permission_set_keys,omitempty"`
-	PermissionSetGroups   []string                `json:"permission_set_group_keys,omitempty"`
-	GuardrailKeys         []string                `json:"guardrail_keys,omitempty"`
-	Guardrails            json.RawMessage         `json:"guardrails,omitempty"`
-	ProvisionToWorkspaces bool                    `json:"provision_to_workspaces,omitempty"`
-	SchemaHash            string                  `json:"schema_hash"`
+	Key                  string                  `json:"key"`
+	Name                 string                  `json:"name"`
+	Description          string                  `json:"description,omitempty"`
+	Permissions          []ProjectRolePermission `json:"permissions,omitempty"`
+	FieldPermissions     json.RawMessage         `json:"field_permissions,omitempty"`
+	ReferencePermissions json.RawMessage         `json:"reference_permissions,omitempty"`
+	ExportRules          json.RawMessage         `json:"export_rules,omitempty"`
+	Audience             string                  `json:"audience,omitempty"`
+	RequiredBindingKey   string                  `json:"required_binding_key,omitempty"`
+	AssignmentMode       string                  `json:"assignment_mode,omitempty"`
+	RiskLevel            string                  `json:"risk_level,omitempty"`
+	ConflictRoleKeys     []string                `json:"conflict_role_keys,omitempty"`
+	GrantableRoleKeys    []string                `json:"grantable_role_keys,omitempty"`
+	PermissionSetKeys    []string                `json:"permission_set_keys,omitempty"`
+	PermissionSetGroups  []string                `json:"permission_set_group_keys,omitempty"`
+	GuardrailKeys        []string                `json:"guardrail_keys,omitempty"`
+	Guardrails           json.RawMessage         `json:"guardrails,omitempty"`
+	MenuKeys             []string                `json:"menu_keys,omitempty"`
+	SchemaHash           string                  `json:"schema_hash"`
 }
 
 // DataScope is the complete authoring vocabulary for record visibility.
@@ -259,7 +260,7 @@ func canonicalProjectDataPolicy(policy ProjectDataPolicy) ProjectDataPolicy {
 }
 
 type ProjectRoleCatalog struct {
-	Application ApplicationRef `json:"application"`
+	SourceOwner string `json:"source_owner"`
 	// Objects is the application-owned object/field catalog used to project
 	// declared role field permissions into an effective AccessBundle. It stays
 	// as canonical JSON so Identity SDK does not take ownership of an
@@ -273,59 +274,40 @@ type ProjectRoleCatalog struct {
 	InitialWorkspaceAdministratorRoleKey string `json:"-"`
 }
 
-type ProjectRoleCatalogReceipt struct {
-	Published int    `json:"published"`
-	SHA256    string `json:"sha256"`
-}
-
-type ProjectRoleCatalogPublisher interface {
-	PublishProjectRoles(context.Context, ProjectRoleCatalog) (ProjectRoleCatalogReceipt, error)
-}
-
-// ProjectRolePermissionBundleRequest lets an in-process product owner install
-// a fixed permission bundle into an existing role. Unlike administrator role
-// authoring, this trusted boundary may include bundled and internal
-// permissions, but it never accepts a browser-selected permission key.
-type ProjectRolePermissionBundleRequest struct {
-	Application    ApplicationRef          `json:"application"`
-	SourceOwner    string                  `json:"source_owner"`
-	RoleKey        string                  `json:"role_key"`
-	ActorID        SubjectID               `json:"actor_id"`
-	Permissions    []ProjectRolePermission `json:"permissions"`
-	BusinessReason string                  `json:"business_reason"`
-	OperationID    string                  `json:"operation_id"`
-}
-
-func (request ProjectRolePermissionBundleRequest) ValidateContract() error {
-	if !request.Application.WorkspaceID.Valid() || !request.Application.ApplicationKey.Valid() {
-		return &Error{Class: ErrorClassBadRequest, Code: "identity.project_role_permission_bundle_scope_invalid"}
+func (catalog ProjectRoleCatalog) ValidateContract() error {
+	if !validSourceOwner(catalog.SourceOwner) {
+		return &Error{Class: ErrorClassBadRequest, Code: "identity.project_role_catalog_owner_invalid"}
 	}
-	if !validSourceOwner(request.SourceOwner) || strings.TrimSpace(request.RoleKey) == "" || strings.TrimSpace(string(request.ActorID)) == "" || strings.TrimSpace(request.BusinessReason) == "" || strings.TrimSpace(request.OperationID) == "" {
-		return &Error{Class: ErrorClassBadRequest, Code: "identity.project_role_permission_bundle_invalid"}
-	}
-	seen := make(map[string]bool, len(request.Permissions))
-	for _, permission := range request.Permissions {
-		key := strings.TrimSpace(permission.PermissionKey)
-		if key == "" || seen[key] || permission.Validate() != nil {
-			return &Error{Class: ErrorClassBadRequest, Code: "identity.project_role_permission_bundle_invalid"}
+	seen := make(map[string]bool, len(catalog.Roles))
+	for _, role := range catalog.Roles {
+		key := strings.TrimSpace(role.Key)
+		if key == "" || strings.TrimSpace(role.Name) == "" || seen[key] {
+			return &Error{Class: ErrorClassBadRequest, Code: "identity.project_role_invalid"}
 		}
 		seen[key] = true
+		for _, permission := range role.Permissions {
+			if err := permission.Validate(); err != nil {
+				return err
+			}
+		}
+		menus := map[string]bool{}
+		for _, menuKey := range role.MenuKeys {
+			menuKey = strings.TrimSpace(menuKey)
+			if menuKey == "" || menus[menuKey] {
+				return &Error{Class: ErrorClassBadRequest, Code: "identity.project_role_menu_invalid"}
+			}
+			menus[menuKey] = true
+		}
 	}
 	return nil
 }
 
-type ProjectRolePermissionBundleReceipt struct {
-	RoleKey         string `json:"role_key"`
-	Added           int    `json:"added"`
-	Updated         int    `json:"updated"`
-	PermissionCount int    `json:"permission_count"`
-	SchemaVersion   string `json:"schema_version"`
-	SchemaHash      string `json:"schema_hash"`
+type ProjectRoleCatalogReceipt struct {
+	SourceOwner string `json:"source_owner"`
+	Published   int    `json:"published"`
+	SHA256      string `json:"sha256"`
 }
 
-// ProjectRolePermissionBundlePublisher is available only on trusted,
-// in-process Identity bindings. It is deliberately separate from the direct
-// administrator authoring API exposed over HTTP.
-type ProjectRolePermissionBundlePublisher interface {
-	PublishProjectRolePermissionBundle(context.Context, ProjectRolePermissionBundleRequest) (ProjectRolePermissionBundleReceipt, error)
+type ProjectRoleCatalogPublisher interface {
+	PublishProjectRoles(context.Context, ProjectRoleCatalog) (ProjectRoleCatalogReceipt, error)
 }

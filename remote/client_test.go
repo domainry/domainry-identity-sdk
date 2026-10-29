@@ -221,7 +221,7 @@ func TestDiscoveryRequiresCompatibleSaaSIssuerAndCapabilities(t *testing.T) {
 		AuthorizationVersion: identity.CurrentAuthorizationContractVersion,
 		Mode:                 identity.DeploymentModeSaaS,
 		Issuer:               "https://identity.example.com",
-		Capabilities:         []string{"authentication", "challenge_authentication", "action_assurance", "token_verification", "authorization", "principal_resolution", "workflow_workload_identity", "identity_projection", "application_registration", "permission_reconciliation"},
+		Capabilities:         []string{"authentication", "challenge_authentication", "action_assurance", "token_verification", "authorization", "principal_resolution", "workflow_workload_identity", "identity_projection", "application_registration", "permission_reconciliation", "project_role_catalog"},
 	}
 	if err := validateDiscovery(valid, valid.Issuer); err != nil {
 		t.Fatal(err)

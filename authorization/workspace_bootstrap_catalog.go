@@ -39,12 +39,6 @@ func WorkspaceBootstrapProjectRoleCatalogSHA256(catalog ProjectRoleCatalog) (str
 		if err != nil {
 			return "", err
 		}
-		if !normalized.ProvisionToWorkspaces {
-			continue
-		}
-		if !workspaceBootstrapProvisionableHumanRole(normalized) {
-			return "", fmt.Errorf("Workspace bootstrap role %q is not a provisionable human role", key)
-		}
 		selected = append(selected, normalized)
 		if key == administratorRoleKey {
 			administratorFound = true
@@ -57,7 +51,7 @@ func WorkspaceBootstrapProjectRoleCatalogSHA256(catalog ProjectRoleCatalog) (str
 		return "", fmt.Errorf("Workspace bootstrap role catalog is empty")
 	}
 	if !administratorFound {
-		return "", fmt.Errorf("Workspace bootstrap initial administrator role %q is not provisioned", administratorRoleKey)
+		return "", fmt.Errorf("Workspace bootstrap initial administrator role %q is not registered", administratorRoleKey)
 	}
 	sort.Slice(selected, func(left, right int) bool { return selected[left].Key < selected[right].Key })
 	canonical, err := json.Marshal(workspaceBootstrapRoleCatalogCanonical{

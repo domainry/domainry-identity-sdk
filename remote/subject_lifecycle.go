@@ -13,10 +13,11 @@ func (value *binding) SystemSubjects() identity.SystemSubjects { return systemSu
 type systemSubjects struct{ client *client }
 
 func (value systemSubjects) invoke(ctx context.Context, operation string, request identity.SubjectErasureRequest) (json.RawMessage, error) {
-	if err := (projectionClient{client: value.client}).requireCredential(); err != nil {
+	if err := (projectionClient{client: value.client}).requireCredential(ctx); err != nil {
 		return nil, err
 	}
-	if request.WorkspaceID != value.client.workspaceID || !identity.WorkspaceID(request.WorkspaceID).Valid() {
+	expectedWorkspace := value.client.resolveWorkspace(requestWorkspaceID(ctx))
+	if request.WorkspaceID != expectedWorkspace || !identity.WorkspaceID(request.WorkspaceID).Valid() {
 		return nil, &identity.Error{Class: identity.ErrorClassForbidden, Code: "auth.workspace_mismatch"}
 	}
 	if strings.TrimSpace(request.SubjectID) == "" {

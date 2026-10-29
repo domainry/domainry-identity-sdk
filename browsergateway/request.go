@@ -65,6 +65,9 @@ func (gateway *Gateway) workspaceID(w http.ResponseWriter, r *http.Request, body
 	if resolved == "" {
 		resolved = string(gateway.config.DefaultWorkspaceID)
 	}
+	if resolved == "" && gateway.config.AllowGlobalApplication {
+		return "", true
+	}
 	workspaceID := identity.WorkspaceID(resolved)
 	if !workspaceID.Valid() {
 		gateway.writeCode(w, r, http.StatusBadRequest, "backend.workspace_scope_required")

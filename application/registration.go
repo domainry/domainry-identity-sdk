@@ -20,25 +20,31 @@ func (value applications) Register(ctx context.Context, input identity.Applicati
 type permissions struct{ binding *binding }
 
 func (value permissions) Reconcile(ctx context.Context, input identity.PermissionReconcileRequest) (identity.PermissionReconcileReceipt, error) {
-	application, err := value.binding.scopedApplication(ctx, input.Application)
-	if err != nil {
-		return identity.PermissionReconcileReceipt{}, err
-	}
-	input.Application = application
 	return value.binding.delegate.Permissions().Reconcile(ctx, input)
 }
 
 func (value permissions) CurrentSourceSnapshot(ctx context.Context, input identity.PermissionSourceSnapshotRequest) (identity.PermissionSourceSnapshot, error) {
-	application, err := value.binding.scopedApplication(ctx, input.Application)
-	if err != nil {
-		return identity.PermissionSourceSnapshot{}, err
-	}
-	input.Application = application
 	reader, ok := value.binding.delegate.Permissions().(identity.PermissionSnapshotReader)
 	if !ok {
 		return identity.PermissionSourceSnapshot{}, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.permission_snapshot_reader_unavailable"}
 	}
 	return reader.CurrentSourceSnapshot(ctx, input)
+}
+
+func (value *binding) PublishProjectRoles(ctx context.Context, input identity.ProjectRoleCatalog) (identity.ProjectRoleCatalogReceipt, error) {
+	publisher, ok := value.delegate.(identity.ProjectRoleCatalogPublisher)
+	if !ok {
+		return identity.ProjectRoleCatalogReceipt{}, &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.project_role_catalog_unavailable"}
+	}
+	return publisher.PublishProjectRoles(ctx, input)
+}
+
+func (value *applicationServiceBinding) PublishProjectRoles(ctx context.Context, input identity.ProjectRoleCatalog) (identity.ProjectRoleCatalogReceipt, error) {
+	return value.binding.PublishProjectRoles(ctx, input)
+}
+
+func (value *applicationServiceVerificationBinding) PublishProjectRoles(ctx context.Context, input identity.ProjectRoleCatalog) (identity.ProjectRoleCatalogReceipt, error) {
+	return value.binding.PublishProjectRoles(ctx, input)
 }
 
 func (value *binding) scopedApplication(ctx context.Context, input identity.ApplicationRef) (identity.ApplicationRef, error) {

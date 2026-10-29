@@ -10,7 +10,7 @@ import (
 type workflowWorkloads struct{ client *client }
 
 func (adapter workflowWorkloads) ApplyWorkflowWorkloadBindings(ctx context.Context, request identity.ApplyWorkflowWorkloadBindingsRequest) (identity.ApplyWorkflowWorkloadBindingsResult, error) {
-	if err := (projectionClient{client: adapter.client}).normalizeScope(&request.Application); err != nil {
+	if err := (projectionClient{client: adapter.client}).normalizeScope(ctx, &request.Application); err != nil {
 		return identity.ApplyWorkflowWorkloadBindingsResult{}, err
 	}
 	if err := request.Validate(); err != nil {
@@ -24,7 +24,7 @@ func (adapter workflowWorkloads) ApplyWorkflowWorkloadBindings(ctx context.Conte
 }
 
 func (adapter workflowWorkloads) GetWorkflowWorkloadBinding(ctx context.Context, request identity.GetWorkflowWorkloadBindingRequest) (identity.WorkflowWorkloadBinding, error) {
-	if err := (projectionClient{client: adapter.client}).normalizeScope(&request.Application); err != nil {
+	if err := (projectionClient{client: adapter.client}).normalizeScope(ctx, &request.Application); err != nil {
 		return identity.WorkflowWorkloadBinding{}, err
 	}
 	if err := request.Validate(); err != nil {

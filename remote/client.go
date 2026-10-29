@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/domainry/domainry-foundation/requestcontext"
 	"github.com/domainry/domainry-foundation/telemetry"
 	identitysdk "github.com/domainry/domainry-identity-sdk"
 )
@@ -193,9 +194,13 @@ func (c *client) execute(ctx context.Context, method, endpoint, accessToken, con
 	if requestBody != nil && contentType != "" {
 		request.Header.Set("Content-Type", contentType)
 	}
-	if c.workspaceID != "" {
-		request.Header.Set("X-Workspace-ID", c.workspaceID)
-		request.Header.Set("X-Domainry-Workspace-ID", c.workspaceID)
+	workspaceID := c.workspaceID
+	if workspaceID == "" {
+		workspaceID = strings.TrimSpace(requestcontext.WorkspaceID(ctx))
+	}
+	if workspaceID != "" {
+		request.Header.Set("X-Workspace-ID", workspaceID)
+		request.Header.Set("X-Domainry-Workspace-ID", workspaceID)
 	}
 	if c.applicationKey != "" {
 		request.Header.Set("X-Domainry-Application-Key", c.applicationKey)

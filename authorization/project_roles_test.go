@@ -35,7 +35,7 @@ func TestProjectRolePermissionCarriesItsOwnClosedDataScope(t *testing.T) {
 
 func TestProjectRoleCatalogPreservesApplicationObjectCatalog(t *testing.T) {
 	catalog := ProjectRoleCatalog{
-		Application:                          ApplicationRef{WorkspaceID: "workspace-primary", ApplicationKey: "runtime"},
+		SourceOwner:                          "application:runtime",
 		Objects:                              json.RawMessage(`[{"key":"customer","fields":[{"key":"name"}]}]`),
 		Roles:                                []ProjectRoleDefinition{},
 		InitialWorkspaceAdministratorRoleKey: "crm_acceptance_admin",
@@ -103,30 +103,5 @@ func TestProjectRolePermissionRejectsAmbiguousOrOpenEndedPolicies(t *testing.T) 
 		if err := permission.Validate(); err == nil {
 			t.Fatalf("invalid permission %d was accepted: %#v", index, permission)
 		}
-	}
-}
-
-func TestProjectRolePermissionBundleRequestIsTrustedAndClosed(t *testing.T) {
-	valid := ProjectRolePermissionBundleRequest{
-		Application:    ApplicationRef{WorkspaceID: "workspace-primary", ApplicationKey: "agent"},
-		SourceOwner:    "agent:product_setup",
-		RoleKey:        "admin",
-		ActorID:        "admin",
-		Permissions:    []ProjectRolePermission{{PermissionKey: "agent.tools.execute", DataScope: DataScopeOwner}},
-		BusinessReason: "Enable the fixed Agent product bundle",
-		OperationID:    "setup-1",
-	}
-	if err := valid.ValidateContract(); err != nil {
-		t.Fatal(err)
-	}
-	duplicate := valid
-	duplicate.Permissions = append(duplicate.Permissions, duplicate.Permissions[0])
-	if err := duplicate.ValidateContract(); err == nil {
-		t.Fatal("duplicate permission was accepted")
-	}
-	emptyActor := valid
-	emptyActor.ActorID = ""
-	if err := emptyActor.ValidateContract(); err == nil {
-		t.Fatal("empty actor was accepted")
 	}
 }

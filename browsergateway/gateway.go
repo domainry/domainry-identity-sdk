@@ -27,6 +27,10 @@ type CookieConfig struct {
 }
 
 type Config struct {
+	// AllowGlobalApplication lets a SaaS browser application omit a Workspace.
+	// Password login is then resolved by Identity's globally unique login name,
+	// while refresh/logout resolve the Workspace from the opaque credential.
+	AllowGlobalApplication bool
 	// RequireExplicitWorkspace disables the single-workspace fallback for trusted host catalogs.
 	RequireExplicitWorkspace bool
 	// ResolvePasswordLoginWorkspace resolves an omitted login scope without
@@ -55,7 +59,7 @@ func New(binding identity.Binding, config Config) (*Gateway, error) {
 	if !config.ApplicationKey.Valid() {
 		return nil, errors.New("Identity browser application key is required")
 	}
-	if !config.RequireExplicitWorkspace && !config.DefaultWorkspaceID.Valid() {
+	if !config.AllowGlobalApplication && !config.RequireExplicitWorkspace && !config.DefaultWorkspaceID.Valid() {
 		return nil, errors.New("Identity browser initialized workspace is required")
 	}
 	if strings.TrimSpace(config.Cookie.Name) == "" {

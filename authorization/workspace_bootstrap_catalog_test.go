@@ -5,14 +5,14 @@ import "testing"
 func TestWorkspaceBootstrapProjectRoleCatalogSHA256IsCanonicalAndAuthorizationComplete(t *testing.T) {
 	roles := []ProjectRoleDefinition{
 		{
-			Key: "admin", Name: "Administrator", Audience: "any", AssignmentMode: "manual", ProvisionToWorkspaces: true, SchemaHash: "schema-admin",
+			Key: "admin", Name: "Administrator", Audience: "any", AssignmentMode: "manual", SchemaHash: "schema-admin",
 			Permissions: []ProjectRolePermission{
 				{PermissionKey: "customer.write", DataScope: DataScopeOrg},
 				{PermissionKey: "customer.read", DataScope: DataScopeAll},
 			},
 			PermissionSetKeys: []string{"write", "read"},
 		},
-		{Key: "member", Name: "Member", Audience: "user", AssignmentMode: "manual", ProvisionToWorkspaces: true, SchemaHash: "schema-member"},
+		{Key: "member", Name: "Member", Audience: "user", AssignmentMode: "manual", SchemaHash: "schema-member"},
 		{Key: "service", Name: "Service", Audience: "service", AssignmentMode: "system_managed"},
 	}
 	digest := func(inputs []ProjectRoleDefinition, administrator string) string {
@@ -49,7 +49,7 @@ func TestWorkspaceBootstrapProjectRoleCatalogSHA256IsCanonicalAndAuthorizationCo
 }
 
 func TestWorkspaceBootstrapProjectRoleCatalogSHA256ValidatesTrustedPolicy(t *testing.T) {
-	validAdmin := ProjectRoleDefinition{Key: "admin", Name: "Admin", Audience: "user", AssignmentMode: "manual", ProvisionToWorkspaces: true}
+	validAdmin := ProjectRoleDefinition{Key: "admin", Name: "Admin", Audience: "user", AssignmentMode: "manual"}
 	for _, test := range []struct {
 		name  string
 		roles []ProjectRoleDefinition
@@ -57,8 +57,7 @@ func TestWorkspaceBootstrapProjectRoleCatalogSHA256ValidatesTrustedPolicy(t *tes
 	}{
 		{name: "missing administrator", roles: []ProjectRoleDefinition{validAdmin}},
 		{name: "unknown administrator", roles: []ProjectRoleDefinition{validAdmin}, admin: "missing"},
-		{name: "service provisioned", roles: []ProjectRoleDefinition{validAdmin, {Key: "service", Name: "Service", Audience: "service", AssignmentMode: "system_managed", ProvisionToWorkspaces: true}}, admin: "admin"},
-		{name: "request-only administrator", roles: []ProjectRoleDefinition{{Key: "admin", Name: "Admin", Audience: "user", AssignmentMode: "request_only", ProvisionToWorkspaces: true}}, admin: "admin"},
+		{name: "request-only administrator", roles: []ProjectRoleDefinition{{Key: "admin", Name: "Admin", Audience: "user", AssignmentMode: "request_only"}}, admin: "admin"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if _, err := WorkspaceBootstrapProjectRoleCatalogSHA256(ProjectRoleCatalog{Roles: test.roles, InitialWorkspaceAdministratorRoleKey: test.admin}); err == nil {

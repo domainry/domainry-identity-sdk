@@ -16,6 +16,26 @@ func Bind(delegate identity.Binding, application identity.ApplicationRef) (ident
 	return bind(delegate, application, nil)
 }
 
+// BindGlobal binds one SaaS application without pinning it to a tenant. The
+// tenant is resolved from each authenticated request; installation-global
+// catalog publication needs no Workspace at all.
+func BindGlobal(delegate identity.Binding, applicationKey identity.ApplicationKey) (identity.Binding, error) {
+	applicationKey = identity.ApplicationKey(strings.TrimSpace(string(applicationKey)))
+	if delegate == nil || !applicationKey.Valid() {
+		return nil, scopeError(identity.ErrorClassBadRequest, "identity.application_scope_invalid")
+	}
+	descriptor := delegate.Descriptor()
+	if audience := strings.TrimSpace(descriptor.Audience); audience != "" && audience != string(applicationKey) {
+		return nil, scopeError(identity.ErrorClassForbidden, "identity.application_scope_mismatch")
+	}
+	descriptor.Audience = string(applicationKey)
+	scoped := &binding{
+		delegate: delegate, application: identity.ApplicationRef{ApplicationKey: applicationKey},
+		descriptor: descriptor, dynamicWorkspace: true,
+	}
+	return wrapBinding(scoped), nil
+}
+
 // BindWithWorkspaceResolver enables host-authorized installation scopes.
 // The ordinary Bind contract remains strictly single-workspace.
 func BindWithWorkspaceResolver(delegate identity.Binding, application identity.ApplicationRef, resolver identity.WorkspaceResolver) (identity.Binding, error) {
@@ -37,23 +57,29 @@ func bind(delegate identity.Binding, application identity.ApplicationRef, resolv
 	}
 	descriptor.Audience = string(application.ApplicationKey)
 	scoped := &binding{delegate: delegate, application: application, descriptor: descriptor, resolver: resolver}
-	if services, ok := delegate.(identity.ApplicationServiceBinding); ok && services.ApplicationServices() != nil {
-		return &applicationServiceBinding{Binding: scoped, binding: scoped}, nil
+	return wrapBinding(scoped), nil
+}
+
+func wrapBinding(scoped *binding) identity.Binding {
+	if services, ok := scoped.delegate.(identity.ApplicationServiceBinding); ok && services.ApplicationServices() != nil {
+		return &applicationServiceBinding{Binding: scoped, binding: scoped}
 	}
-	if verifier, ok := delegate.(identity.ApplicationServiceVerificationBinding); ok && verifier.ApplicationServiceVerifier() != nil {
-		return &applicationServiceVerificationBinding{Binding: scoped, binding: scoped}, nil
+	if verifier, ok := scoped.delegate.(identity.ApplicationServiceVerificationBinding); ok && verifier.ApplicationServiceVerifier() != nil {
+		return &applicationServiceVerificationBinding{Binding: scoped, binding: scoped}
 	}
-	return scoped, nil
+	return scoped
 }
 
 type binding struct {
-	resolver    identity.WorkspaceResolver
-	delegate    identity.Binding
-	application identity.ApplicationRef
-	descriptor  identity.Descriptor
+	resolver         identity.WorkspaceResolver
+	delegate         identity.Binding
+	application      identity.ApplicationRef
+	descriptor       identity.Descriptor
+	dynamicWorkspace bool
 }
 
 func (value *binding) Descriptor() identity.Descriptor { return value.descriptor }
+func (value *binding) IsGlobalApplication() bool       { return value.dynamicWorkspace }
 func (value *binding) Authentication() identity.Authentication {
 	return authentication{binding: value}
 }
@@ -94,6 +120,12 @@ func (value *binding) workspace(ctx context.Context, input identity.WorkspaceID)
 	input = identity.WorkspaceID(strings.TrimSpace(string(input)))
 	if input == "" {
 		input = identity.WorkspaceID(requestcontext.WorkspaceID(ctx))
+	}
+	if value.dynamicWorkspace {
+		if input == "" || input.Valid() {
+			return input, nil
+		}
+		return "", scopeError(identity.ErrorClassBadRequest, "identity.workspace_scope_invalid")
 	}
 	if value.resolver != nil {
 		resolved, err := value.resolveWorkspace(ctx, input)
@@ -159,6 +191,9 @@ func (value *binding) verifyAccessToken(ctx context.Context, accessToken string)
 }
 
 func (value *binding) verifySession(ctx context.Context, session identity.AuthSession, expected identity.WorkspaceID) error {
+	if expected == "" {
+		expected = identity.WorkspaceID(session.WorkspaceID)
+	}
 	if identity.WorkspaceID(strings.TrimSpace(session.WorkspaceID)) != expected || strings.TrimSpace(session.AccessToken) == "" {
 		return scopeError(identity.ErrorClassUnavailable, "identity.session_scope_invalid")
 	}
@@ -194,6 +229,7 @@ func scopeError(class identity.ErrorClass, code string) error {
 }
 
 var _ identity.Binding = (*binding)(nil)
+var _ identity.GlobalApplicationBinding = (*binding)(nil)
 
 type applicationServiceBinding struct {
 	identity.Binding
@@ -218,6 +254,9 @@ func (value *applicationServiceBinding) ExternalAccounts() identity.ExternalAcco
 func (value *applicationServiceBinding) WorkflowWorkloads() identity.WorkflowWorkloadIdentity {
 	return value.binding.WorkflowWorkloads()
 }
+func (value *applicationServiceBinding) IsGlobalApplication() bool {
+	return value.binding.IsGlobalApplication()
+}
 
 type applicationServiceVerificationBinding struct {
 	identity.Binding
@@ -239,6 +278,9 @@ func (value *applicationServiceVerificationBinding) ActionAssurance() identity.A
 func (value *applicationServiceVerificationBinding) WorkflowWorkloads() identity.WorkflowWorkloadIdentity {
 	return value.binding.WorkflowWorkloads()
 }
+func (value *applicationServiceVerificationBinding) IsGlobalApplication() bool {
+	return value.binding.IsGlobalApplication()
+}
 
 var _ identity.Binding = (*applicationServiceBinding)(nil)
 var _ identity.ApplicationServiceBinding = (*applicationServiceBinding)(nil)
@@ -247,9 +289,14 @@ var _ identity.Binding = (*applicationServiceVerificationBinding)(nil)
 var _ identity.ApplicationServiceVerificationBinding = (*applicationServiceVerificationBinding)(nil)
 var _ identity.WorkflowWorkloadIdentityBinding = (*applicationServiceBinding)(nil)
 var _ identity.WorkflowWorkloadIdentityBinding = (*applicationServiceVerificationBinding)(nil)
+var _ identity.GlobalApplicationBinding = (*applicationServiceBinding)(nil)
+var _ identity.GlobalApplicationBinding = (*applicationServiceVerificationBinding)(nil)
 var _ identity.ChallengeAuthenticationBinding = (*binding)(nil)
 var _ identity.ChallengeAuthenticationBinding = (*applicationServiceBinding)(nil)
 var _ identity.ChallengeAuthenticationBinding = (*applicationServiceVerificationBinding)(nil)
 var _ identity.ActionAssuranceBinding = (*binding)(nil)
 var _ identity.ActionAssuranceBinding = (*applicationServiceBinding)(nil)
 var _ identity.ActionAssuranceBinding = (*applicationServiceVerificationBinding)(nil)
+var _ identity.ProjectRoleCatalogPublisher = (*binding)(nil)
+var _ identity.ProjectRoleCatalogPublisher = (*applicationServiceBinding)(nil)
+var _ identity.ProjectRoleCatalogPublisher = (*applicationServiceVerificationBinding)(nil)

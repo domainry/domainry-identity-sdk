@@ -10,17 +10,34 @@ import (
 )
 
 type PermissionDefinition struct {
-	PermissionKey string `json:"permission_key"`
-	ResourceKey   string `json:"resource_key"`
-	OperationKey  string `json:"operation_key"`
-	Label         string `json:"label"`
-	Description   string `json:"description,omitempty"`
-	Category      string `json:"category"`
-	SourceKind    string `json:"source_kind"`
+	PermissionKey string                  `json:"permission_key"`
+	ModuleKey     string                  `json:"module_key"`
+	GroupKey      string                  `json:"group_key"`
+	ResourceKey   string                  `json:"resource_key"`
+	OperationKey  string                  `json:"operation_key"`
+	Label         string                  `json:"label"`
+	Description   string                  `json:"description,omitempty"`
+	Category      string                  `json:"category"`
+	SourceKind    string                  `json:"source_kind"`
+	GrantMode     string                  `json:"grant_mode"`
+	ScopeKind     string                  `json:"scope_kind"`
+	ObjectKey     string                  `json:"object_key,omitempty"`
+	DefaultLocale string                  `json:"default_locale"`
+	I18n          PermissionLocalizedText `json:"i18n"`
 }
 
+type PermissionText struct {
+	ModuleLabel    string `json:"module_label"`
+	GroupLabel     string `json:"group_label"`
+	ResourceLabel  string `json:"resource_label"`
+	OperationLabel string `json:"operation_label"`
+	Label          string `json:"label"`
+	Description    string `json:"description,omitempty"`
+}
+
+type PermissionLocalizedText map[string]PermissionText
+
 type PermissionReconcileRequest struct {
-	Application          ApplicationRef         `json:"application"`
 	SourceOwner          string                 `json:"source_owner"`
 	PreviousSnapshotHash string                 `json:"previous_snapshot_hash,omitempty"`
 	SnapshotHash         string                 `json:"snapshot_hash"`
@@ -28,26 +45,21 @@ type PermissionReconcileRequest struct {
 }
 
 type PermissionReconcileReceipt struct {
-	WorkspaceID          WorkspaceID `json:"workspace_id"`
-	SourceOwner          string      `json:"source_owner"`
-	PreviousSnapshotHash string      `json:"previous_snapshot_hash,omitempty"`
-	SnapshotHash         string      `json:"snapshot_hash"`
-	DefinitionCount      int         `json:"definition_count"`
-	Inserted             int         `json:"inserted"`
-	Updated              int         `json:"updated"`
-	Retired              int         `json:"retired"`
-	Unchanged            int         `json:"unchanged"`
+	SourceOwner          string `json:"source_owner"`
+	PreviousSnapshotHash string `json:"previous_snapshot_hash,omitempty"`
+	SnapshotHash         string `json:"snapshot_hash"`
+	DefinitionCount      int    `json:"definition_count"`
+	Inserted             int    `json:"inserted"`
+	Updated              int    `json:"updated"`
+	Retired              int    `json:"retired"`
+	Unchanged            int    `json:"unchanged"`
 }
 
 type PermissionSourceSnapshotRequest struct {
-	Application ApplicationRef `json:"application"`
-	SourceOwner string         `json:"source_owner"`
+	SourceOwner string `json:"source_owner"`
 }
 
 func (request PermissionSourceSnapshotRequest) ValidateContract() error {
-	if !request.Application.WorkspaceID.Valid() || !request.Application.ApplicationKey.Valid() {
-		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_snapshot_scope_invalid"}
-	}
 	if !validSourceOwner(request.SourceOwner) {
 		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_source_owner_invalid"}
 	}
@@ -55,7 +67,6 @@ func (request PermissionSourceSnapshotRequest) ValidateContract() error {
 }
 
 type PermissionSourceSnapshot struct {
-	WorkspaceID  WorkspaceID            `json:"workspace_id"`
 	SourceOwner  string                 `json:"source_owner"`
 	SnapshotHash string                 `json:"snapshot_hash,omitempty"`
 	Definitions  []PermissionDefinition `json:"definitions,omitempty"`
@@ -66,8 +77,7 @@ func (snapshot PermissionSourceSnapshot) ValidateFor(request PermissionSourceSna
 		return err
 	}
 	hash := strings.TrimSpace(snapshot.SnapshotHash)
-	if snapshot.WorkspaceID != request.Application.WorkspaceID ||
-		strings.TrimSpace(snapshot.SourceOwner) != strings.TrimSpace(request.SourceOwner) ||
+	if strings.TrimSpace(snapshot.SourceOwner) != strings.TrimSpace(request.SourceOwner) ||
 		hash != "" && !validPermissionSnapshotHash(hash) || hash == "" && len(snapshot.Definitions) != 0 {
 		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_source_snapshot_invalid"}
 	}
@@ -81,7 +91,7 @@ func (snapshot PermissionSourceSnapshot) ValidateFor(request PermissionSourceSna
 }
 
 // ValidateFor proves that a successful reconcile response acknowledges the
-// exact workspace, owner and immutable definition snapshot submitted by the
+// exact global source owner and immutable definition snapshot submitted by the
 // caller. Identity may report the submitted previous hash or the new snapshot
 // hash when an idempotent retry observes that snapshot already applied.
 func (receipt PermissionReconcileReceipt) ValidateFor(request PermissionReconcileRequest) error {
@@ -89,8 +99,7 @@ func (receipt PermissionReconcileReceipt) ValidateFor(request PermissionReconcil
 		return err
 	}
 	previousMatches := receipt.PreviousSnapshotHash == request.PreviousSnapshotHash || receipt.PreviousSnapshotHash == request.SnapshotHash
-	if receipt.WorkspaceID != request.Application.WorkspaceID ||
-		strings.TrimSpace(receipt.SourceOwner) != request.SourceOwner ||
+	if strings.TrimSpace(receipt.SourceOwner) != request.SourceOwner ||
 		strings.TrimSpace(receipt.SnapshotHash) != request.SnapshotHash ||
 		receipt.DefinitionCount != len(request.Definitions) || !previousMatches ||
 		receipt.Inserted < 0 || receipt.Updated < 0 || receipt.Retired < 0 || receipt.Unchanged < 0 {
@@ -111,15 +120,19 @@ type PermissionSnapshotReader interface {
 	CurrentSourceSnapshot(context.Context, PermissionSourceSnapshotRequest) (PermissionSourceSnapshot, error)
 }
 
-func NewPermissionReconcileRequest(application ApplicationRef, sourceOwner, previousSnapshotHash string, definitions []PermissionDefinition) (PermissionReconcileRequest, error) {
-	snapshotHash, err := PermissionSnapshotHash(sourceOwner, definitions)
+func NewPermissionReconcileRequest(sourceOwner, previousSnapshotHash string, definitions []PermissionDefinition) (PermissionReconcileRequest, error) {
+	canonicalDefinitions, err := canonicalPermissionDefinitions(definitions)
+	if err != nil {
+		return PermissionReconcileRequest{}, err
+	}
+	snapshotHash, err := PermissionSnapshotHash(sourceOwner, canonicalDefinitions)
 	if err != nil {
 		return PermissionReconcileRequest{}, err
 	}
 	request := PermissionReconcileRequest{
-		Application: application, SourceOwner: strings.TrimSpace(sourceOwner),
+		SourceOwner:          strings.TrimSpace(sourceOwner),
 		PreviousSnapshotHash: strings.TrimSpace(previousSnapshotHash), SnapshotHash: snapshotHash,
-		Definitions: append([]PermissionDefinition(nil), definitions...),
+		Definitions: canonicalDefinitions,
 	}
 	if err := request.ValidateContract(); err != nil {
 		return PermissionReconcileRequest{}, err
@@ -128,9 +141,6 @@ func NewPermissionReconcileRequest(application ApplicationRef, sourceOwner, prev
 }
 
 func (request PermissionReconcileRequest) ValidateContract() error {
-	if !request.Application.WorkspaceID.Valid() || !request.Application.ApplicationKey.Valid() {
-		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_reconcile_scope_invalid"}
-	}
 	if !validSourceOwner(request.SourceOwner) {
 		return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_source_owner_invalid"}
 	}
@@ -139,12 +149,11 @@ func (request PermissionReconcileRequest) ValidateContract() error {
 	}
 	seen := make(map[string]struct{}, len(request.Definitions))
 	for _, definition := range request.Definitions {
-		key := strings.TrimSpace(definition.PermissionKey)
-		resourceKey := strings.TrimSpace(definition.ResourceKey)
-		operationKey := strings.TrimSpace(definition.OperationKey)
-		if key == "" || resourceKey == "" || operationKey == "" || strings.TrimSpace(definition.Label) == "" || strings.TrimSpace(definition.Category) == "" || strings.TrimSpace(definition.SourceKind) == "" || key != resourceKey+"."+operationKey {
+		canonical, err := canonicalPermissionDefinition(definition)
+		if err != nil {
 			return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_definition_invalid"}
 		}
+		key := canonical.PermissionKey
 		if _, duplicate := seen[key]; duplicate {
 			return &Error{Class: ErrorClassBadRequest, Code: "identity.permission_definition_duplicate"}
 		}
@@ -181,31 +190,38 @@ func PermissionSnapshotHash(sourceOwner string, definitions []PermissionDefiniti
 	entries := make([]snapshotEntry, 0, len(definitions))
 	seen := make(map[string]struct{}, len(definitions))
 	for _, definition := range definitions {
-		key := strings.TrimSpace(definition.PermissionKey)
-		resourceKey := strings.TrimSpace(definition.ResourceKey)
-		operationKey := strings.TrimSpace(definition.OperationKey)
-		canonical := struct {
-			PermissionKey string `json:"permission_key"`
-			ResourceKey   string `json:"resource_key"`
-			OperationKey  string `json:"operation_key"`
-			Label         string `json:"label"`
-			Description   string `json:"description"`
-			Category      string `json:"category"`
-			SourceKind    string `json:"source_kind"`
-			SourceOwner   string `json:"source_owner"`
-		}{
-			PermissionKey: key, ResourceKey: resourceKey, OperationKey: operationKey,
-			Label: strings.TrimSpace(definition.Label), Description: strings.TrimSpace(definition.Description),
-			Category: strings.TrimSpace(definition.Category), SourceKind: strings.TrimSpace(definition.SourceKind), SourceOwner: sourceOwner,
+		canonical, err := canonicalPermissionDefinition(definition)
+		if err != nil {
+			return "", err
 		}
-		if canonical.PermissionKey == "" || canonical.ResourceKey == "" || canonical.OperationKey == "" || canonical.Label == "" || canonical.Category == "" || canonical.SourceKind == "" || canonical.PermissionKey != canonical.ResourceKey+"."+canonical.OperationKey {
-			return "", &Error{Class: ErrorClassBadRequest, Code: "identity.permission_definition_invalid"}
-		}
+		key := canonical.PermissionKey
 		if _, duplicate := seen[key]; duplicate {
 			return "", &Error{Class: ErrorClassBadRequest, Code: "identity.permission_definition_duplicate"}
 		}
 		seen[key] = struct{}{}
-		rawDefinition, err := json.Marshal(canonical)
+		rawDefinition, err := json.Marshal(struct {
+			PermissionKey string                  `json:"permission_key"`
+			ModuleKey     string                  `json:"module_key"`
+			GroupKey      string                  `json:"group_key"`
+			ResourceKey   string                  `json:"resource_key"`
+			OperationKey  string                  `json:"operation_key"`
+			Label         string                  `json:"label"`
+			Description   string                  `json:"description"`
+			Category      string                  `json:"category"`
+			SourceKind    string                  `json:"source_kind"`
+			GrantMode     string                  `json:"grant_mode"`
+			ScopeKind     string                  `json:"scope_kind"`
+			ObjectKey     string                  `json:"object_key"`
+			DefaultLocale string                  `json:"default_locale"`
+			I18n          PermissionLocalizedText `json:"i18n"`
+			SourceOwner   string                  `json:"source_owner"`
+		}{
+			PermissionKey: canonical.PermissionKey, ModuleKey: canonical.ModuleKey, GroupKey: canonical.GroupKey,
+			ResourceKey: canonical.ResourceKey, OperationKey: canonical.OperationKey, Label: canonical.Label,
+			Description: canonical.Description, Category: canonical.Category, SourceKind: canonical.SourceKind,
+			GrantMode: canonical.GrantMode, ScopeKind: canonical.ScopeKind, ObjectKey: canonical.ObjectKey,
+			DefaultLocale: canonical.DefaultLocale, I18n: canonical.I18n, SourceOwner: sourceOwner,
+		})
 		if err != nil {
 			return "", err
 		}
@@ -219,6 +235,57 @@ func PermissionSnapshotHash(sourceOwner string, definitions []PermissionDefiniti
 	}
 	snapshotHash := sha256.Sum256(rawSnapshot)
 	return hex.EncodeToString(snapshotHash[:]), nil
+}
+
+func canonicalPermissionDefinitions(source []PermissionDefinition) ([]PermissionDefinition, error) {
+	result := make([]PermissionDefinition, len(source))
+	for index, definition := range source {
+		canonical, err := canonicalPermissionDefinition(definition)
+		if err != nil {
+			return nil, err
+		}
+		result[index] = canonical
+	}
+	return result, nil
+}
+
+func canonicalPermissionDefinition(source PermissionDefinition) (PermissionDefinition, error) {
+	result := source
+	result.PermissionKey = strings.TrimSpace(source.PermissionKey)
+	result.ModuleKey = strings.TrimSpace(source.ModuleKey)
+	result.GroupKey = strings.TrimSpace(source.GroupKey)
+	result.ResourceKey = strings.TrimSpace(source.ResourceKey)
+	result.OperationKey = strings.TrimSpace(source.OperationKey)
+	result.Label = strings.TrimSpace(source.Label)
+	result.Description = strings.TrimSpace(source.Description)
+	result.Category = strings.TrimSpace(source.Category)
+	result.SourceKind = strings.TrimSpace(source.SourceKind)
+	result.GrantMode = strings.TrimSpace(source.GrantMode)
+	result.ScopeKind = strings.TrimSpace(source.ScopeKind)
+	result.ObjectKey = strings.TrimSpace(source.ObjectKey)
+	result.DefaultLocale = strings.TrimSpace(source.DefaultLocale)
+	result.I18n = make(PermissionLocalizedText, len(source.I18n))
+	for rawLocale, rawText := range source.I18n {
+		locale := strings.TrimSpace(rawLocale)
+		if locale == "" {
+			return PermissionDefinition{}, &Error{Class: ErrorClassBadRequest, Code: "identity.permission_definition_invalid"}
+		}
+		result.I18n[locale] = PermissionText{
+			ModuleLabel: strings.TrimSpace(rawText.ModuleLabel), GroupLabel: strings.TrimSpace(rawText.GroupLabel),
+			ResourceLabel: strings.TrimSpace(rawText.ResourceLabel), OperationLabel: strings.TrimSpace(rawText.OperationLabel),
+			Label: strings.TrimSpace(rawText.Label), Description: strings.TrimSpace(rawText.Description),
+		}
+	}
+	text, found := result.I18n[result.DefaultLocale]
+	validGrantMode := result.GrantMode == "direct" || result.GrantMode == "bundled" || result.GrantMode == "internal"
+	validScope := result.ScopeKind == "none" && result.ObjectKey == "" || result.ScopeKind == "record" && validSourceOwner(result.ObjectKey)
+	if !validSourceOwner(result.PermissionKey) || !validSourceOwner(result.ModuleKey) || !validSourceOwner(result.GroupKey) ||
+		!validSourceOwner(result.ResourceKey) || !validSourceOwner(result.OperationKey) || result.PermissionKey != result.ResourceKey+"."+result.OperationKey ||
+		result.Label == "" || result.Category == "" || result.SourceKind == "" || !validGrantMode || !validScope || result.DefaultLocale == "" || !found ||
+		text.ModuleLabel == "" || text.GroupLabel == "" || text.ResourceLabel == "" || text.OperationLabel == "" || text.Label == "" {
+		return PermissionDefinition{}, &Error{Class: ErrorClassBadRequest, Code: "identity.permission_definition_invalid"}
+	}
+	return result, nil
 }
 
 func validSourceOwner(value string) bool {

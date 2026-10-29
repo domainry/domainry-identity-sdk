@@ -51,6 +51,22 @@ type Factory interface {
 	Open(context.Context, ApplicationRef) (Binding, error)
 }
 
+// GlobalApplicationFactory marks a SaaS factory whose application is shared
+// across Workspaces. Runtime must not replace that global scope with its local
+// technical installation Workspace when opening the Binding.
+type GlobalApplicationFactory interface {
+	Factory
+	GlobalApplicationBinding() bool
+}
+
+// GlobalApplicationBinding is a SaaS application Binding that is not pinned
+// to one Workspace. It publishes installation-global catalogs and resolves
+// tenant scope from authenticated requests.
+type GlobalApplicationBinding interface {
+	Binding
+	IsGlobalApplication() bool
+}
+
 // PermissionUsageProviderBinder is implemented only by an embedded Identity
 // module. The host binds its live Action registry projection after composing
 // all Runtime and module Actions. Remote Identity queries the same contract
@@ -476,6 +492,8 @@ type ApplicationRegistration = authorization.ApplicationRegistration
 type ApplicationRegistrationReceipt = authorization.ApplicationRegistrationReceipt
 type ApplicationRegistry = authorization.ApplicationRegistry
 type PermissionDefinition = authorization.PermissionDefinition
+type PermissionText = authorization.PermissionText
+type PermissionLocalizedText = authorization.PermissionLocalizedText
 type PermissionReconcileRequest = authorization.PermissionReconcileRequest
 type PermissionReconcileReceipt = authorization.PermissionReconcileReceipt
 type PermissionRegistry = authorization.PermissionRegistry
@@ -483,8 +501,8 @@ type PermissionSourceSnapshotRequest = authorization.PermissionSourceSnapshotReq
 type PermissionSourceSnapshot = authorization.PermissionSourceSnapshot
 type PermissionSnapshotReader = authorization.PermissionSnapshotReader
 
-func NewPermissionReconcileRequest(application ApplicationRef, sourceOwner, previousSnapshotHash string, definitions []PermissionDefinition) (PermissionReconcileRequest, error) {
-	return authorization.NewPermissionReconcileRequest(application, sourceOwner, previousSnapshotHash, definitions)
+func NewPermissionReconcileRequest(sourceOwner, previousSnapshotHash string, definitions []PermissionDefinition) (PermissionReconcileRequest, error) {
+	return authorization.NewPermissionReconcileRequest(sourceOwner, previousSnapshotHash, definitions)
 }
 
 func PermissionSnapshotHash(sourceOwner string, definitions []PermissionDefinition) (string, error) {
@@ -499,9 +517,6 @@ type DataScope = authorization.DataScope
 type ProjectRoleCatalog = authorization.ProjectRoleCatalog
 type ProjectRoleCatalogReceipt = authorization.ProjectRoleCatalogReceipt
 type ProjectRoleCatalogPublisher = authorization.ProjectRoleCatalogPublisher
-type ProjectRolePermissionBundleRequest = authorization.ProjectRolePermissionBundleRequest
-type ProjectRolePermissionBundleReceipt = authorization.ProjectRolePermissionBundleReceipt
-type ProjectRolePermissionBundlePublisher = authorization.ProjectRolePermissionBundlePublisher
 
 // WorkspaceBootstrapProjectRoleCatalogSHA256 is the shared canonical digest
 // used by Runtime and Identity for the trusted Workspace bootstrap role policy.

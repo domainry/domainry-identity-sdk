@@ -29,6 +29,15 @@ func (adapter permissionRegistry) Reconcile(ctx context.Context, request identit
 	return receipt, err
 }
 
+func (adapter *binding) PublishProjectRoles(ctx context.Context, request identity.ProjectRoleCatalog) (identity.ProjectRoleCatalogReceipt, error) {
+	if err := request.ValidateContract(); err != nil {
+		return identity.ProjectRoleCatalogReceipt{}, err
+	}
+	var receipt identity.ProjectRoleCatalogReceipt
+	err := adapter.client.doJSON(ctx, http.MethodPut, "/identity/project-roles/reconcile", adapter.client.serviceAccessToken, request, &receipt)
+	return receipt, err
+}
+
 func (adapter permissionRegistry) CurrentSourceSnapshot(ctx context.Context, request identity.PermissionSourceSnapshotRequest) (identity.PermissionSourceSnapshot, error) {
 	if err := request.ValidateContract(); err != nil {
 		return identity.PermissionSourceSnapshot{}, err

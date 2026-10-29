@@ -5,6 +5,18 @@ import (
 	"testing"
 )
 
+func testPermissionDefinition(resourceKey, operationKey, label, category, sourceKind string) PermissionDefinition {
+	key := resourceKey + "." + operationKey
+	return PermissionDefinition{
+		PermissionKey: key, ModuleKey: "test", GroupKey: resourceKey,
+		ResourceKey: resourceKey, OperationKey: operationKey, Label: label, Category: category, SourceKind: sourceKind,
+		GrantMode: "direct", ScopeKind: "none", DefaultLocale: "en",
+		I18n: PermissionLocalizedText{"en": {
+			ModuleLabel: "Test", GroupLabel: category, ResourceLabel: category, OperationLabel: operationKey, Label: label,
+		}},
+	}
+}
+
 func TestApplicationRegistrationAndPermissionSnapshotValidation(t *testing.T) {
 	registration := ApplicationRegistration{
 		Application:  ApplicationRef{WorkspaceID: "workspace", ApplicationKey: "runtime"},
@@ -17,16 +29,15 @@ func TestApplicationRegistrationAndPermissionSnapshotValidation(t *testing.T) {
 		t.Fatalf("canonical redirects=%v", got)
 	}
 	request := PermissionReconcileRequest{
-		Application: registration.Application,
 		SourceOwner: "application:runtime",
-		Definitions: []PermissionDefinition{{PermissionKey: "customer.read", ResourceKey: "customer", OperationKey: "read", Label: "Read customers", Category: "Customer", SourceKind: "object_default"}},
+		Definitions: []PermissionDefinition{testPermissionDefinition("customer", "read", "Read customers", "Customer", "object_default")},
 	}
 	request.SnapshotHash, _ = PermissionSnapshotHash(request.SourceOwner, request.Definitions)
 	if err := request.ValidateContract(); err != nil {
 		t.Fatal(err)
 	}
 	receipt := PermissionReconcileReceipt{
-		WorkspaceID: request.Application.WorkspaceID, SourceOwner: request.SourceOwner,
+		SourceOwner:          request.SourceOwner,
 		PreviousSnapshotHash: request.PreviousSnapshotHash, SnapshotHash: request.SnapshotHash,
 		DefinitionCount: len(request.Definitions), Inserted: len(request.Definitions),
 	}
@@ -48,7 +59,7 @@ func TestApplicationRegistrationAndPermissionSnapshotValidation(t *testing.T) {
 		t.Fatalf("invalid receipt error=%#v", err)
 	}
 	reordered := PermissionReconcileRequest{SourceOwner: request.SourceOwner, Definitions: []PermissionDefinition{
-		{PermissionKey: "customer.update", ResourceKey: "customer", OperationKey: "update", Label: "Update customers", Category: "Customer", SourceKind: "object_default"},
+		testPermissionDefinition("customer", "update", "Update customers", "Customer", "object_default"),
 		request.Definitions[0],
 	}}
 	firstHash, err := PermissionSnapshotHash(reordered.SourceOwner, reordered.Definitions)
@@ -93,18 +104,14 @@ func TestApplicationRegistrationAndPermissionSnapshotValidation(t *testing.T) {
 
 func TestPermissionSourceSnapshotValidation(t *testing.T) {
 	request := PermissionSourceSnapshotRequest{
-		Application: ApplicationRef{WorkspaceID: "workspace", ApplicationKey: "runtime"},
 		SourceOwner: "module:notification",
 	}
-	definitions := []PermissionDefinition{{
-		PermissionKey: "notification.templates.list", ResourceKey: "notification.templates", OperationKey: "list",
-		Label: "List templates", Category: "Notification", SourceKind: "module_http",
-	}}
+	definitions := []PermissionDefinition{testPermissionDefinition("notification.templates", "list", "List templates", "Notification", "module_http")}
 	hash, err := PermissionSnapshotHash(request.SourceOwner, definitions)
 	if err != nil {
 		t.Fatal(err)
 	}
-	valid := PermissionSourceSnapshot{WorkspaceID: "workspace", SourceOwner: request.SourceOwner, SnapshotHash: hash, Definitions: definitions}
+	valid := PermissionSourceSnapshot{SourceOwner: request.SourceOwner, SnapshotHash: hash, Definitions: definitions}
 	if err := valid.ValidateFor(request); err != nil {
 		t.Fatal(err)
 	}

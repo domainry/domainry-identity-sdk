@@ -17,7 +17,11 @@ func (adapter authentication) Providers(ctx context.Context, query identity.Prov
 		return nil, err
 	}
 	var providers []identity.Provider
-	if err := adapter.client.doJSON(ctx, http.MethodGet, "/auth/providers", "", nil, &providers); err != nil {
+	endpoint, credential := "/auth/providers", ""
+	if adapter.client.workspaceID == "" {
+		endpoint, credential = "/identity/browser/providers", adapter.client.serviceAccessToken
+	}
+	if err := adapter.client.doJSON(ctx, http.MethodGet, endpoint, credential, nil, &providers); err != nil {
 		return nil, err
 	}
 	return providers, nil
@@ -42,7 +46,11 @@ func (adapter authentication) LoginWithPasswordOutcome(ctx context.Context, requ
 		return identity.AuthenticationOutcome{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "auth.login_request_invalid"}
 	}
 	var raw json.RawMessage
-	if err := adapter.client.doJSON(ctx, http.MethodPost, "/auth/login", "", request, &raw); err != nil {
+	endpoint, credential := "/auth/login", ""
+	if adapter.client.workspaceID == "" {
+		endpoint, credential = "/identity/browser/login", adapter.client.serviceAccessToken
+	}
+	if err := adapter.client.doJSON(ctx, http.MethodPost, endpoint, credential, request, &raw); err != nil {
 		return identity.AuthenticationOutcome{}, err
 	}
 	return decodeAuthenticationOutcome(raw)
@@ -166,7 +174,11 @@ func (adapter authentication) RefreshSession(ctx context.Context, request identi
 	request.ApplicationKey = identity.ApplicationKey(applicationKey)
 	payload := map[string]string{"workspace_id": string(request.WorkspaceID), "application_key": applicationKey, "refresh_token": strings.TrimSpace(request.RefreshToken)}
 	var session identity.AuthSession
-	if err := adapter.client.doJSON(ctx, http.MethodPost, "/auth/refresh", "", payload, &session); err != nil {
+	endpoint, credential := "/auth/refresh", ""
+	if adapter.client.workspaceID == "" {
+		endpoint, credential = "/identity/browser/refresh", adapter.client.serviceAccessToken
+	}
+	if err := adapter.client.doJSON(ctx, http.MethodPost, endpoint, credential, payload, &session); err != nil {
 		return identity.AuthSession{}, err
 	}
 	return session, nil
@@ -181,7 +193,11 @@ func (adapter authentication) LogoutSession(ctx context.Context, request identit
 	if err != nil {
 		return err
 	}
-	return adapter.client.doJSON(ctx, http.MethodPost, "/auth/logout", "", map[string]string{"workspace_id": string(request.WorkspaceID), "application_key": applicationKey, "refresh_token": strings.TrimSpace(request.RefreshToken)}, nil)
+	endpoint, credential := "/auth/logout", ""
+	if adapter.client.workspaceID == "" {
+		endpoint, credential = "/identity/browser/logout", adapter.client.serviceAccessToken
+	}
+	return adapter.client.doJSON(ctx, http.MethodPost, endpoint, credential, map[string]string{"workspace_id": string(request.WorkspaceID), "application_key": applicationKey, "refresh_token": strings.TrimSpace(request.RefreshToken)}, nil)
 }
 
 func (adapter authentication) CurrentSession(ctx context.Context, request identity.CurrentSessionRequest) (identity.SessionView, error) {
@@ -202,6 +218,9 @@ func (adapter authentication) requireWorkspace(workspaceID identity.WorkspaceID)
 	resolved := strings.TrimSpace(string(workspaceID))
 	if resolved == "" {
 		resolved = adapter.client.resolveWorkspace("")
+	}
+	if resolved == "" && adapter.client.workspaceID == "" {
+		return nil
 	}
 	if resolved == "" || adapter.client.workspaceID != "" && resolved != adapter.client.workspaceID {
 		return &identity.Error{Class: identity.ErrorClassForbidden, Code: "auth.workspace_mismatch"}

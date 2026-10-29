@@ -13,6 +13,14 @@ type Factory struct{ config Config }
 
 func NewFactory(config Config) *Factory { return &Factory{config: config} }
 
+func (factory *Factory) GlobalApplicationBinding() bool {
+	return factory != nil && strings.TrimSpace(factory.config.WorkspaceID) == ""
+}
+
+func (factory *Factory) OpenExternalWithDatabase(ctx context.Context, application identity.ApplicationRef, _ identity.DatabaseHandle) (identity.Binding, error) {
+	return factory.Open(ctx, application)
+}
+
 func (factory *Factory) Open(ctx context.Context, application identity.ApplicationRef) (identity.Binding, error) {
 	if ctx == nil {
 		return nil, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.context_required"}
@@ -53,8 +61,11 @@ func (factory *Factory) Open(ctx context.Context, application identity.Applicati
 	delegate := &binding{client: client, tokens: verifier, descriptor: identity.Descriptor{
 		ProtocolVersion: identity.CurrentProtocolVersion, BundleVersion: identity.CurrentPolicyBundleVersion,
 		AuthorizationVersion: identity.CurrentAuthorizationContractVersion, Mode: identity.DeploymentModeSaaS, Issuer: issuer, Audience: audience,
-		Capabilities: []string{"authentication", "challenge_authentication", "action_assurance", "token_verification", "authorization", "principal_resolution", "workflow_workload_identity", "identity_projection", "application_registration", "permission_reconciliation", "credentials", "oidc", "saml"},
+		Capabilities: []string{"authentication", "challenge_authentication", "action_assurance", "token_verification", "authorization", "principal_resolution", "workflow_workload_identity", "identity_projection", "application_registration", "permission_reconciliation", "project_role_catalog", "credentials", "oidc", "saml"},
 	}}
+	if application.WorkspaceID == "" {
+		return identityapplication.BindGlobal(delegate, application.ApplicationKey)
+	}
 	return identityapplication.Bind(delegate, application)
 }
 
@@ -62,8 +73,8 @@ func remoteApplication(config Config, application identity.ApplicationRef) (Conf
 	configured := identity.ApplicationRef{
 		WorkspaceID: identity.WorkspaceID(strings.TrimSpace(config.WorkspaceID)), ApplicationKey: identity.ApplicationKey(strings.TrimSpace(config.Audience)),
 	}
-	if application.WorkspaceID.Valid() || application.ApplicationKey.Valid() {
-		if !application.WorkspaceID.Valid() || !application.ApplicationKey.Valid() {
+	if strings.TrimSpace(string(application.WorkspaceID)) != "" || application.ApplicationKey.Valid() {
+		if strings.TrimSpace(string(application.WorkspaceID)) != "" && !application.WorkspaceID.Valid() || !application.ApplicationKey.Valid() {
 			return Config{}, identity.ApplicationRef{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.application_scope_invalid"}
 		}
 		if configured.WorkspaceID != "" && configured.WorkspaceID != application.WorkspaceID || configured.ApplicationKey != "" && configured.ApplicationKey != application.ApplicationKey {
@@ -72,7 +83,7 @@ func remoteApplication(config Config, application identity.ApplicationRef) (Conf
 	} else {
 		application = configured
 	}
-	if !application.WorkspaceID.Valid() || !application.ApplicationKey.Valid() {
+	if strings.TrimSpace(string(application.WorkspaceID)) != "" && !application.WorkspaceID.Valid() || !application.ApplicationKey.Valid() {
 		return Config{}, identity.ApplicationRef{}, &identity.Error{Class: identity.ErrorClassBadRequest, Code: "identity.application_scope_invalid"}
 	}
 	config.WorkspaceID, config.Audience = string(application.WorkspaceID), string(application.ApplicationKey)
@@ -86,7 +97,7 @@ func validateDiscovery(descriptor identity.Descriptor, expectedIssuer string) er
 	if strings.TrimSpace(descriptor.Issuer) != strings.TrimSpace(expectedIssuer) {
 		return &identity.Error{Class: identity.ErrorClassUnavailable, Code: "identity.issuer_mismatch"}
 	}
-	required := map[string]bool{"authentication": false, "challenge_authentication": false, "action_assurance": false, "token_verification": false, "authorization": false, "principal_resolution": false, "workflow_workload_identity": false, "identity_projection": false, "application_registration": false, "permission_reconciliation": false}
+	required := map[string]bool{"authentication": false, "challenge_authentication": false, "action_assurance": false, "token_verification": false, "authorization": false, "principal_resolution": false, "workflow_workload_identity": false, "identity_projection": false, "application_registration": false, "permission_reconciliation": false, "project_role_catalog": false}
 	for _, capability := range descriptor.Capabilities {
 		if _, exists := required[capability]; exists {
 			required[capability] = true
@@ -145,7 +156,10 @@ func (value *binding) ApplicationServiceVerifier() identity.ApplicationServiceTo
 func (value *binding) Close(context.Context) error { return nil }
 
 var _ identity.Factory = (*Factory)(nil)
+var _ identity.GlobalApplicationFactory = (*Factory)(nil)
+var _ identity.ExternalDatabaseFactory = (*Factory)(nil)
 var _ identity.Binding = (*binding)(nil)
 var _ identity.ApplicationServiceBinding = (*binding)(nil)
 var _ identity.ApplicationServiceVerificationBinding = (*binding)(nil)
 var _ identity.WorkflowWorkloadIdentityBinding = (*binding)(nil)
+var _ identity.ProjectRoleCatalogPublisher = (*binding)(nil)

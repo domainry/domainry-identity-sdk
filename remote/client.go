@@ -23,15 +23,16 @@ const (
 )
 
 type client struct {
-	baseURL            *url.URL
-	workspaceID        string
-	applicationKey     string
-	httpClient         *http.Client
-	userAgent          string
-	serviceAccessToken string
-	requestTimeout     time.Duration
-	retry              RetryPolicy
-	breaker            *availabilityCircuitBreaker
+	baseURL                               *url.URL
+	workspaceID                           string
+	applicationKey                        string
+	httpClient                            *http.Client
+	userAgent                             string
+	serviceAccessToken                    string
+	applicationServiceVerifierAccessToken string
+	requestTimeout                        time.Duration
+	retry                                 RetryPolicy
+	breaker                               *availabilityCircuitBreaker
 }
 
 func newClient(config Config) (*client, error) {
@@ -58,7 +59,8 @@ func newClient(config Config) (*client, error) {
 	}
 	return &client{
 		baseURL: baseURL, workspaceID: strings.TrimSpace(config.WorkspaceID), applicationKey: strings.TrimSpace(config.Audience),
-		httpClient: telemetry.InstrumentHTTPClient(httpClient, "github.com/domainry/domainry-identity-sdk/remote"), userAgent: userAgent, serviceAccessToken: strings.TrimSpace(config.ServiceAccessToken),
+		httpClient: telemetry.InstrumentHTTPClient(httpClient, "github.com/domainry/domainry-identity-sdk/remote"), userAgent: userAgent,
+		serviceAccessToken: strings.TrimSpace(config.ServiceAccessToken), applicationServiceVerifierAccessToken: strings.TrimSpace(config.ApplicationServiceVerifierAccessToken),
 		requestTimeout: config.RequestTimeout, retry: config.Retry,
 		breaker: newAvailabilityCircuitBreaker(config.CircuitBreaker, config.Clock),
 	}, nil

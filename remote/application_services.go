@@ -33,7 +33,11 @@ func (adapter applicationServices) Verify(ctx context.Context, request identity.
 	var principal identity.ApplicationServicePrincipal
 	headers := http.Header{}
 	headers.Set("X-Domainry-Workspace-ID", adapter.client.workspaceID)
-	if err := adapter.client.doJSONWithHeaders(ctx, http.MethodPost, "/identity/application-service/verify", adapter.client.serviceAccessToken, request, &principal, headers); err != nil {
+	credential := adapter.client.applicationServiceVerifierAccessToken
+	if credential == "" {
+		credential = adapter.client.serviceAccessToken
+	}
+	if err := adapter.client.doJSONWithHeaders(ctx, http.MethodPost, "/identity/application-service/verify", credential, request, &principal, headers); err != nil {
 		return identity.ApplicationServicePrincipal{}, err
 	}
 	return principal, nil

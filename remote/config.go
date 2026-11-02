@@ -25,12 +25,17 @@ type Config struct {
 	Issuer             string
 	Audience           string
 	ServiceAccessToken string
-	HTTPClient         *http.Client
-	UserAgent          string
-	RequestTimeout     time.Duration
-	Retry              RetryPolicy
-	CircuitBreaker     CircuitBreakerPolicy
-	Clock              identity.Clock
+	// ApplicationServiceVerifierAccessToken authenticates this application
+	// when it verifies an incoming application-service token. Global SaaS
+	// applications can use their global service credential here without
+	// reusing the Workspace-scoped credential needed by other Identity APIs.
+	ApplicationServiceVerifierAccessToken string
+	HTTPClient                            *http.Client
+	UserAgent                             string
+	RequestTimeout                        time.Duration
+	Retry                                 RetryPolicy
+	CircuitBreaker                        CircuitBreakerPolicy
+	Clock                                 identity.Clock
 }
 
 func normalizedConfig(config Config) Config {

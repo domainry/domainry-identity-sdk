@@ -64,3 +64,31 @@ func TestApplicationServicesExchangeAndVerifyKeepStaticCredentialAtIdentity(t *t
 		t.Fatalf("principal=%+v err=%v", principal, err)
 	}
 }
+
+func TestApplicationServicesVerifyUsesDedicatedVerifierCredential(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/identity/application-service/verify" {
+			http.NotFound(response, request)
+			return
+		}
+		if request.Header.Get("Authorization") != "Bearer global-resource-credential" {
+			t.Fatalf("verify authorization=%q", request.Header.Get("Authorization"))
+		}
+		_ = json.NewEncoder(response).Encode(identity.ApplicationServicePrincipal{SubjectID: "service:orders-runtime", Audience: "domainry-notification"})
+	}))
+	t.Cleanup(server.Close)
+	client, err := newClient(Config{
+		Endpoint: server.URL, Audience: "domainry-notification", ServiceAccessToken: "workspace-registration-credential",
+		ApplicationServiceVerifierAccessToken: "global-resource-credential", HTTPClient: server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	grant := identity.ApplicationServiceGrant{Resource: "notification_event", Action: "publish"}
+	principal, err := (applicationServices{client: client}).Verify(t.Context(), identity.VerifyApplicationServiceTokenRequest{
+		AccessToken: "short-token", Audience: "domainry-notification", Grant: grant,
+	})
+	if err != nil || principal.SubjectID != "service:orders-runtime" {
+		t.Fatalf("principal=%+v err=%v", principal, err)
+	}
+}

@@ -201,7 +201,9 @@ func (gateway *Gateway) ExchangeAuthorizationCode(w http.ResponseWriter, r *http
 
 func validatedReturnURL(raw string) (*url.URL, bool) {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
-	return parsed, err == nil && parsed.IsAbs() && (parsed.Scheme == "https" || parsed.Scheme == "http" && (parsed.Hostname() == "localhost" || parsed.Hostname() == "127.0.0.1"))
+	// Match application registration: the Identity authority checks the exact
+	// registered callback before issuing a code. Private hosts may use HTTP.
+	return parsed, err == nil && parsed.IsAbs() && parsed.Host != "" && parsed.User == nil && parsed.Fragment == "" && (parsed.Scheme == "https" || parsed.Scheme == "http")
 }
 
 func validReturnURL(raw string) bool {

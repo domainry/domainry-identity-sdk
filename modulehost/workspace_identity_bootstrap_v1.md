@@ -1,16 +1,16 @@
-# Workspace Identity bootstrap V1
+# Workspace Identity bootstrap V5
 
 Workspace bootstrap is a trusted in-process contract. Its only protocol is
-`domainry-workspace-identity-bootstrap-v1`, with SHA-256
-`2437c3597855a0985c63d82bc4f524e4e28053ba54d956c790262a1500d7c53c`.
+`domainry-workspace-identity-bootstrap-v5`, with SHA-256
+`09d8c1814de8b9a8b0e19c65e3bba2aeb863d6bebf89b0e2f3e2c37ee22cb13c`.
 
 The host binds a `ProjectRoleCatalog` before the first Workspace transaction.
 `InitialWorkspaceAdministratorRoleKey` is mandatory. Identity provisions every
-role marked `provision_to_workspaces=true` whose audience is `any`, `user`, or
-`business_profile` and whose assignment mode is `manual` or `request_only`.
+role whose audience is `any`, `user`, or `business_profile` and whose assignment
+mode is `manual` or `request_only`.
 The initial administrator role is more restrictive: it must be explicitly
-named, provisioned, manually assignable, have audience `any` or `user`, and
-must not require another binding.
+named, manually assignable, have audience `any` or `user`, and must not require
+another binding.
 
 The SDK canonicalizes the complete selected authorization definitions and the
 explicit administrator key through

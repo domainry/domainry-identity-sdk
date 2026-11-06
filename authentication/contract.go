@@ -89,6 +89,14 @@ type PasswordLoginRequest struct {
 	Password       string         `json:"password"`
 }
 
+type ProviderPasswordLoginRequest struct {
+	WorkspaceID    WorkspaceID    `json:"workspace_id"`
+	ApplicationKey ApplicationKey `json:"application_key,omitempty"`
+	Provider       string         `json:"provider"`
+	Login          string         `json:"login"`
+	Password       string         `json:"password"`
+}
+
 type BeginFederatedLoginRequest struct {
 	WorkspaceID    WorkspaceID    `json:"workspace_id"`
 	ApplicationKey ApplicationKey `json:"application_key,omitempty"`
@@ -250,6 +258,14 @@ type Authentication interface {
 type ChallengeAuthentication interface {
 	LoginWithPasswordOutcome(context.Context, PasswordLoginRequest) (AuthenticationOutcome, error)
 	VerifyOTPOutcome(context.Context, VerifyOTPRequest) (AuthenticationOutcome, error)
+}
+
+// ProviderPasswordAuthentication is an optional server-side authentication
+// capability for password-verifying providers such as LDAP. The application
+// password is forwarded only to the Identity authority and is never treated
+// as an Identity-owned credential.
+type ProviderPasswordAuthentication interface {
+	LoginWithProviderPassword(context.Context, ProviderPasswordLoginRequest) (AuthSession, error)
 }
 
 type ChangePasswordRequest struct {

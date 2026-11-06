@@ -41,6 +41,7 @@ func browserGatewayRouteSpecs() []browserGatewayRouteSpec {
 		{key: "identity.browser.providers.list", capabilityKey: "identity.browser.providers", capabilityLabel: "Browser identity providers", operationKey: "list", operationLabel: "List", label: "List browser identity providers", method: http.MethodGet, suffix: "/auth/providers", handlerKey: "providers", authorization: anonymous, risk: actioncontract.RiskLow},
 		{key: "identity.browser.providers.start_get", capabilityKey: "identity.browser.providers", capabilityLabel: "Browser identity providers", operationKey: "start_get", operationLabel: "Start", label: "Start a browser provider challenge", method: http.MethodGet, suffix: "/auth/providers/{provider}/start", handlerKey: "provider_start", authorization: anonymous, risk: actioncontract.RiskMedium},
 		{key: "identity.browser.providers.start_post", capabilityKey: "identity.browser.providers", capabilityLabel: "Browser identity providers", operationKey: "start_post", operationLabel: "Start", label: "Start a browser provider challenge", method: http.MethodPost, suffix: "/auth/providers/{provider}/start", handlerKey: "provider_start", authorization: anonymous, risk: actioncontract.RiskMedium},
+		{key: "identity.browser.providers.password_login", capabilityKey: "identity.browser.providers", capabilityLabel: "Browser identity providers", operationKey: "password_login", operationLabel: "Login", label: "Create a browser session through a password-verifying provider", method: http.MethodPost, suffix: "/auth/providers/{provider}/login", handlerKey: "provider_password_login", authorization: anonymous, risk: actioncontract.RiskMedium},
 		{key: "identity.browser.providers.callback_get", capabilityKey: "identity.browser.providers", capabilityLabel: "Browser identity providers", operationKey: "callback_get", operationLabel: "Callback", label: "Complete a browser provider callback", method: http.MethodGet, suffix: "/auth/providers/{provider}/callback", handlerKey: "provider_callback", authorization: anonymous, risk: actioncontract.RiskMedium},
 		{key: "identity.browser.providers.callback_post", capabilityKey: "identity.browser.providers", capabilityLabel: "Browser identity providers", operationKey: "callback_post", operationLabel: "Callback", label: "Complete a browser provider callback", method: http.MethodPost, suffix: "/auth/providers/{provider}/callback", handlerKey: "provider_callback", authorization: anonymous, risk: actioncontract.RiskMedium},
 		{key: "identity.browser.providers.verify", capabilityKey: "identity.browser.providers", capabilityLabel: "Browser identity providers", operationKey: "verify", operationLabel: "Verify", label: "Verify a browser provider challenge", method: http.MethodPost, suffix: "/auth/providers/{provider}/verify", handlerKey: "provider_verify", authorization: anonymous, risk: actioncontract.RiskMedium},
@@ -110,6 +111,8 @@ func (gateway *Gateway) routeHandler(handlerKey string) http.HandlerFunc {
 		return gateway.Providers
 	case "provider_start":
 		return gateway.StartProvider
+	case "provider_password_login":
+		return gateway.LoginWithProviderPassword
 	case "provider_callback":
 		return gateway.ProviderCallback
 	case "provider_verify":

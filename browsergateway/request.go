@@ -20,6 +20,12 @@ type browserPasswordLoginRequest struct {
 	Password    string               `json:"password"`
 }
 
+type browserProviderPasswordLoginRequest struct {
+	WorkspaceID identity.WorkspaceID `json:"workspace_id,omitempty"`
+	Login       string               `json:"login"`
+	Password    string               `json:"password"`
+}
+
 type browserProviderStartRequest struct {
 	WorkspaceID identity.WorkspaceID `json:"workspace_id,omitempty"`
 	ReturnURL   string               `json:"return_url,omitempty"`

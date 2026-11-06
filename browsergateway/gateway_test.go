@@ -31,7 +31,7 @@ func TestBrowserGatewayRoutesProjectOneFrozenActionManifest(t *testing.T) {
 	if err := registry.Freeze(); err != nil {
 		t.Fatal(err)
 	}
-	if len(definitions) != 19 || len(patterns) != len(definitions) {
+	if len(definitions) != 20 || len(patterns) != len(definitions) {
 		t.Fatalf("definitions=%d patterns=%d", len(definitions), len(patterns))
 	}
 	for index, definition := range definitions {
@@ -92,18 +92,19 @@ func (*testExternalAccounts) UnbindExternalAccount(context.Context, identity.Unb
 }
 
 type testAuthentication struct {
-	providerQuery   identity.ProviderQuery
-	loginRequest    identity.PasswordLoginRequest
-	loginSession    identity.AuthSession
-	beginRequest    identity.BeginFederatedLoginRequest
-	exchangeRequest identity.ExchangeAuthorizationCodeRequest
-	verifyRequest   identity.VerifyOTPRequest
-	refreshRequest  identity.RefreshRequest
-	refreshError    error
-	logoutRequest   identity.LogoutRequest
-	logoutError     error
-	currentRequest  identity.CurrentSessionRequest
-	currentSession  identity.SessionView
+	providerQuery           identity.ProviderQuery
+	loginRequest            identity.PasswordLoginRequest
+	loginSession            identity.AuthSession
+	providerPasswordRequest identity.ProviderPasswordLoginRequest
+	beginRequest            identity.BeginFederatedLoginRequest
+	exchangeRequest         identity.ExchangeAuthorizationCodeRequest
+	verifyRequest           identity.VerifyOTPRequest
+	refreshRequest          identity.RefreshRequest
+	refreshError            error
+	logoutRequest           identity.LogoutRequest
+	logoutError             error
+	currentRequest          identity.CurrentSessionRequest
+	currentSession          identity.SessionView
 }
 
 func (authentication *testAuthentication) Providers(_ context.Context, request identity.ProviderQuery) ([]identity.Provider, error) {
@@ -116,6 +117,10 @@ func (authentication *testAuthentication) LoginWithPassword(_ context.Context, r
 		return authentication.loginSession, nil
 	}
 	return fakeAuthSession("login-refresh"), nil
+}
+func (authentication *testAuthentication) LoginWithProviderPassword(_ context.Context, request identity.ProviderPasswordLoginRequest) (identity.AuthSession, error) {
+	authentication.providerPasswordRequest = request
+	return fakeAuthSession("provider-password-refresh"), nil
 }
 func (authentication *testAuthentication) BeginFederatedLogin(_ context.Context, request identity.BeginFederatedLoginRequest) (identity.ProviderChallenge, error) {
 	authentication.beginRequest = request
@@ -283,6 +288,26 @@ func TestGatewayKeepsRefreshCredentialInHTTPOnlyCookie(t *testing.T) {
 	}
 	if authentication.loginRequest.ApplicationKey != "identity-admin" || authentication.loginRequest.WorkspaceID != "workspace-primary" {
 		t.Fatalf("login request=%#v", authentication.loginRequest)
+	}
+}
+
+func TestGatewayCreatesLDAPBrowserSessionWithoutExposingApplicationScope(t *testing.T) {
+	authentication := &testAuthentication{}
+	mux := newTestGateway(t, authentication)
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/browser/auth/providers/ldap/login", strings.NewReader(`{"workspace_id":"workspace-primary","login":"alice","password":"directory-secret"}`))
+	request.Header.Set("X-Workspace-ID", "workspace-primary")
+	mux.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	requestValue := authentication.providerPasswordRequest
+	if requestValue.Provider != "ldap" || requestValue.Login != "alice" || requestValue.Password != "directory-secret" || requestValue.WorkspaceID != "workspace-primary" || requestValue.ApplicationKey != "identity-admin" {
+		t.Fatalf("provider password request=%#v", requestValue)
+	}
+	cookies := response.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Value != "provider-password-refresh" || !cookies[0].HttpOnly {
+		t.Fatalf("cookies=%#v", cookies)
 	}
 }
 

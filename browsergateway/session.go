@@ -38,6 +38,31 @@ func (gateway *Gateway) Login(w http.ResponseWriter, r *http.Request) {
 	gateway.writeBrowserSession(w, r, session)
 }
 
+func (gateway *Gateway) LoginWithProviderPassword(w http.ResponseWriter, r *http.Request) {
+	var browserRequest browserProviderPasswordLoginRequest
+	if !gateway.decodeJSON(w, r, &browserRequest) {
+		return
+	}
+	workspaceID, ok := gateway.workspaceID(w, r, browserRequest.WorkspaceID)
+	if !ok {
+		return
+	}
+	authentication, ok := gateway.binding.Authentication().(identity.ProviderPasswordAuthentication)
+	if !ok {
+		gateway.writeCode(w, r, http.StatusServiceUnavailable, "auth.provider_password_login_unavailable")
+		return
+	}
+	session, err := authentication.LoginWithProviderPassword(r.Context(), identity.ProviderPasswordLoginRequest{
+		WorkspaceID: workspaceID, ApplicationKey: gateway.config.ApplicationKey, Provider: r.PathValue("provider"),
+		Login: browserRequest.Login, Password: browserRequest.Password,
+	})
+	if err != nil {
+		gateway.writeError(w, r, err)
+		return
+	}
+	gateway.writeBrowserSession(w, r, session)
+}
+
 func (gateway *Gateway) writeBrowserAuthenticationOutcome(w http.ResponseWriter, r *http.Request, workspaceID identity.WorkspaceID, outcome identity.AuthenticationOutcome) {
 	if outcome.Status == identity.AuthenticationStatusChallengeRequired && outcome.Challenge != nil {
 		gateway.writeJSON(w, http.StatusOK, browserAuthenticationOutcome{Status: outcome.Status, WorkspaceID: workspaceID, Challenge: outcome.Challenge})

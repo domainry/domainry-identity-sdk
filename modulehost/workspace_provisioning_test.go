@@ -25,8 +25,7 @@ func TestWorkspaceIdentityBootstrapIsNonHTTPAndCredentialNeverSerializes(t *test
 		ContractVersion: WorkspaceIdentityBootstrapContractVersion,
 		ContractHash:    WorkspaceIdentityBootstrapContractHash,
 		InvocationID:    "invocation", WorkspaceID: "workspace", CompanyID: "company",
-		CompanyCode: "COMPANY", CompanyName: "Company", FirstStoreID: "store",
-		FirstStoreCode: "STORE", FirstStoreName: "Store", InitialAdminUserID: "user",
+		CompanyCode: "COMPANY", CompanyName: "Company", InitialAdminUserID: "user",
 		InitialAdminLoginID: "admin@example.test", InitialAdminName: "Admin", InitialAdminPassword: "domainry!123",
 	})
 	if err != nil {
@@ -56,10 +55,10 @@ func TestWorkspaceIdentityBootstrapIsNonHTTPAndCredentialNeverSerializes(t *test
 }
 
 func TestWorkspaceIdentityBootstrapContractConstantsArePinned(t *testing.T) {
-	if WorkspaceIdentityBootstrapContractVersion != "domainry-workspace-identity-bootstrap-v5" {
+	if WorkspaceIdentityBootstrapContractVersion != "domainry-workspace-identity-bootstrap-v6" {
 		t.Fatalf("version=%q", WorkspaceIdentityBootstrapContractVersion)
 	}
-	if WorkspaceIdentityBootstrapContractHash != "09d8c1814de8b9a8b0e19c65e3bba2aeb863d6bebf89b0e2f3e2c37ee22cb13c" {
+	if WorkspaceIdentityBootstrapContractHash != "3168970e8f8f9308ad8714bf5fd450c76d8bf44cbc6f2c4e5adfa9c4093ee783" {
 		t.Fatalf("hash=%q", WorkspaceIdentityBootstrapContractHash)
 	}
 	digest := sha256.Sum256([]byte(WorkspaceIdentityBootstrapContractCanonical))

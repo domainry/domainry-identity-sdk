@@ -282,15 +282,6 @@ type HandlerInitialCredential = identitymodel.HandlerInitialCredential
 type HandlerBoundIdentityRequest = identitymodel.HandlerBoundIdentityRequest
 type HandlerBoundIdentity = identitymodel.HandlerBoundIdentity
 type HandlerDelivery = identitymodel.HandlerDelivery
-type StoreOrganizationOperation = identitymodel.StoreOrganizationOperation
-type StoreOrganizationMutation = identitymodel.StoreOrganizationMutation
-type StoreOrganizationDeliveryRequest = identitymodel.StoreOrganizationDeliveryRequest
-type StoreOrganization = identitymodel.StoreOrganization
-type StoreOrganizationDeliveryResult = identitymodel.StoreOrganizationDeliveryResult
-type StoreOrganizationResolveRequest = identitymodel.StoreOrganizationResolveRequest
-type StoreOrganizationListRequest = identitymodel.StoreOrganizationListRequest
-type StoreOrganizationPage = identitymodel.StoreOrganizationPage
-type StoreOrganizationDelivery = identitymodel.StoreOrganizationDelivery
 type WorkspaceIdentityUsageRequest = identitymodel.WorkspaceIdentityUsageRequest
 type WorkspaceIdentityUsageResolveRequest = identitymodel.WorkspaceIdentityUsageResolveRequest
 type WorkspaceIdentityUsageAuthorizationRequest = identitymodel.WorkspaceIdentityUsageAuthorizationRequest
@@ -311,17 +302,6 @@ const (
 	HandlerUserDisable                           = identitymodel.HandlerUserDisable
 	HandlerLoginNone                             = identitymodel.HandlerLoginNone
 	HandlerLoginPassword                         = identitymodel.HandlerLoginPassword
-	StoreOrganizationDeliveryContractVersionV1   = identitymodel.StoreOrganizationDeliveryContractVersionV1
-	StoreOrganizationDefaultPageSize             = identitymodel.StoreOrganizationDefaultPageSize
-	StoreOrganizationMaxPageSize                 = identitymodel.StoreOrganizationMaxPageSize
-	StoreOrganizationDeliveryCreatePermission    = identitymodel.StoreOrganizationDeliveryCreatePermission
-	StoreOrganizationDeliveryRenamePermission    = identitymodel.StoreOrganizationDeliveryRenamePermission
-	StoreOrganizationDeliveryDisablePermission   = identitymodel.StoreOrganizationDeliveryDisablePermission
-	StoreOrganizationDeliveryResolvePermission   = identitymodel.StoreOrganizationDeliveryResolvePermission
-	StoreOrganizationDeliveryListPermission      = identitymodel.StoreOrganizationDeliveryListPermission
-	StoreOrganizationCreate                      = identitymodel.StoreOrganizationCreate
-	StoreOrganizationRename                      = identitymodel.StoreOrganizationRename
-	StoreOrganizationDisable                     = identitymodel.StoreOrganizationDisable
 	WorkspaceIdentityUsageContractVersionV1      = identitymodel.WorkspaceIdentityUsageContractVersionV1
 	WorkspaceIdentityUsageContractVersionV2      = identitymodel.WorkspaceIdentityUsageContractVersionV2
 	WorkspaceIdentityUsageContractVersionV3      = identitymodel.WorkspaceIdentityUsageContractVersionV3
@@ -351,20 +331,6 @@ type HandlerDeliveryUnitOfWorkBinder interface {
 
 type EmbeddedHandlerDeliveryBinding interface {
 	HandlerDeliveryUnitOfWorkBinder() HandlerDeliveryUnitOfWorkBinder
-}
-
-// StoreOrganizationDeliveryBinding is available on the deployment-neutral
-// core. Embedded Runtime integrations must use the UoW binder below.
-type StoreOrganizationDeliveryBinding interface {
-	StoreOrganizationDelivery() StoreOrganizationDelivery
-}
-
-type StoreOrganizationDeliveryUnitOfWorkBinder interface {
-	BindStoreOrganizationDeliveryUnitOfWork(EmbeddedTransaction) (StoreOrganizationDelivery, error)
-}
-
-type EmbeddedStoreOrganizationDeliveryBinding interface {
-	StoreOrganizationDeliveryUnitOfWorkBinder() StoreOrganizationDeliveryUnitOfWorkBinder
 }
 
 // WorkspaceIdentityUsageUnitOfWorkBinder is the only public discovery surface
@@ -580,7 +546,6 @@ const (
 	WorkspaceProvisionFailureAfterRoleAssignment    = modulehost.WorkspaceProvisionFailureAfterRoleAssignment
 	WorkspaceProvisionFailureAfterCredential        = modulehost.WorkspaceProvisionFailureAfterCredential
 	WorkspaceProvisionFailureAfterCompany           = modulehost.WorkspaceProvisionFailureAfterCompany
-	WorkspaceProvisionFailureAfterFirstStore        = modulehost.WorkspaceProvisionFailureAfterFirstStore
 	WorkspaceProvisionFailureAfterBootstrapReceipt  = modulehost.WorkspaceProvisionFailureAfterBootstrapReceipt
 	WorkspaceIdentityBootstrapContractVersion       = modulehost.WorkspaceIdentityBootstrapContractVersion
 	WorkspaceIdentityBootstrapContractCanonical     = modulehost.WorkspaceIdentityBootstrapContractCanonical

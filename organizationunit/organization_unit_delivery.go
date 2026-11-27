@@ -1,11 +1,13 @@
 // Package organizationunit defines the narrow, transaction-bound contract
-// used by generated Runtime handlers to create and resolve Identity-owned
-// organization units. It is intentionally separate from generic management
-// CRUD: callers cannot move, rename, disable, or otherwise rewrite the tree.
+// used by generated Runtime handlers to create, resolve, list, rename, and
+// disable Identity-owned organization units. It is intentionally separate
+// from generic management CRUD: callers cannot move nodes or rewrite
+// Identity-owned hierarchy facts.
 package organizationunit
 
 import (
 	"context"
+	"strings"
 
 	identitysdk "github.com/domainry/domainry-identity-sdk"
 )
@@ -14,45 +16,44 @@ const DeliveryContractVersionV1 = "domainry-identity-organization-unit-delivery-
 
 const (
 	DeliveryCreatePermission  = "identity.organization_unit_delivery.create"
+	DeliveryRenamePermission  = "identity.organization_unit_delivery.rename"
+	DeliveryDisablePermission = "identity.organization_unit_delivery.disable"
 	DeliveryResolvePermission = "identity.organization_unit_delivery.resolve"
+	DeliveryListPermission    = "identity.organization_unit_delivery.list"
+)
+
+const (
+	DefaultPageSize = 50
+	MaxPageSize     = 100
 )
 
 type NodeType string
 
-const (
-	NodeTypeCompany    NodeType = "company"
-	NodeTypeRegion     NodeType = "region"
-	NodeTypeStore      NodeType = "store"
-	NodeTypeDepartment NodeType = "department"
-	NodeTypeTeam       NodeType = "team"
-	NodeTypeWarehouse  NodeType = "warehouse"
-)
+const NodeTypeCompany NodeType = "company"
 
 func (value NodeType) Valid() bool {
-	switch value {
-	case NodeTypeCompany, NodeTypeRegion, NodeTypeStore, NodeTypeDepartment, NodeTypeTeam, NodeTypeWarehouse:
-		return true
-	default:
+	raw := string(value)
+	if raw == "" || len(raw) > 64 || raw != strings.TrimSpace(raw) || raw[0] < 'a' || raw[0] > 'z' {
 		return false
 	}
+	for _, char := range raw[1:] {
+		if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '_' {
+			return false
+		}
+	}
+	return raw[len(raw)-1] != '_'
 }
 
 // ValidDeliveryChild reports whether V1 may create the type through the
-// generic delivery capability. Company remains root-only and store retains its
-// purpose-specific StoreOrganizationDelivery lifecycle and quota policy.
+// generic delivery capability. Company remains host-owned and root-only; all
+// non-root node types use the same lifecycle contract.
 func (value NodeType) ValidDeliveryChild() bool {
-	switch value {
-	case NodeTypeRegion, NodeTypeDepartment, NodeTypeTeam, NodeTypeWarehouse:
-		return true
-	default:
-		return false
-	}
+	return value.Valid() && value != NodeTypeCompany
 }
 
 // CreateCandidate deliberately accepts only create-time facts. Identity owns
 // status, path, ancestors, and depth. A parent is mandatory, so company (the
-// root node type) is not accepted by V1; store also remains exclusively owned
-// by StoreOrganizationDelivery.
+// root node type) is not accepted by V1.
 type CreateCandidate struct {
 	OrganizationID       string   `json:"organization_id"`
 	Code                 string   `json:"code"`
@@ -94,6 +95,35 @@ type DeliveryResult struct {
 	Replayed     bool                      `json:"replayed"`
 }
 
+type MutationOperation string
+
+const (
+	MutationRename  MutationOperation = "rename"
+	MutationDisable MutationOperation = "disable"
+)
+
+func (value MutationOperation) Valid() bool {
+	return value == MutationRename || value == MutationDisable
+}
+
+// MutationCandidate identifies an existing node and the exact lifecycle
+// transition requested by source-owned code. Identity preserves node type,
+// code, parent and hierarchy; only rename changes Name.
+type MutationCandidate struct {
+	Operation       MutationOperation `json:"operation"`
+	OrganizationID  string            `json:"organization_id"`
+	NodeType        NodeType          `json:"node_type"`
+	Name            string            `json:"name,omitempty"`
+	ExpectedVersion int64             `json:"expected_version"`
+}
+
+type MutationRequest struct {
+	ContractVersion string            `json:"contract_version"`
+	AccessToken     string            `json:"-"`
+	IdempotencyKey  string            `json:"idempotency_key"`
+	Organization    MutationCandidate `json:"organization"`
+}
+
 // ResolveRequest requires the expected type. Identity resolves and authorizes
 // against the node's persisted active parent; callers neither discover nor
 // supply a potentially forged parent ID.
@@ -104,9 +134,24 @@ type ResolveRequest struct {
 	NodeType        NodeType `json:"node_type"`
 }
 
+type ListRequest struct {
+	ContractVersion string   `json:"contract_version"`
+	AccessToken     string   `json:"-"`
+	NodeType        NodeType `json:"node_type"`
+	PageSize        int      `json:"page_size,omitempty"`
+	Cursor          string   `json:"cursor,omitempty"`
+}
+
+type Page struct {
+	Items      []DeliveredOrganizationUnit `json:"items"`
+	NextCursor string                      `json:"next_cursor,omitempty"`
+}
+
 type Delivery interface {
 	CreateOrganizationUnit(context.Context, DeliveryRequest) (DeliveryResult, error)
+	MutateOrganizationUnit(context.Context, MutationRequest) (DeliveryResult, error)
 	ResolveOrganizationUnit(context.Context, ResolveRequest) (DeliveredOrganizationUnit, error)
+	ListOrganizationUnits(context.Context, ListRequest) (Page, error)
 }
 
 type UnitOfWorkBinder interface {

@@ -32,7 +32,6 @@ const (
 	WorkspaceProvisionFailureAfterRoleAssignment   = "after_role_assignment"
 	WorkspaceProvisionFailureAfterCredential       = "after_credential"
 	WorkspaceProvisionFailureAfterCompany          = "after_company"
-	WorkspaceProvisionFailureAfterFirstStore       = "after_first_store"
 	WorkspaceProvisionFailureAfterBootstrapReceipt = "after_bootstrap_receipt"
 )
 
@@ -59,9 +58,10 @@ type WorkspaceIdentityProvisionRequest struct {
 // only on the embedded bootstrap boundary used by a host-owned verification
 // child process. Credentials can never enter a public or serialized request.
 type WorkspaceAcceptanceOrganization struct {
-	ID   string `json:"id"`
-	Code string `json:"code"`
-	Name string `json:"name"`
+	ID       string `json:"id"`
+	Code     string `json:"code"`
+	Name     string `json:"name"`
+	NodeType string `json:"node_type"`
 }
 
 type WorkspaceAcceptanceActor struct {
@@ -116,9 +116,9 @@ type WorkspaceAcceptanceFixtureProvisionerBinding interface {
 }
 
 const (
-	WorkspaceIdentityBootstrapContractVersion   = "domainry-workspace-identity-bootstrap-v5"
-	WorkspaceIdentityBootstrapContractCanonical = "domainry-workspace-identity-bootstrap-v5|request:invocation_id,workspace_id,company_id,company_code,company_name,first_store_id,first_store_code,first_store_name,initial_admin_user_id,initial_admin_login_id,initial_admin_name,initial_admin_password|roles:trusted_bound_catalog(audience=any_or_user_or_business_profile,assignment_mode=manual_or_request_only),role_catalog_sha256|assignment:initial_admin=trusted_explicit_manual_any_or_user_role@company|result:receipt_with_role_policy_evidence|completion:committed,rolled_back|credential:trusted_request_password_post_commit_one_time_nonpersistent"
-	WorkspaceIdentityBootstrapContractHash      = "09d8c1814de8b9a8b0e19c65e3bba2aeb863d6bebf89b0e2f3e2c37ee22cb13c"
+	WorkspaceIdentityBootstrapContractVersion   = "domainry-workspace-identity-bootstrap-v6"
+	WorkspaceIdentityBootstrapContractCanonical = "domainry-workspace-identity-bootstrap-v6|request:invocation_id,workspace_id,company_id,company_code,company_name,initial_admin_user_id,initial_admin_login_id,initial_admin_name,initial_admin_password|roles:trusted_bound_catalog(audience=any_or_user_or_business_profile,assignment_mode=manual_or_request_only),role_catalog_sha256|assignment:initial_admin=trusted_explicit_manual_any_or_user_role@company|result:receipt_with_role_policy_evidence|completion:committed,rolled_back|credential:trusted_request_password_post_commit_one_time_nonpersistent"
+	WorkspaceIdentityBootstrapContractHash      = "3168970e8f8f9308ad8714bf5fd450c76d8bf44cbc6f2c4e5adfa9c4093ee783"
 )
 
 // WorkspaceIdentityBootstrapRequest is a trusted, in-process-only graph
@@ -134,9 +134,6 @@ type WorkspaceIdentityBootstrapRequest struct {
 	CompanyID            string `json:"-"`
 	CompanyCode          string `json:"-"`
 	CompanyName          string `json:"-"`
-	FirstStoreID         string `json:"-"`
-	FirstStoreCode       string `json:"-"`
-	FirstStoreName       string `json:"-"`
 	InitialAdminUserID   string `json:"-"`
 	InitialAdminLoginID  string `json:"-"`
 	InitialAdminName     string `json:"-"`
@@ -152,7 +149,6 @@ type WorkspaceIdentityBootstrapReceipt struct {
 	InvocationID                         string `json:"invocation_id"`
 	WorkspaceID                          string `json:"workspace_id"`
 	CompanyID                            string `json:"company_id"`
-	FirstStoreID                         string `json:"first_store_id"`
 	InitialAdminUserID                   string `json:"initial_admin_user_id"`
 	InitialAdminLoginID                  string `json:"initial_admin_login_id"`
 	RoleCatalogSHA256                    string `json:"role_catalog_sha256"`

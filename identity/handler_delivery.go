@@ -2,11 +2,13 @@ package identity
 
 import "context"
 
-// HandlerDeliveryContractVersionV1 is the stable contract consumed by
-// generated Runtime business handlers. Requests deliberately carry no
-// workspace, actor user, or actor role: the provider derives all authority
-// from AccessToken and its application-scoped Binding.
-const HandlerDeliveryContractVersionV1 = "domainry-identity-handler-delivery-v1"
+// HandlerDeliveryContractVersionV2 is the stable contract consumed by Runtime
+// business handlers. A human invocation supplies AccessToken. A governed
+// background invocation instead supplies WorkloadAuthority so Identity can
+// re-resolve the active workload release at the delivery boundary.
+const HandlerDeliveryContractVersionV2 = "domainry-identity-handler-delivery-v2"
+
+const CurrentHandlerDeliveryContractVersion = HandlerDeliveryContractVersionV2
 
 // These purpose-specific grants authorize only the composed HandlerDelivery
 // use cases. They are not aliases for Identity's public user, role-assignment,
@@ -66,16 +68,40 @@ type HandlerProfileBindingMutation struct {
 	EmbeddedProfileRecord map[string]any `json:"-"`
 }
 
+// HandlerWorkloadAuthority is the non-secret proof carried by a governed
+// background invocation. It is not a resolved Principal: Identity must compare
+// every field with its current application-scoped workload binding before it
+// authorizes delivery. WorkspaceID is included because a module installation
+// may serve more than one host-authorized workspace.
+//
+// The value is intentionally excluded from JSON together with AccessToken.
+// HandlerDelivery is an infrastructure-only in-process capability; authority
+// must not be copied into handler payloads, receipts, or domain records.
+type HandlerWorkloadAuthority struct {
+	WorkspaceID         WorkspaceID
+	SubjectID           SubjectID
+	RoleKey             string
+	WorkflowKey         string
+	DefinitionVersionID string
+	DefinitionVersion   int
+	ReleaseID           string
+	ReleaseDigest       string
+	TaskID              string
+	SourceEventID       string
+	InitiatorSubjectID  SubjectID
+}
+
 // HandlerDeliveryRequest atomically delivers an Identity user, the exact set
 // of manual roles, and an optional one-to-one profile binding. AccessToken is
 // injected by the trusted Runtime invocation boundary and is never serialized.
 type HandlerDeliveryRequest struct {
-	ContractVersion string                         `json:"contract_version"`
-	AccessToken     string                         `json:"-"`
-	IdempotencyKey  string                         `json:"idempotency_key"`
-	User            HandlerUserMutation            `json:"user"`
-	RoleKeys        []string                       `json:"role_keys"`
-	ProfileBinding  *HandlerProfileBindingMutation `json:"profile_binding,omitempty"`
+	ContractVersion   string                         `json:"contract_version"`
+	AccessToken       string                         `json:"-"`
+	WorkloadAuthority *HandlerWorkloadAuthority      `json:"-"`
+	IdempotencyKey    string                         `json:"idempotency_key"`
+	User              HandlerUserMutation            `json:"user"`
+	RoleKeys          []string                       `json:"role_keys"`
+	ProfileBinding    *HandlerProfileBindingMutation `json:"profile_binding,omitempty"`
 }
 
 type HandlerProfileBinding struct {
@@ -122,10 +148,11 @@ type HandlerInitialCredential struct {
 // profile. Identity derives workspace, actor, role, and hierarchy from the
 // bearer and returns the profile binding only after exact-user verification.
 type HandlerBoundIdentityRequest struct {
-	ContractVersion string                         `json:"contract_version"`
-	AccessToken     string                         `json:"-"`
-	UserID          string                         `json:"user_id"`
-	ProfileBinding  *HandlerProfileBindingSelector `json:"profile_binding,omitempty"`
+	ContractVersion   string                         `json:"contract_version"`
+	AccessToken       string                         `json:"-"`
+	WorkloadAuthority *HandlerWorkloadAuthority      `json:"-"`
+	UserID            string                         `json:"user_id"`
+	ProfileBinding    *HandlerProfileBindingSelector `json:"profile_binding,omitempty"`
 }
 
 // HandlerBoundIdentity is the minimal canonical projection business handlers

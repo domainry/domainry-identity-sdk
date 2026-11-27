@@ -274,6 +274,7 @@ type HandlerUserOperation = identitymodel.HandlerUserOperation
 type HandlerLoginMode = identitymodel.HandlerLoginMode
 type HandlerUserMutation = identitymodel.HandlerUserMutation
 type HandlerProfileBindingMutation = identitymodel.HandlerProfileBindingMutation
+type HandlerWorkloadAuthority = identitymodel.HandlerWorkloadAuthority
 type HandlerDeliveryRequest = identitymodel.HandlerDeliveryRequest
 type HandlerProfileBinding = identitymodel.HandlerProfileBinding
 type HandlerProfileBindingSelector = identitymodel.HandlerProfileBindingSelector
@@ -292,7 +293,8 @@ type WorkspaceIdentityUsagePage = identitymodel.WorkspaceIdentityUsagePage
 type WorkspaceIdentityUsageAggregate = identitymodel.WorkspaceIdentityUsageAggregate
 
 const (
-	HandlerDeliveryContractVersionV1             = identitymodel.HandlerDeliveryContractVersionV1
+	HandlerDeliveryContractVersionV2             = identitymodel.HandlerDeliveryContractVersionV2
+	CurrentHandlerDeliveryContractVersion        = identitymodel.CurrentHandlerDeliveryContractVersion
 	HandlerDeliveryCreatePermission              = identitymodel.HandlerDeliveryCreatePermission
 	HandlerDeliveryUpdatePermission              = identitymodel.HandlerDeliveryUpdatePermission
 	HandlerDeliveryDisablePermission             = identitymodel.HandlerDeliveryDisablePermission
